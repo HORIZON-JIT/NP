@@ -1002,10 +1002,9 @@ function cacheInvalidate(date) {
   // localStorageキャッシュ：当該日 + 当該月期のみ削除（他月は保持）
   lsCacheDelete(`daily_${date}`);
   lsCacheDelete(rangeKey);
-  // 入力モードキャッシュも削除
-  for (const k of Object.keys(localStorage)) {
-    if (k.startsWith(CACHE_PREFIX + `input_${date}_`)) localStorage.removeItem(k);
-  }
+  // 入力モードキャッシュも削除（既知のキーパターンで直接削除）
+  const author = getAuthor();
+  if (author) localStorage.removeItem(CACHE_PREFIX + `input_${date}_${author}`);
 }
 
 // ═══════════════════════════════════════════
@@ -1338,6 +1337,57 @@ async function gasJsonpRetry(url, params, retries=1) {
   }
 }
 
+// ── 書き込み専用GAS通信（POST成功で即return、GETへフォールスルーしない）──
+async function gasJsonpWrite(url, params, timeoutMs = 10000) {
+  // ① POST no-cors — opaqueでもデータ送信成功なので即return
+  try {
+    await Promise.race([
+      fetch(url, {
+        method: 'POST', credentials: 'include', mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(params),
+      }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeoutMs))
+    ]);
+    return { ok: true, source: 'post' };
+  } catch (e) { console.warn('gasJsonpWrite POST失敗、GETへ:', e.message); }
+
+  // ② GET fetch — POST失敗時のみ
+  try {
+    const qs = new URLSearchParams(params).toString();
+    const res = await Promise.race([
+      fetch(url + '?' + qs, {
+        method: 'GET', redirect: 'follow', credentials: 'include',
+      }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeoutMs))
+    ]);
+    const text = await res.text();
+    if (text && !text.trim().startsWith('<!')) {
+      const clean = text.trim().replace(/^[^(]+\(/, '').replace(/\)\s*;?\s*$/, '');
+      return JSON.parse(clean);
+    }
+    return { ok: true, source: 'get-html' };
+  } catch (e) { console.warn('gasJsonpWrite GET失敗、JSONPへ:', e.message); }
+
+  // ③ JSONP — 最終手段
+  const qs2 = new URLSearchParams(params).toString();
+  return new Promise((resolve, reject) => {
+    const cb    = '_g_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const el    = document.createElement('script');
+    const timer = setTimeout(() => {
+      delete window[cb]; el.remove();
+      reject(new Error('タイムアウト（JSONP書き込み）'));
+    }, timeoutMs);
+    window[cb] = d => { clearTimeout(timer); delete window[cb]; el.remove(); resolve(d); };
+    el.onerror = () => {
+      clearTimeout(timer); delete window[cb]; el.remove();
+      reject(new Error('接続エラー（GASへ到達できません）'));
+    };
+    el.src = url + '?' + qs2 + '&callback=' + cb;
+    document.head.appendChild(el);
+  });
+}
+
 // ═══════════════════════════════════════════
 //  STORAGE（キャッシュ付き）
 //  ★v2: localStorageに永続キャッシュ化
@@ -1472,14 +1522,14 @@ async function saveDay(date, author, rows) {
     if(r.hoursNormal>0) entries.push({cdMain:s.mainCd,main:s.mainLabel,cdSub:r.cdSub,sub:s.label,hours:r.hoursNormal,kubun:'通常'});
     if(r.hoursOT>0)     entries.push({cdMain:s.mainCd,main:s.mainLabel,cdSub:r.cdSub,sub:s.label,hours:r.hoursOT,     kubun:'残業'});
   });
-  await gasJsonp(url,{action:'saveDay',date,author,entries:JSON.stringify(entries)});
+  await gasJsonpWrite(url,{action:'saveDay',date,author,entries:JSON.stringify(entries)});
 }
 
 async function saveLeaveTime(date, author, leaveTime) {
   const url=getGasUrl();
   if (!url) { localStorage.setItem(`leave_${date}_${author}`, leaveTime||''); return; }
-  const d=await gasJsonpRetry(url,{action:'saveLeaveTime',date,author,leaveTime:leaveTime||''});
-  if (!d.ok) throw new Error(d.error||'退勤時刻保存失敗');
+  const d=await gasJsonpWrite(url,{action:'saveLeaveTime',date,author,leaveTime:leaveTime||''});
+  if (d && !d.ok && d.error) throw new Error(d.error||'退勤時刻保存失敗');
 }
 
 // "HH:MM" → {normal, ot} を返す
@@ -2219,10 +2269,13 @@ async function submitDay() {
   const leaveTime=(document.getElementById('input-leave')?.value)||'';
   setLoading(true);
   try {
-    // saveDay・saveLeaveTime を並列実行（直列→並列で通信を1往復分に短縮）
-    await Promise.all([
-      saveDay(currentDate, author, rows),
-      saveLeaveTime(currentDate, author, leaveTime),
+    // saveDay・saveLeaveTime を並列実行 + 全体20秒タイムアウト
+    await Promise.race([
+      Promise.all([
+        saveDay(currentDate, author, rows),
+        saveLeaveTime(currentDate, author, leaveTime),
+      ]),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('保存がタイムアウトしました（20秒）')), 20000))
     ]);
     cacheInvalidate(currentDate); // キャッシュクリア
     const msg=document.getElementById('save-msg');
