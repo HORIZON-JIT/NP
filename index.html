@@ -179,6 +179,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .test-res{font-size:12px;margin-top:5px;padding:5px 9px;border-radius:6px;display:none;font-weight:600;}
 .test-res.ok{background:#ecfdf5;color:var(--success);display:block;border:1px solid #6ee7b7;}
 .test-res.ng{background:#fff1f2;color:var(--danger);display:block;border:1px solid #fda4af;}
+.test-res.auth{background:#fef9c3;color:#92400e;display:block;border:1px solid #fde68a;line-height:1.6;font-weight:500;}
+.test-res .auth-actions{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;}
+.test-res .auth-actions button{font-size:11px;padding:5px 12px;border-radius:6px;font-weight:700;cursor:pointer;font-family:inherit;border:none;}
+.test-res .btn-auth-open{background:#f59e0b;color:#fff;}
+.test-res .btn-auth-retry{background:var(--primary);color:#fff;}
 .ibox{background:var(--g50);border:1px solid var(--g200);border-radius:8px;padding:9px 11px;font-size:11px;color:var(--g600);line-height:1.7;margin-top:7px;}
 .modal-btns{display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px;}
 
@@ -1229,17 +1234,80 @@ async function clearGas() {
   localStorage.removeItem('gas_url');
   updateModeUI(); closeModal('settings-modal'); await loadDay_and_render();
 }
+// ── 接続テスト（高速版: POST スキップ、8秒タイムアウト、認証失敗検出）──
+let _testConnUrl = '';
 async function testConn() {
   const url = document.getElementById('s-gasurl').value.trim() || GAS_URL_DEFAULT;
+  _testConnUrl = url;
   const el  = document.getElementById('test-res');
-  el.className = 'test-res'; el.textContent = '🔄 接続中...'; el.style.display = 'block';
+  el.className = 'test-res'; el.style.display = 'block';
+
+  // ── Stage 2: GET fetch（POST no-cors はテストでは常にopaqueで無意味なのでスキップ）──
+  el.textContent = '🔄 GET接続を試行中...';
+  let authIssue = false;
   try {
-    const d = await gasJsonp(url, { action: 'test' });
-    el.textContent = d.ok ? `✅ 接続成功！ ${d.message||''}` : `❌ ${d.error||'不明'}`;
-    el.className   = d.ok ? 'test-res ok' : 'test-res ng';
-  } catch(e) {
-    el.textContent = `❌ ${e.message}`;
-    el.className   = 'test-res ng';
+    const qs  = new URLSearchParams({ action: 'test' }).toString();
+    const res = await Promise.race([
+      fetch(url + '?' + qs, { method: 'GET', redirect: 'follow', credentials: 'include' }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))
+    ]);
+    const text = await res.text();
+    if (text && !text.trim().startsWith('<!')) {
+      const clean = text.trim().replace(/^[^(]+\(/, '').replace(/\)\s*;?\s*$/, '');
+      const d = JSON.parse(clean);
+      el.textContent = d.ok ? `✅ 接続成功！ ${d.message||''}` : `❌ ${d.error||'不明'}`;
+      el.className   = d.ok ? 'test-res ok' : 'test-res ng';
+      return;
+    }
+    // HTMLが返った = ログインページへのリダイレクト → 認証失敗
+    authIssue = true;
+  } catch(_) {}
+
+  // ── Stage 3: JSONP（認証失敗が確定していなければ試行）──
+  if (!authIssue) {
+    el.textContent = '🔄 JSONP接続を試行中...';
+    try {
+      const d = await new Promise((resolve, reject) => {
+        const cb = '_g_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+        const sc = document.createElement('script');
+        const timer = setTimeout(() => { delete window[cb]; sc.remove(); reject(new Error('timeout')); }, 8000);
+        window[cb] = d => { clearTimeout(timer); delete window[cb]; sc.remove(); resolve(d); };
+        sc.onerror = () => { clearTimeout(timer); delete window[cb]; sc.remove(); reject(new Error('script-error')); };
+        sc.src = url + '?action=test&callback=' + cb;
+        document.head.appendChild(sc);
+      });
+      el.textContent = d.ok ? `✅ 接続成功！ ${d.message||''}` : `❌ ${d.error||'不明'}`;
+      el.className   = d.ok ? 'test-res ok' : 'test-res ng';
+      return;
+    } catch(_) {}
+  }
+
+  // ── 全段階失敗: 認証ガイダンスまたはエラー表示 ──
+  _showAuthGuidance(el, authIssue);
+}
+
+function _showAuthGuidance(el, authIssue) {
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (authIssue || isMobile) {
+    el.className = 'test-res auth';
+    el.innerHTML =
+      '<strong>⚠ Google Workspaceへの認証が必要です</strong><br>' +
+      '<span style="font-size:11px;">スマートフォンではサードパーティCookieの制限により、' +
+      'GAS URLを直接開いてログインする必要があります。</span>' +
+      '<div class="auth-actions">' +
+        '<button class="btn-auth-open" onclick="window.open(_testConnUrl+\'?action=test\',\'_blank\')">GAS URLを開いてログイン</button>' +
+        '<button class="btn-auth-retry" onclick="testConn()">再テスト</button>' +
+      '</div>' +
+      '<div style="font-size:11px;color:#92400e;margin-top:6px;">ログイン完了後「再テスト」を押してください</div>';
+  } else {
+    el.className = 'test-res ng';
+    el.innerHTML =
+      '❌ 接続できませんでした<br>' +
+      '<span style="font-size:11px;">GAS URLが正しいか確認してください。' +
+      'horizon.co.jpのGoogle Workspaceにログイン済みである必要があります。</span>' +
+      '<div class="auth-actions">' +
+        '<button class="btn-auth-retry" onclick="testConn()">再テスト</button>' +
+      '</div>';
   }
 }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
