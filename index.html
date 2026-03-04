@@ -1268,7 +1268,7 @@ async function testConn() {
     if (text && !text.trim().startsWith('<!')) {
       const clean = text.trim().replace(/^[^(]+\(/, '').replace(/\)\s*;?\s*$/, '');
       const d = JSON.parse(clean);
-      el.textContent = d.ok ? `✅ 接続成功！ ${d.message||''}` : `❌ ${d.error||'不明'}`;
+      el.textContent = d.ok ? '✅ 接続成功！' : `❌ ${d.error||'不明'}`;
       el.className   = d.ok ? 'test-res ok' : 'test-res ng';
       return;
     }
@@ -1289,7 +1289,7 @@ async function testConn() {
         sc.src = url + '?action=test&callback=' + cb;
         document.head.appendChild(sc);
       });
-      el.textContent = d.ok ? `✅ 接続成功！ ${d.message||''}` : `❌ ${d.error||'不明'}`;
+      el.textContent = d.ok ? '✅ 接続成功！' : `❌ ${d.error||'不明'}`;
       el.className   = d.ok ? 'test-res ok' : 'test-res ng';
       return;
     } catch(_) {}
