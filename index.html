@@ -255,17 +255,19 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   /* ── コンテナ ── */
   .container{padding:10px 10px;}
 
-  /* ── 入力テーブル：CD列を非表示・文字を詰める ── */
+  /* ── 入力テーブル：CD列を非表示・大分類圧縮・時間列を詰める ── */
   table.entry-tbl{font-size:12px;}
-  table.entry-tbl thead th{padding:6px 5px;font-size:11px;}
+  table.entry-tbl thead th{padding:5px 3px;font-size:10px;white-space:normal;line-height:1.2;}
   table.entry-tbl th.th-cd{display:none;}
   table.entry-tbl td.td-cd{display:none;}
-  table.entry-tbl th.th-main{width:62px;}
-  table.entry-tbl th.th-hours{width:82px;}
-  table.entry-tbl td{padding:4px 5px;}
-  .td-main .main-cd{font-size:13px;}
-  .td-main .main-lbl{font-size:9px;}
-  .hours-wrap input{width:52px;font-size:12px;padding:3px;}
+  table.entry-tbl th.th-main{width:36px;padding:5px 2px;}
+  table.entry-tbl th.th-hours{width:58px;padding:5px 2px;}
+  table.entry-tbl td{padding:4px 3px;}
+  .td-main{padding:3px 2px!important;}
+  .td-main .main-cd{font-size:13px;line-height:1.1;}
+  .td-main .main-lbl{display:none;}
+  .hours-wrap{gap:2px;}
+  .hours-wrap input{width:44px;font-size:12px;padding:3px 1px;border-radius:5px;}
 
   /* ── 入力カードヘッダー ── */
   .submit-header{padding:8px 10px;flex-wrap:wrap;gap:4px;}
@@ -333,6 +335,17 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   .person-grid{grid-template-columns:1fr;}
   .tab{font-size:11px;padding:8px 9px;}
   .btn-submit{font-size:12px;padding:7px 16px;}
+  .container{padding:10px 6px;}
+  table.entry-tbl{font-size:11px;}
+  table.entry-tbl thead th{font-size:9px;}
+  table.entry-tbl th.th-main{width:28px;}
+  table.entry-tbl th.th-hours{width:48px;}
+  table.entry-tbl td{padding:3px 2px;}
+  .hours-wrap input{width:36px;font-size:11px;padding:2px 0;}
+  .td-main .main-cd{font-size:11px;}
+  tfoot td{padding:6px 4px;font-size:12px;}
+  tfoot .ft-total{font-size:14px;}
+  tfoot .ft-label{font-size:11px;}
 }
 .btn-pdf{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border:none;border-radius:7px;padding:5px 13px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:700;transition:all .15s;display:flex;align-items:center;gap:5px;box-shadow:0 2px 6px rgba(220,38,38,.3);}
 .btn-pdf:hover{background:linear-gradient(135deg,#b91c1c,#991b1b);transform:translateY(-1px);box-shadow:0 4px 10px rgba(220,38,38,.4);}
