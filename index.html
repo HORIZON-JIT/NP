@@ -2329,7 +2329,9 @@ async function loadDay_and_render() {
   } finally { setLoading(false); }
 }
 
+let _submitRunning = false;
 async function submitDay() {
+  if (_submitRunning) return;          // ★ 二重実行防止
   const author=getAuthor();
   if (!author){ alert('設定から担当者名を入力してください'); openSettings(); return; }
   const rows=[];
@@ -2339,14 +2341,18 @@ async function submitDay() {
     if(h>0||ot>0) rows.push({cdSub:cd,hoursNormal:h,hoursOT:ot});
   }
   const leaveTime=(document.getElementById('input-leave')?.value)||'';
+  _submitRunning = true;
+  const btn = document.querySelector('.btn-submit');
+  if (btn) btn.disabled = true;
   setLoading(true);
   try {
-    // saveDay・saveLeaveTime を並列実行 + 全体20秒タイムアウト
+    // ★ saveDay → saveLeaveTime を直列実行（GASは同一ユーザーの同時実行を制限するため）
+    // 並列だと片方がキュー待ちになりタイムアウトの原因になっていた
     await Promise.race([
-      Promise.all([
-        saveDay(currentDate, author, rows),
-        saveLeaveTime(currentDate, author, leaveTime),
-      ]),
+      (async () => {
+        await saveDay(currentDate, author, rows);
+        await saveLeaveTime(currentDate, author, leaveTime);
+      })(),
       new Promise((_, rej) => setTimeout(() => rej(new Error('保存がタイムアウトしました（20秒）')), 20000))
     ]);
     cacheInvalidate(currentDate); // キャッシュクリア
@@ -2359,7 +2365,11 @@ async function submitDay() {
   } catch(e) {
     const msg=document.getElementById('save-msg');
     msg.textContent=`❌ 保存失敗: ${e.message}`; msg.className='err'; msg.style.display='inline-block';
-  } finally { setLoading(false); }
+  } finally {
+    setLoading(false);
+    _submitRunning = false;
+    if (btn) btn.disabled = false;
+  }
 }
 
 // 現在時刻を退勤時刻に入力する
