@@ -1405,25 +1405,36 @@ async function gasJsonpRetry(url, params, retries=1) {
   }
 }
 
-// ── 書き込み専用GAS通信（POST成功で即return、GETへフォールスルーしない）──
+// ── 書き込み専用GAS通信（Fire-and-Forget方式）──
+// GASはPOST body受信時点でデータ保存済み。302リダイレクト先のレスポンスを
+// 待つとスマホで数秒〜10秒以上かかるため、送信だけして即returnする。
 async function gasJsonpWrite(url, params, timeoutMs = 10000) {
-  // ① POST no-cors + redirect:manual
-  //    GASは302リダイレクトを返すが、データはPOST body受信時点で保存済み。
-  //    redirect:'manual' でリダイレクト先を追わず302受信時点で即resolve。
-  try {
-    await Promise.race([
-      fetch(url, {
-        method: 'POST', credentials: 'include', mode: 'no-cors',
-        redirect: 'manual',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(params),
-      }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
-    ]);
-    return { ok: true, source: 'post' };
-  } catch (e) { console.warn('gasJsonpWrite POST失敗、JSONPへ:', e.message); }
+  const body = JSON.stringify(params);
 
-  // ② JSONP — POST失敗時のフォールバック（GETは同じリダイレクト問題があるので省略）
+  // ① sendBeacon（最も確実なfire-and-forget。ブラウザが送信をキュー管理）
+  try {
+    if (navigator.sendBeacon) {
+      const blob = new Blob([body], { type: 'text/plain' });
+      if (navigator.sendBeacon(url, blob)) {
+        return { ok: true, source: 'beacon' };
+      }
+    }
+  } catch (e) { console.warn('sendBeacon失敗:', e.message); }
+
+  // ② fetch発火→300ms後abort（リクエストは送信されるがレスポンスは待たない）
+  try {
+    const ctrl = new AbortController();
+    fetch(url, {
+      method: 'POST', credentials: 'include', mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body, signal: ctrl.signal,
+    }).catch(() => {});
+    await new Promise(r => setTimeout(r, 300));
+    ctrl.abort();
+    return { ok: true, source: 'post' };
+  } catch (e) { console.warn('gasJsonpWrite POST失敗:', e.message); }
+
+  // ③ JSONP — 上記すべて失敗時のフォールバック
   const qs = new URLSearchParams(params).toString();
   return new Promise((resolve, reject) => {
     const cb    = '_g_' + Date.now() + '_' + Math.random().toString(36).slice(2);
