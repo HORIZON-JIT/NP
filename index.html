@@ -179,6 +179,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .test-res{font-size:12px;margin-top:5px;padding:5px 9px;border-radius:6px;display:none;font-weight:600;}
 .test-res.ok{background:#ecfdf5;color:var(--success);display:block;border:1px solid #6ee7b7;}
 .test-res.ng{background:#fff1f2;color:var(--danger);display:block;border:1px solid #fda4af;}
+.test-res.auth{background:#fef9c3;color:#92400e;display:block;border:1px solid #fde68a;line-height:1.6;font-weight:500;}
+.test-res .auth-actions{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;}
+.test-res .auth-actions button{font-size:11px;padding:5px 12px;border-radius:6px;font-weight:700;cursor:pointer;font-family:inherit;border:none;}
+.test-res .btn-auth-open{background:#f59e0b;color:#fff;}
+.test-res .btn-auth-retry{background:var(--primary);color:#fff;}
 .ibox{background:var(--g50);border:1px solid var(--g200);border-radius:8px;padding:9px 11px;font-size:11px;color:var(--g600);line-height:1.7;margin-top:7px;}
 .modal-btns{display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px;}
 
@@ -549,7 +554,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <div class="leave-row no-print">
         <label class="leave-label" for="input-leave">🕐 退勤時刻</label>
         <input type="time" id="input-leave" class="leave-input" placeholder="--:--" step="60"
-               oninput="onLeaveChange()" />
+               oninput="onLeaveChangeDebounced()" />
         <button class="btn-stamp no-print" onclick="stampNow()" title="現在時刻を入力">⏱ 現在時刻を反映</button>
         <span id="leave-ot-preview" class="leave-ot-preview"></span>
       </div>
@@ -929,6 +934,17 @@ let _ALL_SUBS = [];
 let _INP_CACHE = {};
 rebuildSubMap();
 
+// ── パフォーマンス: updateTotals を RAF でコアレス ──
+let _updateTotalsRAF = 0;
+function scheduleUpdateTotals() {
+  if (!_updateTotalsRAF) {
+    _updateTotalsRAF = requestAnimationFrame(() => {
+      _updateTotalsRAF = 0;
+      updateTotals();
+    });
+  }
+}
+
 // ── 項目管理 UI ──
 
 
@@ -991,10 +1007,9 @@ function cacheInvalidate(date) {
   // localStorageキャッシュ：当該日 + 当該月期のみ削除（他月は保持）
   lsCacheDelete(`daily_${date}`);
   lsCacheDelete(rangeKey);
-  // 入力モードキャッシュも削除
-  for (const k of Object.keys(localStorage)) {
-    if (k.startsWith(CACHE_PREFIX + `input_${date}_`)) localStorage.removeItem(k);
-  }
+  // 入力モードキャッシュも削除（既知のキーパターンで直接削除）
+  const author = getAuthor();
+  if (author) localStorage.removeItem(CACHE_PREFIX + `input_${date}_${author}`);
 }
 
 // ═══════════════════════════════════════════
@@ -1219,17 +1234,80 @@ async function clearGas() {
   localStorage.removeItem('gas_url');
   updateModeUI(); closeModal('settings-modal'); await loadDay_and_render();
 }
+// ── 接続テスト（高速版: POST スキップ、8秒タイムアウト、認証失敗検出）──
+let _testConnUrl = '';
 async function testConn() {
   const url = document.getElementById('s-gasurl').value.trim() || GAS_URL_DEFAULT;
+  _testConnUrl = url;
   const el  = document.getElementById('test-res');
-  el.className = 'test-res'; el.textContent = '🔄 接続中...'; el.style.display = 'block';
+  el.className = 'test-res'; el.style.display = 'block';
+
+  // ── Stage 2: GET fetch（POST no-cors はテストでは常にopaqueで無意味なのでスキップ）──
+  el.textContent = '🔄 GET接続を試行中...';
+  let authIssue = false;
   try {
-    const d = await gasJsonp(url, { action: 'test' });
-    el.textContent = d.ok ? `✅ 接続成功！ ${d.message||''}` : `❌ ${d.error||'不明'}`;
-    el.className   = d.ok ? 'test-res ok' : 'test-res ng';
-  } catch(e) {
-    el.textContent = `❌ ${e.message}`;
-    el.className   = 'test-res ng';
+    const qs  = new URLSearchParams({ action: 'test' }).toString();
+    const res = await Promise.race([
+      fetch(url + '?' + qs, { method: 'GET', redirect: 'follow', credentials: 'include' }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))
+    ]);
+    const text = await res.text();
+    if (text && !text.trim().startsWith('<!')) {
+      const clean = text.trim().replace(/^[^(]+\(/, '').replace(/\)\s*;?\s*$/, '');
+      const d = JSON.parse(clean);
+      el.textContent = d.ok ? `✅ 接続成功！ ${d.message||''}` : `❌ ${d.error||'不明'}`;
+      el.className   = d.ok ? 'test-res ok' : 'test-res ng';
+      return;
+    }
+    // HTMLが返った = ログインページへのリダイレクト → 認証失敗
+    authIssue = true;
+  } catch(_) {}
+
+  // ── Stage 3: JSONP（認証失敗が確定していなければ試行）──
+  if (!authIssue) {
+    el.textContent = '🔄 JSONP接続を試行中...';
+    try {
+      const d = await new Promise((resolve, reject) => {
+        const cb = '_g_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+        const sc = document.createElement('script');
+        const timer = setTimeout(() => { delete window[cb]; sc.remove(); reject(new Error('timeout')); }, 8000);
+        window[cb] = d => { clearTimeout(timer); delete window[cb]; sc.remove(); resolve(d); };
+        sc.onerror = () => { clearTimeout(timer); delete window[cb]; sc.remove(); reject(new Error('script-error')); };
+        sc.src = url + '?action=test&callback=' + cb;
+        document.head.appendChild(sc);
+      });
+      el.textContent = d.ok ? `✅ 接続成功！ ${d.message||''}` : `❌ ${d.error||'不明'}`;
+      el.className   = d.ok ? 'test-res ok' : 'test-res ng';
+      return;
+    } catch(_) {}
+  }
+
+  // ── 全段階失敗: 認証ガイダンスまたはエラー表示 ──
+  _showAuthGuidance(el, authIssue);
+}
+
+function _showAuthGuidance(el, authIssue) {
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (authIssue || isMobile) {
+    el.className = 'test-res auth';
+    el.innerHTML =
+      '<strong>⚠ Google Workspaceへの認証が必要です</strong><br>' +
+      '<span style="font-size:11px;">スマートフォンではサードパーティCookieの制限により、' +
+      'GAS URLを直接開いてログインする必要があります。</span>' +
+      '<div class="auth-actions">' +
+        '<button class="btn-auth-open" onclick="window.open(_testConnUrl+\'?action=test\',\'_blank\')">GAS URLを開いてログイン</button>' +
+        '<button class="btn-auth-retry" onclick="testConn()">再テスト</button>' +
+      '</div>' +
+      '<div style="font-size:11px;color:#92400e;margin-top:6px;">ログイン完了後「再テスト」を押してください</div>';
+  } else {
+    el.className = 'test-res ng';
+    el.innerHTML =
+      '❌ 接続できませんでした<br>' +
+      '<span style="font-size:11px;">GAS URLが正しいか確認してください。' +
+      'horizon.co.jpのGoogle Workspaceにログイン済みである必要があります。</span>' +
+      '<div class="auth-actions">' +
+        '<button class="btn-auth-retry" onclick="testConn()">再テスト</button>' +
+      '</div>';
   }
 }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
@@ -1325,6 +1403,57 @@ async function gasJsonpRetry(url, params, retries=1) {
       } else throw e;
     }
   }
+}
+
+// ── 書き込み専用GAS通信（POST成功で即return、GETへフォールスルーしない）──
+async function gasJsonpWrite(url, params, timeoutMs = 10000) {
+  // ① POST no-cors — opaqueでもデータ送信成功なので即return
+  try {
+    await Promise.race([
+      fetch(url, {
+        method: 'POST', credentials: 'include', mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(params),
+      }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeoutMs))
+    ]);
+    return { ok: true, source: 'post' };
+  } catch (e) { console.warn('gasJsonpWrite POST失敗、GETへ:', e.message); }
+
+  // ② GET fetch — POST失敗時のみ
+  try {
+    const qs = new URLSearchParams(params).toString();
+    const res = await Promise.race([
+      fetch(url + '?' + qs, {
+        method: 'GET', redirect: 'follow', credentials: 'include',
+      }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeoutMs))
+    ]);
+    const text = await res.text();
+    if (text && !text.trim().startsWith('<!')) {
+      const clean = text.trim().replace(/^[^(]+\(/, '').replace(/\)\s*;?\s*$/, '');
+      return JSON.parse(clean);
+    }
+    return { ok: true, source: 'get-html' };
+  } catch (e) { console.warn('gasJsonpWrite GET失敗、JSONPへ:', e.message); }
+
+  // ③ JSONP — 最終手段
+  const qs2 = new URLSearchParams(params).toString();
+  return new Promise((resolve, reject) => {
+    const cb    = '_g_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const el    = document.createElement('script');
+    const timer = setTimeout(() => {
+      delete window[cb]; el.remove();
+      reject(new Error('タイムアウト（JSONP書き込み）'));
+    }, timeoutMs);
+    window[cb] = d => { clearTimeout(timer); delete window[cb]; el.remove(); resolve(d); };
+    el.onerror = () => {
+      clearTimeout(timer); delete window[cb]; el.remove();
+      reject(new Error('接続エラー（GASへ到達できません）'));
+    };
+    el.src = url + '?' + qs2 + '&callback=' + cb;
+    document.head.appendChild(el);
+  });
 }
 
 // ═══════════════════════════════════════════
@@ -1461,14 +1590,14 @@ async function saveDay(date, author, rows) {
     if(r.hoursNormal>0) entries.push({cdMain:s.mainCd,main:s.mainLabel,cdSub:r.cdSub,sub:s.label,hours:r.hoursNormal,kubun:'通常'});
     if(r.hoursOT>0)     entries.push({cdMain:s.mainCd,main:s.mainLabel,cdSub:r.cdSub,sub:s.label,hours:r.hoursOT,     kubun:'残業'});
   });
-  await gasJsonp(url,{action:'saveDay',date,author,entries:JSON.stringify(entries)});
+  await gasJsonpWrite(url,{action:'saveDay',date,author,entries:JSON.stringify(entries)});
 }
 
 async function saveLeaveTime(date, author, leaveTime) {
   const url=getGasUrl();
   if (!url) { localStorage.setItem(`leave_${date}_${author}`, leaveTime||''); return; }
-  const d=await gasJsonpRetry(url,{action:'saveLeaveTime',date,author,leaveTime:leaveTime||''});
-  if (!d.ok) throw new Error(d.error||'退勤時刻保存失敗');
+  const d=await gasJsonpWrite(url,{action:'saveLeaveTime',date,author,leaveTime:leaveTime||''});
+  if (d && !d.ok && d.error) throw new Error(d.error||'退勤時刻保存失敗');
 }
 
 // "HH:MM" → {normal, ot} を返す
@@ -1489,6 +1618,8 @@ function getLunchBreak(dateStr) {
 
 function calcFromLeave(leaveHHMM, dateStr) {
   if (!leaveHHMM) return null;
+  const _ck = `${leaveHHMM}|${dateStr||currentDate}`;
+  if (calcFromLeave._ck === _ck) return calcFromLeave._cv;
   const [hh,mm] = leaveHHMM.split(':').map(Number);
   if (isNaN(hh)||isNaN(mm)) return null;
   const leaveMins = hh*60 + mm;
@@ -1522,7 +1653,10 @@ function calcFromLeave(leaveHHMM, dateStr) {
   let normal = workMins < 15 ? 0 : Math.ceil(workMins / 30) * 0.5;
   normal = Math.max(0, normal);
 
-  return {normal, ot};
+  const _result = {normal, ot};
+  calcFromLeave._ck = _ck;
+  calcFromLeave._cv = _result;
+  return _result;
 }
 
 // 後方互換: 残業時間だけ返す（既存呼び出し箇所用）
@@ -1986,10 +2120,10 @@ function makeHoursCell(id, cdSub, isOT) {
   inp.type='number'; inp.id=id; inp.min=0; inp.step=0.5; inp.value='0';
   if (isOT) {
     // 残業列：通常が8h未満のときは読み取り専用表示（入力は可）
-    inp.oninput=()=>{ refreshCellStyle(inp); updateTotals(); };
+    inp.oninput=()=>{ refreshCellStyle(inp); scheduleUpdateTotals(); };
   } else {
     // 通常列：8hを超えた分はその行の残業列へ自動振り替え
-    inp.oninput=()=>{ clampNormal(cdSub); updateTotals(); };
+    inp.oninput=()=>{ clampNormal(cdSub); scheduleUpdateTotals(); };
   }
   wrap.appendChild(inp); td.appendChild(wrap); return td;
 }
@@ -2096,11 +2230,13 @@ function updateTotals() {
   toEl.classList.toggle('has-ot', ot > 0);
 
   // スタイル＋ヒントを1ループで（querySelectorAll不要）
+  const hintChanged = (updateTotals._lastHint !== hint);
+  updateTotals._lastHint = hint;
   for (const cd in _INP_CACHE) {
     const {h: inp, ot: otInp, td} = _INP_CACHE[cd];
     if (inp)   inp.classList.toggle('at-max', atMax && parseFloat(inp.value) > 0);
     if (otInp) otInp.classList.toggle('has-ot', parseFloat(otInp.value) > 0);
-    if (td)    td.title = `クリックで ${td.textContent} の${hint}`;
+    if (hintChanged && td) td.title = `クリックで ${td.textContent} の${hint}`;
   }
 
   // ── 退勤時刻セーフティチェック ──
@@ -2109,35 +2245,34 @@ function updateTotals() {
 
 function checkHoursSafety(normal, ot) {
   const warnEl  = document.getElementById('hours-safety-warn');
-  const limEl   = document.getElementById('safety-limit');
-  const inpEl   = document.getElementById('safety-input');
   if (!warnEl) return;
 
   const leaveTime = document.getElementById('input-leave')?.value || '';
-  if (!leaveTime) { warnEl.style.display = 'none'; return; }
+  if (!leaveTime) { if (warnEl.style.display !== 'none') warnEl.style.display = 'none'; checkHoursSafety._lastKey = ''; return; }
 
   const calc = calcFromLeave(leaveTime);
-  if (!calc) { warnEl.style.display = 'none'; return; }
+  if (!calc) { if (warnEl.style.display !== 'none') warnEl.style.display = 'none'; checkHoursSafety._lastKey = ''; return; }
 
   // 実勤務時間上限 = 通常 + 残業（0.5刻みに切り捨て）
   const limitRaw = (calc.normal + calc.ot);
   const limit = Math.floor(limitRaw * 2) / 2;  // 0.5刻み切り捨て
   const total = Math.round((normal + ot) * 10) / 10;
 
-  if (total > limit) {
-    warnEl.style.background = '#fff7ed';
-    warnEl.style.borderColor = '#fb923c';
-    warnEl.style.color = '#ea580c';
-    warnEl.innerHTML = `⚠ 入力合計時間が退勤時刻から計算した実勤務時間を<strong>超えています</strong>（上限: <span id="safety-limit">${limit.toFixed(1)}</span>h、入力: <span id="safety-input">${total.toFixed(1)}</span>h）`;
-    warnEl.style.display = 'block';
-  } else if (total < limit) {
-    warnEl.style.background = '#eff6ff';
-    warnEl.style.borderColor = '#60a5fa';
-    warnEl.style.color = '#1d4ed8';
-    warnEl.innerHTML = `ℹ 入力合計時間が退勤時刻から計算した実勤務時間より<strong>少ない</strong>です（上限: <span id="safety-limit">${limit.toFixed(1)}</span>h、入力: <span id="safety-input">${total.toFixed(1)}</span>h）`;
-    warnEl.style.display = 'block';
-  } else {
+  const state = total > limit ? 'over' : total < limit ? 'under' : 'match';
+  const key = `${state}_${limit}_${total}`;
+  if (checkHoursSafety._lastKey === key) return;
+  checkHoursSafety._lastKey = key;
+
+  if (state === 'match') {
     warnEl.style.display = 'none';
+  } else {
+    const isOver = state === 'over';
+    warnEl.style.cssText = isOver
+      ? 'display:block;margin:4px 0 2px;padding:5px 10px;border-radius:7px;font-size:12px;font-weight:700;background:#fff7ed;border:1px solid #fb923c;color:#ea580c;'
+      : 'display:block;margin:4px 0 2px;padding:5px 10px;border-radius:7px;font-size:12px;font-weight:700;background:#eff6ff;border:1px solid #60a5fa;color:#1d4ed8;';
+    warnEl.innerHTML = isOver
+      ? `⚠ 入力合計時間が退勤時刻から計算した実勤務時間を<strong>超えています</strong>（上限: <span id="safety-limit">${limit.toFixed(1)}</span>h、入力: <span id="safety-input">${total.toFixed(1)}</span>h）`
+      : `ℹ 入力合計時間が退勤時刻から計算した実勤務時間より<strong>少ない</strong>です（上限: <span id="safety-limit">${limit.toFixed(1)}</span>h、入力: <span id="safety-input">${total.toFixed(1)}</span>h）`;
   }
 }
 function clearInputs() {
@@ -2202,10 +2337,13 @@ async function submitDay() {
   const leaveTime=(document.getElementById('input-leave')?.value)||'';
   setLoading(true);
   try {
-    // saveDay・saveLeaveTime を並列実行（直列→並列で通信を1往復分に短縮）
-    await Promise.all([
-      saveDay(currentDate, author, rows),
-      saveLeaveTime(currentDate, author, leaveTime),
+    // saveDay・saveLeaveTime を並列実行 + 全体20秒タイムアウト
+    await Promise.race([
+      Promise.all([
+        saveDay(currentDate, author, rows),
+        saveLeaveTime(currentDate, author, leaveTime),
+      ]),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('保存がタイムアウトしました（20秒）')), 20000))
     ]);
     cacheInvalidate(currentDate); // キャッシュクリア
     const msg=document.getElementById('save-msg');
@@ -2230,6 +2368,11 @@ function stampNow() {
 }
 
 // 退勤時刻入力リアルタイムプレビュー
+let _leaveChangeTimer = 0;
+function onLeaveChangeDebounced() {
+  clearTimeout(_leaveChangeTimer);
+  _leaveChangeTimer = setTimeout(onLeaveChange, 150);
+}
 function onLeaveChange() {
   const val = document.getElementById('input-leave')?.value||'';
   const el  = document.getElementById('leave-ot-preview');
@@ -3612,7 +3755,14 @@ function updateStickyOffsets() {
     document.getElementById('first-launch-overlay').style.display = 'flex';
   }
   updateStickyOffsets();
-  window.addEventListener('resize', updateStickyOffsets);
+  window.addEventListener('resize', () => {
+    if (!updateStickyOffsets._raf) {
+      updateStickyOffsets._raf = requestAnimationFrame(() => {
+        updateStickyOffsets._raf = 0;
+        updateStickyOffsets();
+      });
+    }
+  });
   updateModeUI();
   document.getElementById('settings-modal').addEventListener('click',function(e){
     if(e.target===this) closeModal('settings-modal');
