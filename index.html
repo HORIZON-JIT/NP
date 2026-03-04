@@ -549,7 +549,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <div class="leave-row no-print">
         <label class="leave-label" for="input-leave">🕐 退勤時刻</label>
         <input type="time" id="input-leave" class="leave-input" placeholder="--:--" step="60"
-               oninput="onLeaveChange()" />
+               oninput="onLeaveChangeDebounced()" />
         <button class="btn-stamp no-print" onclick="stampNow()" title="現在時刻を入力">⏱ 現在時刻を反映</button>
         <span id="leave-ot-preview" class="leave-ot-preview"></span>
       </div>
@@ -928,6 +928,17 @@ const SUB_MAP = {};
 let _ALL_SUBS = [];
 let _INP_CACHE = {};
 rebuildSubMap();
+
+// ── パフォーマンス: updateTotals を RAF でコアレス ──
+let _updateTotalsRAF = 0;
+function scheduleUpdateTotals() {
+  if (!_updateTotalsRAF) {
+    _updateTotalsRAF = requestAnimationFrame(() => {
+      _updateTotalsRAF = 0;
+      updateTotals();
+    });
+  }
+}
 
 // ── 項目管理 UI ──
 
@@ -1489,6 +1500,8 @@ function getLunchBreak(dateStr) {
 
 function calcFromLeave(leaveHHMM, dateStr) {
   if (!leaveHHMM) return null;
+  const _ck = `${leaveHHMM}|${dateStr||currentDate}`;
+  if (calcFromLeave._ck === _ck) return calcFromLeave._cv;
   const [hh,mm] = leaveHHMM.split(':').map(Number);
   if (isNaN(hh)||isNaN(mm)) return null;
   const leaveMins = hh*60 + mm;
@@ -1522,7 +1535,10 @@ function calcFromLeave(leaveHHMM, dateStr) {
   let normal = workMins < 15 ? 0 : Math.ceil(workMins / 30) * 0.5;
   normal = Math.max(0, normal);
 
-  return {normal, ot};
+  const _result = {normal, ot};
+  calcFromLeave._ck = _ck;
+  calcFromLeave._cv = _result;
+  return _result;
 }
 
 // 後方互換: 残業時間だけ返す（既存呼び出し箇所用）
@@ -1986,10 +2002,10 @@ function makeHoursCell(id, cdSub, isOT) {
   inp.type='number'; inp.id=id; inp.min=0; inp.step=0.5; inp.value='0';
   if (isOT) {
     // 残業列：通常が8h未満のときは読み取り専用表示（入力は可）
-    inp.oninput=()=>{ refreshCellStyle(inp); updateTotals(); };
+    inp.oninput=()=>{ refreshCellStyle(inp); scheduleUpdateTotals(); };
   } else {
     // 通常列：8hを超えた分はその行の残業列へ自動振り替え
-    inp.oninput=()=>{ clampNormal(cdSub); updateTotals(); };
+    inp.oninput=()=>{ clampNormal(cdSub); scheduleUpdateTotals(); };
   }
   wrap.appendChild(inp); td.appendChild(wrap); return td;
 }
@@ -2096,11 +2112,13 @@ function updateTotals() {
   toEl.classList.toggle('has-ot', ot > 0);
 
   // スタイル＋ヒントを1ループで（querySelectorAll不要）
+  const hintChanged = (updateTotals._lastHint !== hint);
+  updateTotals._lastHint = hint;
   for (const cd in _INP_CACHE) {
     const {h: inp, ot: otInp, td} = _INP_CACHE[cd];
     if (inp)   inp.classList.toggle('at-max', atMax && parseFloat(inp.value) > 0);
     if (otInp) otInp.classList.toggle('has-ot', parseFloat(otInp.value) > 0);
-    if (td)    td.title = `クリックで ${td.textContent} の${hint}`;
+    if (hintChanged && td) td.title = `クリックで ${td.textContent} の${hint}`;
   }
 
   // ── 退勤時刻セーフティチェック ──
@@ -2109,35 +2127,34 @@ function updateTotals() {
 
 function checkHoursSafety(normal, ot) {
   const warnEl  = document.getElementById('hours-safety-warn');
-  const limEl   = document.getElementById('safety-limit');
-  const inpEl   = document.getElementById('safety-input');
   if (!warnEl) return;
 
   const leaveTime = document.getElementById('input-leave')?.value || '';
-  if (!leaveTime) { warnEl.style.display = 'none'; return; }
+  if (!leaveTime) { if (warnEl.style.display !== 'none') warnEl.style.display = 'none'; checkHoursSafety._lastKey = ''; return; }
 
   const calc = calcFromLeave(leaveTime);
-  if (!calc) { warnEl.style.display = 'none'; return; }
+  if (!calc) { if (warnEl.style.display !== 'none') warnEl.style.display = 'none'; checkHoursSafety._lastKey = ''; return; }
 
   // 実勤務時間上限 = 通常 + 残業（0.5刻みに切り捨て）
   const limitRaw = (calc.normal + calc.ot);
   const limit = Math.floor(limitRaw * 2) / 2;  // 0.5刻み切り捨て
   const total = Math.round((normal + ot) * 10) / 10;
 
-  if (total > limit) {
-    warnEl.style.background = '#fff7ed';
-    warnEl.style.borderColor = '#fb923c';
-    warnEl.style.color = '#ea580c';
-    warnEl.innerHTML = `⚠ 入力合計時間が退勤時刻から計算した実勤務時間を<strong>超えています</strong>（上限: <span id="safety-limit">${limit.toFixed(1)}</span>h、入力: <span id="safety-input">${total.toFixed(1)}</span>h）`;
-    warnEl.style.display = 'block';
-  } else if (total < limit) {
-    warnEl.style.background = '#eff6ff';
-    warnEl.style.borderColor = '#60a5fa';
-    warnEl.style.color = '#1d4ed8';
-    warnEl.innerHTML = `ℹ 入力合計時間が退勤時刻から計算した実勤務時間より<strong>少ない</strong>です（上限: <span id="safety-limit">${limit.toFixed(1)}</span>h、入力: <span id="safety-input">${total.toFixed(1)}</span>h）`;
-    warnEl.style.display = 'block';
-  } else {
+  const state = total > limit ? 'over' : total < limit ? 'under' : 'match';
+  const key = `${state}_${limit}_${total}`;
+  if (checkHoursSafety._lastKey === key) return;
+  checkHoursSafety._lastKey = key;
+
+  if (state === 'match') {
     warnEl.style.display = 'none';
+  } else {
+    const isOver = state === 'over';
+    warnEl.style.cssText = isOver
+      ? 'display:block;margin:4px 0 2px;padding:5px 10px;border-radius:7px;font-size:12px;font-weight:700;background:#fff7ed;border:1px solid #fb923c;color:#ea580c;'
+      : 'display:block;margin:4px 0 2px;padding:5px 10px;border-radius:7px;font-size:12px;font-weight:700;background:#eff6ff;border:1px solid #60a5fa;color:#1d4ed8;';
+    warnEl.innerHTML = isOver
+      ? `⚠ 入力合計時間が退勤時刻から計算した実勤務時間を<strong>超えています</strong>（上限: <span id="safety-limit">${limit.toFixed(1)}</span>h、入力: <span id="safety-input">${total.toFixed(1)}</span>h）`
+      : `ℹ 入力合計時間が退勤時刻から計算した実勤務時間より<strong>少ない</strong>です（上限: <span id="safety-limit">${limit.toFixed(1)}</span>h、入力: <span id="safety-input">${total.toFixed(1)}</span>h）`;
   }
 }
 function clearInputs() {
@@ -2230,6 +2247,11 @@ function stampNow() {
 }
 
 // 退勤時刻入力リアルタイムプレビュー
+let _leaveChangeTimer = 0;
+function onLeaveChangeDebounced() {
+  clearTimeout(_leaveChangeTimer);
+  _leaveChangeTimer = setTimeout(onLeaveChange, 150);
+}
 function onLeaveChange() {
   const val = document.getElementById('input-leave')?.value||'';
   const el  = document.getElementById('leave-ot-preview');
@@ -3612,7 +3634,14 @@ function updateStickyOffsets() {
     document.getElementById('first-launch-overlay').style.display = 'flex';
   }
   updateStickyOffsets();
-  window.addEventListener('resize', updateStickyOffsets);
+  window.addEventListener('resize', () => {
+    if (!updateStickyOffsets._raf) {
+      updateStickyOffsets._raf = requestAnimationFrame(() => {
+        updateStickyOffsets._raf = 0;
+        updateStickyOffsets();
+      });
+    }
+  });
   updateModeUI();
   document.getElementById('settings-modal').addEventListener('click',function(e){
     if(e.target===this) closeModal('settings-modal');
