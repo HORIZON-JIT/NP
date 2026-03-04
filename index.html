@@ -1406,7 +1406,11 @@ async function gasJsonpRetry(url, params, retries=1) {
 }
 
 // ── 書き込み専用GAS通信（POST成功で即return、GETへフォールスルーしない）──
+// タイムアウト: POST 3s + GET 5s + JSONP 10s = 最大18s（submitDay全体20s内に収める）
 async function gasJsonpWrite(url, params, timeoutMs = 10000) {
+  const postTimeout = Math.min(3000, timeoutMs);
+  const getTimeout  = Math.min(5000, timeoutMs);
+
   // ① POST no-cors — opaqueでもデータ送信成功なので即return
   try {
     await Promise.race([
@@ -1415,7 +1419,7 @@ async function gasJsonpWrite(url, params, timeoutMs = 10000) {
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(params),
       }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeoutMs))
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), postTimeout))
     ]);
     return { ok: true, source: 'post' };
   } catch (e) { console.warn('gasJsonpWrite POST失敗、GETへ:', e.message); }
@@ -1427,7 +1431,7 @@ async function gasJsonpWrite(url, params, timeoutMs = 10000) {
       fetch(url + '?' + qs, {
         method: 'GET', redirect: 'follow', credentials: 'include',
       }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeoutMs))
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), getTimeout))
     ]);
     const text = await res.text();
     if (text && !text.trim().startsWith('<!')) {
