@@ -1406,43 +1406,25 @@ async function gasJsonpRetry(url, params, retries=1) {
 }
 
 // ── 書き込み専用GAS通信（POST成功で即return、GETへフォールスルーしない）──
-// タイムアウト: POST 3s + GET 5s + JSONP 10s = 最大18s（submitDay全体20s内に収める）
 async function gasJsonpWrite(url, params, timeoutMs = 10000) {
-  const postTimeout = Math.min(3000, timeoutMs);
-  const getTimeout  = Math.min(5000, timeoutMs);
-
-  // ① POST no-cors — opaqueでもデータ送信成功なので即return
+  // ① POST no-cors + redirect:manual
+  //    GASは302リダイレクトを返すが、データはPOST body受信時点で保存済み。
+  //    redirect:'manual' でリダイレクト先を追わず302受信時点で即resolve。
   try {
     await Promise.race([
       fetch(url, {
         method: 'POST', credentials: 'include', mode: 'no-cors',
+        redirect: 'manual',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(params),
       }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), postTimeout))
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
     ]);
     return { ok: true, source: 'post' };
-  } catch (e) { console.warn('gasJsonpWrite POST失敗、GETへ:', e.message); }
+  } catch (e) { console.warn('gasJsonpWrite POST失敗、JSONPへ:', e.message); }
 
-  // ② GET fetch — POST失敗時のみ
-  try {
-    const qs = new URLSearchParams(params).toString();
-    const res = await Promise.race([
-      fetch(url + '?' + qs, {
-        method: 'GET', redirect: 'follow', credentials: 'include',
-      }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), getTimeout))
-    ]);
-    const text = await res.text();
-    if (text && !text.trim().startsWith('<!')) {
-      const clean = text.trim().replace(/^[^(]+\(/, '').replace(/\)\s*;?\s*$/, '');
-      return JSON.parse(clean);
-    }
-    return { ok: true, source: 'get-html' };
-  } catch (e) { console.warn('gasJsonpWrite GET失敗、JSONPへ:', e.message); }
-
-  // ③ JSONP — 最終手段
-  const qs2 = new URLSearchParams(params).toString();
+  // ② JSONP — POST失敗時のフォールバック（GETは同じリダイレクト問題があるので省略）
+  const qs = new URLSearchParams(params).toString();
   return new Promise((resolve, reject) => {
     const cb    = '_g_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const el    = document.createElement('script');
@@ -1455,7 +1437,7 @@ async function gasJsonpWrite(url, params, timeoutMs = 10000) {
       clearTimeout(timer); delete window[cb]; el.remove();
       reject(new Error('接続エラー（GASへ到達できません）'));
     };
-    el.src = url + '?' + qs2 + '&callback=' + cb;
+    el.src = url + '?' + qs + '&callback=' + cb;
     document.head.appendChild(el);
   });
 }
