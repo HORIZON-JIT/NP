@@ -13,8 +13,10 @@ import numpy as np
 from datetime import date, timedelta
 import calendar
 
-from config import MAIN_CATEGORIES, AUTHORS, SUB_CATEGORIES, REGULAR_HOURS, get_main_cd, get_main_label
-from fetch_data import fetch_date_range, to_dataframe, fetch_weekly_breakdown, fetch_monthly_breakdown
+from config import MAIN_CATEGORIES, AUTHORS, SUB_CATEGORIES, REGULAR_HOURS, CLOSING_DAY, get_main_cd, get_main_label
+from fetch_data import (fetch_date_range, to_dataframe, fetch_weekly_breakdown,
+                        fetch_monthly_breakdown, fetch_fiscal_monthly_breakdown,
+                        get_fiscal_month, get_fiscal_month_range)
 
 # ── ページ設定 ──
 st.set_page_config(page_title="NPA Dashboard", page_icon="📊", layout="wide")
@@ -314,6 +316,11 @@ def load_monthly(s: str, e: str):
     return fetch_monthly_breakdown(s, e)
 
 
+@st.cache_data(ttl=600, show_spinner=False)
+def load_fiscal_monthly(s: str, e: str, closing_day: int = 15):
+    return fetch_fiscal_monthly_breakdown(s, e, closing_day)
+
+
 with st.spinner("データ取得中..."):
     try:
         df, raw_data = load_data(str(start_date), str(end_date))
@@ -521,66 +528,76 @@ elif page == "📂 工程別":
 # ────────────────────────────────────
 elif page == "⏰ 残業・36協定":
     st.markdown('<p class="main-header">残業・36協定管理</p>', unsafe_allow_html=True)
-    st.markdown(f'<p class="sub-header">{start_date.strftime("%Y/%m/%d")} — {end_date.strftime("%Y/%m/%d")}</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="sub-header">{start_date.strftime("%Y/%m/%d")} — {end_date.strftime("%Y/%m/%d")}　|　{CLOSING_DAY}日締め</p>', unsafe_allow_html=True)
 
-    ot_df = (
-        df.groupby("author", as_index=False)
-        .agg(残業=("hoursOT", "sum"))
-    )
-    ot_df = sort_by_author(ot_df)
+    # ── 月度別データを取得（15日締め） ──
+    with st.spinner("月度別データ取得中..."):
+        try:
+            fiscal_df = load_fiscal_monthly(str(start_date), str(end_date), CLOSING_DAY)
+        except Exception as e:
+            st.error(f"月度別データ取得エラー: {e}")
+            fiscal_df = pd.DataFrame()
 
-    fig5 = go.Figure()
-    fig5.add_trace(go.Bar(
-        x=ot_df["author"], y=ot_df["残業"],
-        marker=dict(
-            color=ot_df["残業"],
-            colorscale=[[0, "#4ECDC4"], [0.5, "#FBBF24"], [1, "#EF4444"]],
-        ),
-        text=[f"{v:.1f}h" for v in ot_df["残業"]],
-        textposition="outside",
-        textfont=dict(color="#C8CDDF"),
-    ))
-    fig5.update_layout(title="担当者別 残業時間", yaxis_title="残業時間 (h)", height=400)
-    fig5.add_hline(y=45, line_dash="dash", line_color="#EF4444",
-                   annotation_text="月上限 45h", annotation_font_color="#EF4444")
-    apply_dark(fig5)
-    st.plotly_chart(fig5, use_container_width=True)
+    if not fiscal_df.empty:
+        if selected_authors:
+            fiscal_df = fiscal_df[fiscal_df["author"].isin(selected_authors)].copy()
 
-    # 残業比率テーブル
-    auth_full = (
-        df.groupby("author", as_index=False)
-        .agg(通常=("hoursNormal", "sum"), 残業=("hoursOT", "sum"))
-    )
-    auth_full["合計"] = auth_full["通常"] + auth_full["残業"]
-    auth_full["残業率"] = (auth_full["残業"] / auth_full["合計"] * 100).round(1)
-    auth_full = sort_by_author(auth_full)
+        # ── 月度別 残業棒グラフ（担当者×月度） ──
+        fm_ot = (
+            fiscal_df.groupby(["fiscal_label", "fiscal_month", "author"], as_index=False)
+            .agg(残業=("hoursOT", "sum"))
+        )
+        fm_ot = fm_ot.sort_values("fiscal_month")
 
-    section_header("📊", "担当者別 残業比率")
-    st.dataframe(
-        auth_full[["author", "通常", "残業", "合計", "残業率"]].rename(
-            columns={"author": "担当者", "残業率": "残業率 (%)"}
-        ),
-        use_container_width=True, hide_index=True
-    )
+        fig5 = px.bar(
+            fm_ot, x="author", y="残業", color="fiscal_label",
+            barmode="group",
+            title="担当者別 月度残業時間（15日締め）",
+            labels={"残業": "残業時間 (h)", "author": "担当者", "fiscal_label": "月度"},
+            color_discrete_sequence=NEON_COLORS,
+        )
+        fig5.add_hline(y=45, line_dash="dash", line_color="#EF4444",
+                       annotation_text="月上限 45h", annotation_font_color="#EF4444")
+        fig5.update_layout(height=450)
+        apply_dark(fig5)
+        st.plotly_chart(fig5, use_container_width=True)
 
-    # ── 36協定アラート ──
+        # ── 月度別 残業比率テーブル ──
+        section_header("📊", "月度別 残業比率")
+        fm_summary = (
+            fiscal_df.groupby(["author", "fiscal_label", "fiscal_month"], as_index=False)
+            .agg(通常=("hoursNormal", "sum"), 残業=("hoursOT", "sum"))
+        )
+        fm_summary["合計"] = fm_summary["通常"] + fm_summary["残業"]
+        fm_summary["残業率"] = (fm_summary["残業"] / fm_summary["合計"] * 100).round(1)
+        fm_summary = fm_summary.sort_values(["fiscal_month", "author"])
+        st.dataframe(
+            fm_summary[["author", "fiscal_label", "通常", "残業", "合計", "残業率"]].rename(
+                columns={"author": "担当者", "fiscal_label": "月度", "残業率": "残業率 (%)"}
+            ),
+            use_container_width=True, hide_index=True
+        )
+    else:
+        st.info("月度別データがありません。")
+
+    # ── 36協定アラート（月度別） ──
     st.markdown("---")
-    section_header("⚡", "36協定 残業上限チェック")
+    section_header("⚡", "36協定 残業上限チェック（15日締め月度別）")
     st.caption("月45h / 年360h が上限（特別条項: 月100h / 年720h）")
 
-    ot_by_author = (
-        df.groupby("author", as_index=False)
-        .agg(月残業=("hoursOT", "sum"))
-    )
-    ot_by_author = sort_by_author(ot_by_author)
-
-    year_start = date(end_date.year, 1, 1)
+    # 年間累計（1月度〜現在の月度まで、15日締めベース）
+    # 年度開始 = 前年12/16（1月度の開始）
+    fiscal_year_start_date = date(end_date.year - 1, 12, CLOSING_DAY + 1)
     with st.spinner("年間残業データ取得中..."):
         try:
-            year_monthly = load_monthly(year_start.isoformat(), str(end_date))
-            if not year_monthly.empty:
+            year_fiscal = load_fiscal_monthly(
+                fiscal_year_start_date.isoformat(), str(end_date), CLOSING_DAY
+            )
+            if not year_fiscal.empty:
+                if selected_authors:
+                    year_fiscal = year_fiscal[year_fiscal["author"].isin(selected_authors)].copy()
                 year_ot = (
-                    year_monthly.groupby("author", as_index=False)
+                    year_fiscal.groupby("author", as_index=False)
                     .agg(年間累計=("hoursOT", "sum"))
                 )
             else:
@@ -588,32 +605,62 @@ elif page == "⏰ 残業・36協定":
         except Exception:
             year_ot = pd.DataFrame(columns=["author", "年間累計"])
 
-    limit_df = ot_by_author.merge(year_ot, on="author", how="left").fillna(0)
+    if not fiscal_df.empty:
+        # 月度リスト（選択範囲内）
+        fiscal_months = (
+            fiscal_df[["fiscal_year", "fiscal_month", "fiscal_label"]]
+            .drop_duplicates()
+            .sort_values("fiscal_month")
+        )
 
-    for _, row in limit_df.iterrows():
-        name = row["author"]
-        monthly_ot = row["月残業"]
-        yearly_ot = row["年間累計"]
+        for _, fm_row in fiscal_months.iterrows():
+            fy = fm_row["fiscal_year"]
+            fm = fm_row["fiscal_month"]
+            fl = fm_row["fiscal_label"]
 
-        col_name, col_month, col_year = st.columns([1, 2, 2])
-        with col_name:
-            st.markdown(f"**{name}**")
-        with col_month:
-            pct_m = min(monthly_ot / 45 * 100, 100)
-            st.markdown(f"月: **{monthly_ot:.1f}h** / 45h")
-            st.progress(min(pct_m / 100, 1.0))
-            if monthly_ot > 45:
-                st.markdown(f'<div class="alert-card danger">月上限超過 (+{monthly_ot - 45:.1f}h)</div>', unsafe_allow_html=True)
-            elif monthly_ot > 36:
-                st.markdown(f'<div class="alert-card warning">月上限まで残り {45 - monthly_ot:.1f}h</div>', unsafe_allow_html=True)
-        with col_year:
-            pct_y = min(yearly_ot / 360 * 100, 100)
-            st.markdown(f"年: **{yearly_ot:.1f}h** / 360h")
-            st.progress(min(pct_y / 100, 1.0))
-            if yearly_ot > 360:
-                st.markdown(f'<div class="alert-card danger">年上限超過 (+{yearly_ot - 360:.1f}h)</div>', unsafe_allow_html=True)
-            elif yearly_ot > 300:
-                st.markdown(f'<div class="alert-card warning">年上限まで残り {360 - yearly_ot:.1f}h</div>', unsafe_allow_html=True)
+            fm_start, fm_end = get_fiscal_month_range(fy, fm, CLOSING_DAY)
+
+            st.markdown(f"### {fy}年 {fl}（{fm_start.strftime('%m/%d')}〜{fm_end.strftime('%m/%d')}）")
+
+            # この月度のデータ
+            month_data = fiscal_df[
+                (fiscal_df["fiscal_year"] == fy) & (fiscal_df["fiscal_month"] == fm)
+            ]
+            month_ot = (
+                month_data.groupby("author", as_index=False)
+                .agg(月残業=("hoursOT", "sum"))
+            )
+            month_ot = sort_by_author(month_ot)
+
+            # 年間累計をマージ
+            month_limit = month_ot.merge(year_ot, on="author", how="left").fillna(0)
+
+            for _, row in month_limit.iterrows():
+                name = row["author"]
+                m_ot = row["月残業"]
+                y_ot = row["年間累計"]
+
+                col_name, col_month, col_year = st.columns([1, 2, 2])
+                with col_name:
+                    st.markdown(f"**{name}**")
+                with col_month:
+                    pct_m = min(m_ot / 45 * 100, 100)
+                    st.markdown(f"月度: **{m_ot:.1f}h** / 45h")
+                    st.progress(min(pct_m / 100, 1.0))
+                    if m_ot > 45:
+                        st.markdown(f'<div class="alert-card danger">月上限超過 (+{m_ot - 45:.1f}h)</div>', unsafe_allow_html=True)
+                    elif m_ot > 36:
+                        st.markdown(f'<div class="alert-card warning">月上限まで残り {45 - m_ot:.1f}h</div>', unsafe_allow_html=True)
+                with col_year:
+                    pct_y = min(y_ot / 360 * 100, 100)
+                    st.markdown(f"年累計: **{y_ot:.1f}h** / 360h")
+                    st.progress(min(pct_y / 100, 1.0))
+                    if y_ot > 360:
+                        st.markdown(f'<div class="alert-card danger">年上限超過 (+{y_ot - 360:.1f}h)</div>', unsafe_allow_html=True)
+                    elif y_ot > 300:
+                        st.markdown(f'<div class="alert-card warning">年上限まで残り {360 - y_ot:.1f}h</div>', unsafe_allow_html=True)
+
+            st.markdown("---")
 
 # ────────────────────────────────────
 # 推移分析
@@ -1178,29 +1225,49 @@ elif page == "🔍 個人サマリ":
                 st.plotly_chart(fig_p_pie, use_container_width=True)
 
             with col_right:
-                section_header("⚡", f"{person} 36協定進捗")
+                section_header("⚡", f"{person} 36協定進捗（{CLOSING_DAY}日締め）")
 
-                st.markdown(f"**月残業: {p_ot:.1f}h / 45h**")
-                st.progress(min(p_ot / 45, 1.0))
-                if p_ot > 45:
-                    st.markdown(f'<div class="alert-card danger">月上限超過 (+{p_ot - 45:.1f}h)</div>', unsafe_allow_html=True)
-                elif p_ot > 36:
-                    st.markdown(f'<div class="alert-card warning">残り {45 - p_ot:.1f}h</div>', unsafe_allow_html=True)
+                # 現在の月度を特定（終了日ベース）
+                cur_fy, cur_fm = get_fiscal_month(end_date, CLOSING_DAY)
+                cur_fm_start, cur_fm_end = get_fiscal_month_range(cur_fy, cur_fm, CLOSING_DAY)
+
+                # 当月度の残業を取得
+                try:
+                    cur_month_data = load_fiscal_monthly(
+                        str(max(cur_fm_start, start_date)),
+                        str(min(cur_fm_end, end_date)),
+                        CLOSING_DAY
+                    )
+                    if not cur_month_data.empty:
+                        p_cur_ot = cur_month_data[cur_month_data["author"] == person]["hoursOT"].sum()
+                    else:
+                        p_cur_ot = 0.0
+                except Exception:
+                    p_cur_ot = 0.0
+
+                st.markdown(f"**{cur_fm}月度残業: {p_cur_ot:.1f}h / 45h**")
+                st.caption(f"{cur_fm_start.strftime('%m/%d')}〜{cur_fm_end.strftime('%m/%d')}")
+                st.progress(min(p_cur_ot / 45, 1.0))
+                if p_cur_ot > 45:
+                    st.markdown(f'<div class="alert-card danger">月上限超過 (+{p_cur_ot - 45:.1f}h)</div>', unsafe_allow_html=True)
+                elif p_cur_ot > 36:
+                    st.markdown(f'<div class="alert-card warning">残り {45 - p_cur_ot:.1f}h</div>', unsafe_allow_html=True)
                 else:
                     st.markdown('<div class="alert-card success">正常範囲</div>', unsafe_allow_html=True)
 
+                # 年間累計（1月度〜現在月度、15日締めベース）
                 try:
-                    yr_data = load_monthly(
-                        date(end_date.year, 1, 1).isoformat(),
-                        str(end_date)
+                    yr_fiscal_start = date(end_date.year - 1, 12, CLOSING_DAY + 1)
+                    yr_data = load_fiscal_monthly(
+                        yr_fiscal_start.isoformat(), str(end_date), CLOSING_DAY
                     )
                     if not yr_data.empty:
                         yr_person = yr_data[yr_data["author"] == person]
                         yr_ot = yr_person["hoursOT"].sum()
                     else:
-                        yr_ot = p_ot
+                        yr_ot = p_cur_ot
                 except Exception:
-                    yr_ot = p_ot
+                    yr_ot = p_cur_ot
 
                 st.markdown(f"**年間累計残業: {yr_ot:.1f}h / 360h**")
                 st.progress(min(yr_ot / 360, 1.0))

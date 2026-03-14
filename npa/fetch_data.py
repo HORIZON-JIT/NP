@@ -216,6 +216,98 @@ def fetch_monthly_breakdown(start_date: str, end_date: str) -> pd.DataFrame:
     return pd.concat(all_dfs, ignore_index=True)
 
 
+def get_fiscal_month(d, closing_day: int = 15) -> tuple[int, int]:
+    """
+    日付が属する月度を返す（15日締めの場合）。
+
+    15日締め: 前月16日〜当月15日 = 当月度
+      例: 12/1 → 12月度, 12/16 → 1月度, 1/15 → 1月度, 3/14 → 3月度
+
+    Returns:
+        (year, month) の月度
+    """
+    if d.day <= closing_day:
+        return (d.year, d.month)
+    else:
+        if d.month == 12:
+            return (d.year + 1, 1)
+        else:
+            return (d.year, d.month + 1)
+
+
+def get_fiscal_month_range(year: int, month: int, closing_day: int = 15):
+    """
+    月度の開始日・終了日を返す。
+
+    例: 2026年3月度（15日締め） → 2026/2/16 〜 2026/3/15
+
+    Returns:
+        (start_date, end_date)
+    """
+    import calendar
+    from datetime import date as dt_date
+
+    # 開始: 前月の closing_day + 1
+    if month == 1:
+        start = dt_date(year - 1, 12, closing_day + 1)
+    else:
+        start = dt_date(year, month - 1, closing_day + 1)
+
+    # 終了: 当月の closing_day（月末を超えないよう調整）
+    _, last_day = calendar.monthrange(year, month)
+    end_day = min(closing_day, last_day)
+    end = dt_date(year, month, end_day)
+
+    return (start, end)
+
+
+def fetch_fiscal_monthly_breakdown(start_date: str, end_date: str, closing_day: int = 15) -> pd.DataFrame:
+    """
+    期間を月度（15日締め）ごとに分割してデータ取得。
+    fiscal_year, fiscal_month, fiscal_label 列を付与。
+    """
+    from datetime import date as dt_date
+
+    start = dt_date.fromisoformat(start_date)
+    end = dt_date.fromisoformat(end_date)
+
+    # 開始日・終了日の月度を求める
+    fy_s, fm_s = get_fiscal_month(start, closing_day)
+    fy_e, fm_e = get_fiscal_month(end, closing_day)
+
+    all_dfs = []
+    fy, fm = fy_s, fm_s
+
+    while (fy, fm) <= (fy_e, fm_e):
+        ms, me = get_fiscal_month_range(fy, fm, closing_day)
+        # 選択期間でクリップ
+        ms = max(ms, start)
+        me = min(me, end)
+
+        if ms <= me:
+            try:
+                raw = fetch_date_range(ms.isoformat(), me.isoformat())
+                df = to_dataframe(raw)
+                if not df.empty:
+                    df["fiscal_year"] = fy
+                    df["fiscal_month"] = fm
+                    df["fiscal_label"] = f"{fm}月度"
+                    all_dfs.append(df)
+            except Exception:
+                pass
+
+        # 次の月度
+        if fm == 12:
+            fy += 1
+            fm = 1
+        else:
+            fm += 1
+
+    if not all_dfs:
+        return pd.DataFrame()
+    return pd.concat(all_dfs, ignore_index=True)
+
+
 def get_leave_map(data: dict) -> dict:
     """
     GASレスポンスから退勤時間マップを取得。
