@@ -827,7 +827,12 @@ elif page == "📊 稼働・偏り":
             title="チーム平均との差分（赤=平均以上 / 青=平均以下）"
         )
 
-    fig_heat.update_layout(height=max(350, len(ordered_authors) * 50))
+    fig_heat.update_layout(
+        height=max(500, len(ordered_authors) * 70),
+        xaxis=dict(tickfont=dict(size=13)),
+        yaxis=dict(tickfont=dict(size=13)),
+    )
+    fig_heat.update_traces(textfont=dict(size=13))
     apply_dark(fig_heat)
     st.plotly_chart(fig_heat, use_container_width=True)
 
@@ -903,9 +908,11 @@ elif page == "📊 稼働・偏り":
         title="担当者 × 中分類 ヒートマップ"
     )
     fig_sub_heat.update_layout(
-        height=max(400, len(ordered_authors) * 50),
-        xaxis=dict(tickangle=-45)
+        height=max(550, len(ordered_authors) * 70),
+        xaxis=dict(tickangle=-45, tickfont=dict(size=12)),
+        yaxis=dict(tickfont=dict(size=13)),
     )
+    fig_sub_heat.update_traces(textfont=dict(size=12))
     apply_dark(fig_sub_heat)
     st.plotly_chart(fig_sub_heat, use_container_width=True)
 
@@ -998,7 +1005,12 @@ elif page == "📊 稼働・偏り":
         labels={"x": "担当者", "y": "担当者", "color": "類似度"},
         title="作業パターン類似度マトリクス"
     )
-    fig_sim.update_layout(height=max(400, len(authors_list) * 55))
+    fig_sim.update_layout(
+        height=max(550, len(authors_list) * 70),
+        xaxis=dict(tickfont=dict(size=13)),
+        yaxis=dict(tickfont=dict(size=13)),
+    )
+    fig_sim.update_traces(textfont=dict(size=13))
     apply_dark(fig_sim)
     st.plotly_chart(fig_sim, use_container_width=True)
 
