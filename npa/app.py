@@ -46,6 +46,18 @@ def load_data(s: str, e: str):
 with st.spinner("データ取得中..."):
     try:
         df, raw_data = load_data(str(start_date), str(end_date))
+    except FileNotFoundError as e:
+        st.error("Google OAuth2 認証が未設定です。")
+        st.info(str(e))
+        st.stop()
+    except RuntimeError as e:
+        err_msg = str(e)
+        if "認証" in err_msg or "ログイン" in err_msg:
+            st.error(f"認証エラー: {err_msg}")
+            st.info("ターミナルで `python npa/gas_auth.py` を実行して再認証してください。")
+        else:
+            st.error(f"データ取得エラー: {err_msg}")
+        st.stop()
     except Exception as e:
         st.error(f"データ取得エラー: {e}")
         st.stop()
