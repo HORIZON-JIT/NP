@@ -261,6 +261,109 @@ def get_fiscal_month_range(year: int, month: int, closing_day: int = 15):
     return (start, end)
 
 
+def get_fiscal_year(d, closing_day: int = 15, fy_start_month: int = 10) -> int:
+    """
+    日付が属する年度を返す。
+
+    10月始まり・15日締めの場合:
+      2025/9/16〜2026/9/15 = 2025年度
+      2025/3/14 → 3月度 → 2024年度
+      2025/10/1 → 10月度 → 2025年度
+
+    Returns:
+        年度（int）
+    """
+    _, fm = get_fiscal_month(d, closing_day)
+    y = d.year if d.day <= closing_day else (d.year if d.month < 12 else d.year + 1)
+    # get_fiscal_month が返す year を使う
+    fy_year, fy_month = get_fiscal_month(d, closing_day)
+    if fy_month >= fy_start_month:
+        return fy_year
+    else:
+        return fy_year - 1
+
+
+def get_fiscal_year_range(fiscal_year: int, closing_day: int = 15, fy_start_month: int = 10):
+    """
+    年度の日付範囲を返す。
+
+    例: 2025年度（10月始まり・15日締め） → 2025/9/16 〜 2026/9/15
+
+    Returns:
+        (start_date, end_date)
+    """
+    # 年度開始 = 開始月度の範囲の開始日
+    start = get_fiscal_month_range(fiscal_year, fy_start_month, closing_day)[0]
+
+    # 年度終了 = 最終月度(fy_start_month - 1)の範囲の終了日
+    end_month = fy_start_month - 1 if fy_start_month > 1 else 12
+    end_year = fiscal_year + 1 if fy_start_month > 1 else fiscal_year
+    end = get_fiscal_month_range(end_year, end_month, closing_day)[1]
+
+    return (start, end)
+
+
+def _fiscal_month_order(fy_start_month: int = 10) -> list[int]:
+    """年度の月度順序を返す。例: 10月始まり → [10,11,12,1,2,...,9]"""
+    return [(fy_start_month + i - 1) % 12 + 1 for i in range(12)]
+
+
+def get_fiscal_quarter_range(fiscal_year: int, quarter: int,
+                             closing_day: int = 15, fy_start_month: int = 10):
+    """
+    四半期の日付範囲を返す。
+
+    10月始まり: Q1=10,11,12月度 / Q2=1,2,3月度 / Q3=4,5,6月度 / Q4=7,8,9月度
+
+    Returns:
+        (start_date, end_date)
+    """
+    ordered = _fiscal_month_order(fy_start_month)
+    q_months = ordered[(quarter - 1) * 3 : quarter * 3]
+
+    first_m = q_months[0]
+    last_m = q_months[-1]
+
+    # 月度の暦年を決定
+    first_y = fiscal_year if first_m >= fy_start_month else fiscal_year + 1
+    last_y = fiscal_year if last_m >= fy_start_month else fiscal_year + 1
+
+    start = get_fiscal_month_range(first_y, first_m, closing_day)[0]
+    end = get_fiscal_month_range(last_y, last_m, closing_day)[1]
+
+    return (start, end)
+
+
+def get_fiscal_half_range(fiscal_year: int, half: int,
+                          closing_day: int = 15, fy_start_month: int = 10):
+    """
+    上期/下期の日付範囲を返す。
+
+    half=1 (上期): Q1+Q2 / half=2 (下期): Q3+Q4
+
+    Returns:
+        (start_date, end_date)
+    """
+    if half == 1:
+        start = get_fiscal_quarter_range(fiscal_year, 1, closing_day, fy_start_month)[0]
+        end = get_fiscal_quarter_range(fiscal_year, 2, closing_day, fy_start_month)[1]
+    else:
+        start = get_fiscal_quarter_range(fiscal_year, 3, closing_day, fy_start_month)[0]
+        end = get_fiscal_quarter_range(fiscal_year, 4, closing_day, fy_start_month)[1]
+
+    return (start, end)
+
+
+def get_current_fiscal_quarter(d, closing_day: int = 15, fy_start_month: int = 10) -> int:
+    """
+    日付が属する四半期番号を返す（1〜4）。
+    """
+    _, fm = get_fiscal_month(d, closing_day)
+    ordered = _fiscal_month_order(fy_start_month)
+    idx = ordered.index(fm)
+    return idx // 3 + 1
+
+
 def fetch_fiscal_monthly_breakdown(start_date: str, end_date: str, closing_day: int = 15) -> pd.DataFrame:
     """
     期間を月度（15日締め）ごとに分割してデータ取得。

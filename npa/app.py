@@ -13,10 +13,14 @@ import numpy as np
 from datetime import date, timedelta
 import calendar
 
-from config import MAIN_CATEGORIES, AUTHORS, SUB_CATEGORIES, REGULAR_HOURS, CLOSING_DAY, get_main_cd, get_main_label
+from config import (MAIN_CATEGORIES, AUTHORS, SUB_CATEGORIES, REGULAR_HOURS,
+                    CLOSING_DAY, FISCAL_YEAR_START_MONTH, get_main_cd, get_main_label)
 from fetch_data import (fetch_date_range, to_dataframe, fetch_weekly_breakdown,
                         fetch_monthly_breakdown, fetch_fiscal_monthly_breakdown,
-                        get_fiscal_month, get_fiscal_month_range)
+                        get_fiscal_month, get_fiscal_month_range,
+                        get_fiscal_year, get_fiscal_year_range,
+                        get_fiscal_quarter_range, get_fiscal_half_range,
+                        get_current_fiscal_quarter, _fiscal_month_order)
 
 # ── ページ設定 ──
 st.set_page_config(page_title="NPA Dashboard", page_icon="📊", layout="wide")
@@ -242,19 +246,139 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # 期間設定
+    # ── 期間設定（3モード切替） ──
     st.markdown("**📅 分析期間**")
     today = date.today()
-    default_start = today.replace(day=1)
-    default_end = today
 
-    col_s, col_e = st.columns(2)
-    start_date = col_s.date_input("開始", value=default_start, label_visibility="collapsed")
-    end_date = col_e.date_input("終了", value=default_end, label_visibility="collapsed")
+    # デフォルト: 当月度
+    cur_fy_m = get_fiscal_month(today, CLOSING_DAY)
+    default_fm_start, default_fm_end = get_fiscal_month_range(cur_fy_m[0], cur_fy_m[1], CLOSING_DAY)
 
-    if start_date > end_date:
-        st.error("開始日 > 終了日")
-        st.stop()
+    # session_state 初期化
+    if "period_start" not in st.session_state:
+        st.session_state["period_start"] = default_fm_start
+        st.session_state["period_end"] = default_fm_end
+        st.session_state["period_label"] = f"当月度（{cur_fy_m[1]}月度）"
+
+    date_mode = st.radio(
+        "選択方法", ["プリセット", "月度指定", "カスタム"],
+        horizontal=True, key="date_mode", label_visibility="collapsed"
+    )
+
+    if date_mode == "プリセット":
+        cur_fy = get_fiscal_year(today, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+        cur_q = get_current_fiscal_quarter(today, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+
+        row1_a, row1_b = st.columns(2)
+        row2_a, row2_b = st.columns(2)
+        row3_a, row3_b = st.columns(2)
+
+        with row1_a:
+            if st.button("当月度", use_container_width=True):
+                s, e = get_fiscal_month_range(cur_fy_m[0], cur_fy_m[1], CLOSING_DAY)
+                st.session_state["period_start"] = s
+                st.session_state["period_end"] = e
+                st.session_state["period_label"] = f"{cur_fy_m[1]}月度"
+        with row1_b:
+            if st.button("前月度", use_container_width=True):
+                # 前月度 = 当月度の1つ前
+                pm = cur_fy_m[1] - 1 if cur_fy_m[1] > 1 else 12
+                py = cur_fy_m[0] if cur_fy_m[1] > 1 else cur_fy_m[0] - 1
+                s, e = get_fiscal_month_range(py, pm, CLOSING_DAY)
+                st.session_state["period_start"] = s
+                st.session_state["period_end"] = e
+                st.session_state["period_label"] = f"{pm}月度"
+
+        with row2_a:
+            if st.button("当四半期", use_container_width=True):
+                s, e = get_fiscal_quarter_range(cur_fy, cur_q, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+                st.session_state["period_start"] = s
+                st.session_state["period_end"] = e
+                st.session_state["period_label"] = f"{cur_fy}年度 Q{cur_q}"
+        with row2_b:
+            if st.button("当年度", use_container_width=True):
+                s, e = get_fiscal_year_range(cur_fy, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+                st.session_state["period_start"] = s
+                st.session_state["period_end"] = e
+                st.session_state["period_label"] = f"{cur_fy}年度"
+
+        with row3_a:
+            if st.button("上期", use_container_width=True):
+                s, e = get_fiscal_half_range(cur_fy, 1, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+                st.session_state["period_start"] = s
+                st.session_state["period_end"] = e
+                st.session_state["period_label"] = f"{cur_fy}年度 上期"
+        with row3_b:
+            if st.button("下期", use_container_width=True):
+                s, e = get_fiscal_half_range(cur_fy, 2, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+                st.session_state["period_start"] = s
+                st.session_state["period_end"] = e
+                st.session_state["period_label"] = f"{cur_fy}年度 下期"
+
+        start_date = st.session_state["period_start"]
+        end_date = st.session_state["period_end"]
+
+    elif date_mode == "月度指定":
+        cur_fy = get_fiscal_year(today, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+        fy_options = [cur_fy, cur_fy - 1, cur_fy - 2]
+        fy_labels = [f"{y}年度" for y in fy_options]
+
+        sel_fy_label = st.selectbox("年度", fy_labels, index=0, key="fy_sel")
+        sel_fy = fy_options[fy_labels.index(sel_fy_label)]
+
+        # 月度は10月度〜9月度の順
+        fm_order = _fiscal_month_order(FISCAL_YEAR_START_MONTH)
+        fm_labels = [f"{m}月度" for m in fm_order]
+
+        # 当月度のindex
+        cur_fm_idx = fm_order.index(cur_fy_m[1]) if cur_fy_m[1] in fm_order else 0
+
+        col_fm_s, col_fm_e = st.columns(2)
+        with col_fm_s:
+            sel_start_label = st.selectbox("開始", fm_labels, index=cur_fm_idx, key="fm_start_sel")
+            sel_start_m = fm_order[fm_labels.index(sel_start_label)]
+        with col_fm_e:
+            sel_end_label = st.selectbox("終了", fm_labels, index=cur_fm_idx, key="fm_end_sel")
+            sel_end_m = fm_order[fm_labels.index(sel_end_label)]
+
+        # 暦年を算出
+        start_cal_y = sel_fy if sel_start_m >= FISCAL_YEAR_START_MONTH else sel_fy + 1
+        end_cal_y = sel_fy if sel_end_m >= FISCAL_YEAR_START_MONTH else sel_fy + 1
+
+        start_date = get_fiscal_month_range(start_cal_y, sel_start_m, CLOSING_DAY)[0]
+        end_date = get_fiscal_month_range(end_cal_y, sel_end_m, CLOSING_DAY)[1]
+
+        if start_date > end_date:
+            st.error("開始月度が終了月度より後です")
+            st.stop()
+
+        st.session_state["period_start"] = start_date
+        st.session_state["period_end"] = end_date
+        if sel_start_m == sel_end_m:
+            st.session_state["period_label"] = f"{sel_fy}年度 {sel_start_m}月度"
+        else:
+            st.session_state["period_label"] = f"{sel_fy}年度 {sel_start_m}月度〜{sel_end_m}月度"
+
+    else:  # カスタム
+        col_s, col_e = st.columns(2)
+        start_date = col_s.date_input("開始", value=st.session_state["period_start"],
+                                      label_visibility="collapsed")
+        end_date = col_e.date_input("終了", value=st.session_state["period_end"],
+                                    label_visibility="collapsed")
+
+        if start_date > end_date:
+            st.error("開始日 > 終了日")
+            st.stop()
+
+        st.session_state["period_start"] = start_date
+        st.session_state["period_end"] = end_date
+        st.session_state["period_label"] = "カスタム"
+
+    # 選択中の期間を表示
+    st.caption(
+        f"{start_date.strftime('%Y/%m/%d')} 〜 {end_date.strftime('%Y/%m/%d')}"
+        f"　({CLOSING_DAY}日締め)"
+    )
 
     st.markdown("---")
 
@@ -587,7 +711,8 @@ elif page == "⏰ 残業・36協定":
 
     # 年間累計（1月度〜現在の月度まで、15日締めベース）
     # 年度開始 = 前年12/16（1月度の開始）
-    fiscal_year_start_date = date(end_date.year - 1, 12, CLOSING_DAY + 1)
+    cur_fy_36 = get_fiscal_year(end_date, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+    fiscal_year_start_date = get_fiscal_year_range(cur_fy_36, CLOSING_DAY, FISCAL_YEAR_START_MONTH)[0]
     with st.spinner("年間残業データ取得中..."):
         try:
             year_fiscal = load_fiscal_monthly(
@@ -1267,9 +1392,10 @@ elif page == "🔍 個人サマリ":
                 else:
                     st.markdown('<div class="alert-card success">正常範囲</div>', unsafe_allow_html=True)
 
-                # 年間累計（1月度〜現在月度、15日締めベース）
+                # 年間累計（10月度〜現在月度、15日締めベース）
                 try:
-                    yr_fiscal_start = date(end_date.year - 1, 12, CLOSING_DAY + 1)
+                    cur_fy_p = get_fiscal_year(end_date, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+                    yr_fiscal_start = get_fiscal_year_range(cur_fy_p, CLOSING_DAY, FISCAL_YEAR_START_MONTH)[0]
                     yr_data = load_fiscal_monthly(
                         yr_fiscal_start.isoformat(), str(end_date), CLOSING_DAY
                     )
@@ -1307,27 +1433,33 @@ elif page == "🔍 個人サマリ":
             )
 
             # 月別残業推移（個人）
-            section_header("📈", f"{person} 月別推移")
+            section_header("📈", f"{person} 月度別推移")
             try:
-                yr_data_full = load_monthly(
-                    date(end_date.year, 1, 1).isoformat(),
-                    str(end_date)
+                cur_fy_pm = get_fiscal_year(end_date, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+                fy_pm_start = get_fiscal_year_range(cur_fy_pm, CLOSING_DAY, FISCAL_YEAR_START_MONTH)[0]
+                yr_data_full = load_fiscal_monthly(
+                    fy_pm_start.isoformat(), str(end_date), CLOSING_DAY
                 )
                 if not yr_data_full.empty:
                     p_monthly = (
                         yr_data_full[yr_data_full["author"] == person]
-                        .groupby("month", as_index=False)
+                        .groupby(["fiscal_month", "fiscal_label"], as_index=False)
                         .agg(残業=("hoursOT", "sum"), 通常=("hoursNormal", "sum"))
                     )
-                    p_monthly["月名"] = p_monthly["month"].map(lambda m: f"{m}月")
+                    # 年度順にソート
+                    fm_order = _fiscal_month_order(FISCAL_YEAR_START_MONTH)
+                    p_monthly["_order"] = p_monthly["fiscal_month"].map(
+                        lambda m: fm_order.index(m) if m in fm_order else 99
+                    )
+                    p_monthly = p_monthly.sort_values("_order")
 
                     fig_p_month = go.Figure()
                     fig_p_month.add_trace(go.Bar(
-                        x=p_monthly["月名"], y=p_monthly["通常"],
+                        x=p_monthly["fiscal_label"], y=p_monthly["通常"],
                         name="通常", marker_color="#60A5FA"
                     ))
                     fig_p_month.add_trace(go.Bar(
-                        x=p_monthly["月名"], y=p_monthly["残業"],
+                        x=p_monthly["fiscal_label"], y=p_monthly["残業"],
                         name="残業", marker_color="#F87171"
                     ))
                     fig_p_month.add_hline(
@@ -1336,13 +1468,13 @@ elif page == "🔍 個人サマリ":
                     )
                     fig_p_month.update_layout(
                         barmode="stack",
-                        title=f"{person} {end_date.year}年 月別工数",
+                        title=f"{person} {cur_fy_pm}年度 月度別工数",
                         yaxis_title="時間 (h)", height=400
                     )
                     apply_dark(fig_p_month)
                     st.plotly_chart(fig_p_month, use_container_width=True)
             except Exception:
-                st.info("月別データを取得できませんでした。")
+                st.info("月度別データを取得できませんでした。")
 
 # ────────────────────────────────────
 # データ一覧
