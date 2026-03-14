@@ -19,10 +19,12 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-# GAS Web Appにアクセスするために必要なスコープ
+# GAS Web App（組織内限定）にアクセスするために必要なスコープ
+# drive スコープが必要（GAS Web AppはDrive基盤で認証される）
 SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/drive",
 ]
 
 _DIR = Path(__file__).parent
