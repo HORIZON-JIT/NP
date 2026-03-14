@@ -366,7 +366,6 @@ with tab4:
 # ══════════════════════════════════════════
 with tab5:
     # ── 稼働率 ──
-    st.success("✅ 最新コード反映テスト - この文字が見えたら反映OK")
     st.subheader("稼働率（所定労働時間に対する実績）")
     st.caption(f"所定: 営業日{bdays}日 × {REGULAR_HOURS}h = {bdays * REGULAR_HOURS:.0f}h/人")
 
