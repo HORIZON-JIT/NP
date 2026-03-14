@@ -54,6 +54,12 @@ SUB_CATEGORIES = {
 # 所定労働時間
 REGULAR_HOURS = 8.0
 
+# 締め日（15日締め = 16日〜翌15日が1ヶ月度）
+CLOSING_DAY = 15
+
+# 年度開始月（10月始まり = 10月度〜翌9月度が1年度）
+FISCAL_YEAR_START_MONTH = 10
+
 
 def get_main_cd(cd_sub: str) -> str:
     """中分類コードから大分類コードを取得"""

@@ -13,8 +13,14 @@ import numpy as np
 from datetime import date, timedelta
 import calendar
 
-from config import MAIN_CATEGORIES, AUTHORS, SUB_CATEGORIES, REGULAR_HOURS, get_main_cd, get_main_label
-from fetch_data import fetch_date_range, to_dataframe, fetch_weekly_breakdown, fetch_monthly_breakdown
+from config import (MAIN_CATEGORIES, AUTHORS, SUB_CATEGORIES, REGULAR_HOURS,
+                    CLOSING_DAY, FISCAL_YEAR_START_MONTH, get_main_cd, get_main_label)
+from fetch_data import (fetch_date_range, to_dataframe, fetch_weekly_breakdown,
+                        fetch_monthly_breakdown, fetch_fiscal_monthly_breakdown,
+                        get_fiscal_month, get_fiscal_month_range,
+                        get_fiscal_year, get_fiscal_year_range,
+                        get_fiscal_quarter_range, get_fiscal_half_range,
+                        get_current_fiscal_quarter, _fiscal_month_order)
 
 # ── ページ設定 ──
 st.set_page_config(page_title="NPA Dashboard", page_icon="📊", layout="wide")
@@ -240,19 +246,139 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # 期間設定
+    # ── 期間設定（3モード切替） ──
     st.markdown("**📅 分析期間**")
     today = date.today()
-    default_start = today.replace(day=1)
-    default_end = today
 
-    col_s, col_e = st.columns(2)
-    start_date = col_s.date_input("開始", value=default_start, label_visibility="collapsed")
-    end_date = col_e.date_input("終了", value=default_end, label_visibility="collapsed")
+    # デフォルト: 当月度
+    cur_fy_m = get_fiscal_month(today, CLOSING_DAY)
+    default_fm_start, default_fm_end = get_fiscal_month_range(cur_fy_m[0], cur_fy_m[1], CLOSING_DAY)
 
-    if start_date > end_date:
-        st.error("開始日 > 終了日")
-        st.stop()
+    # session_state 初期化
+    if "period_start" not in st.session_state:
+        st.session_state["period_start"] = default_fm_start
+        st.session_state["period_end"] = default_fm_end
+        st.session_state["period_label"] = f"当月度（{cur_fy_m[1]}月度）"
+
+    date_mode = st.radio(
+        "選択方法", ["プリセット", "月度指定", "カスタム"],
+        horizontal=True, key="date_mode", label_visibility="collapsed"
+    )
+
+    if date_mode == "プリセット":
+        cur_fy = get_fiscal_year(today, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+        cur_q = get_current_fiscal_quarter(today, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+
+        row1_a, row1_b = st.columns(2)
+        row2_a, row2_b = st.columns(2)
+        row3_a, row3_b = st.columns(2)
+
+        with row1_a:
+            if st.button("当月度", use_container_width=True):
+                s, e = get_fiscal_month_range(cur_fy_m[0], cur_fy_m[1], CLOSING_DAY)
+                st.session_state["period_start"] = s
+                st.session_state["period_end"] = e
+                st.session_state["period_label"] = f"{cur_fy_m[1]}月度"
+        with row1_b:
+            if st.button("前月度", use_container_width=True):
+                # 前月度 = 当月度の1つ前
+                pm = cur_fy_m[1] - 1 if cur_fy_m[1] > 1 else 12
+                py = cur_fy_m[0] if cur_fy_m[1] > 1 else cur_fy_m[0] - 1
+                s, e = get_fiscal_month_range(py, pm, CLOSING_DAY)
+                st.session_state["period_start"] = s
+                st.session_state["period_end"] = e
+                st.session_state["period_label"] = f"{pm}月度"
+
+        with row2_a:
+            if st.button("当四半期", use_container_width=True):
+                s, e = get_fiscal_quarter_range(cur_fy, cur_q, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+                st.session_state["period_start"] = s
+                st.session_state["period_end"] = e
+                st.session_state["period_label"] = f"{cur_fy}年度 Q{cur_q}"
+        with row2_b:
+            if st.button("当年度", use_container_width=True):
+                s, e = get_fiscal_year_range(cur_fy, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+                st.session_state["period_start"] = s
+                st.session_state["period_end"] = e
+                st.session_state["period_label"] = f"{cur_fy}年度"
+
+        with row3_a:
+            if st.button("上期", use_container_width=True):
+                s, e = get_fiscal_half_range(cur_fy, 1, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+                st.session_state["period_start"] = s
+                st.session_state["period_end"] = e
+                st.session_state["period_label"] = f"{cur_fy}年度 上期"
+        with row3_b:
+            if st.button("下期", use_container_width=True):
+                s, e = get_fiscal_half_range(cur_fy, 2, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+                st.session_state["period_start"] = s
+                st.session_state["period_end"] = e
+                st.session_state["period_label"] = f"{cur_fy}年度 下期"
+
+        start_date = st.session_state["period_start"]
+        end_date = st.session_state["period_end"]
+
+    elif date_mode == "月度指定":
+        cur_fy = get_fiscal_year(today, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+        fy_options = [cur_fy, cur_fy - 1, cur_fy - 2]
+        fy_labels = [f"{y}年度" for y in fy_options]
+
+        sel_fy_label = st.selectbox("年度", fy_labels, index=0, key="fy_sel")
+        sel_fy = fy_options[fy_labels.index(sel_fy_label)]
+
+        # 月度は10月度〜9月度の順
+        fm_order = _fiscal_month_order(FISCAL_YEAR_START_MONTH)
+        fm_labels = [f"{m}月度" for m in fm_order]
+
+        # 当月度のindex
+        cur_fm_idx = fm_order.index(cur_fy_m[1]) if cur_fy_m[1] in fm_order else 0
+
+        col_fm_s, col_fm_e = st.columns(2)
+        with col_fm_s:
+            sel_start_label = st.selectbox("開始", fm_labels, index=cur_fm_idx, key="fm_start_sel")
+            sel_start_m = fm_order[fm_labels.index(sel_start_label)]
+        with col_fm_e:
+            sel_end_label = st.selectbox("終了", fm_labels, index=cur_fm_idx, key="fm_end_sel")
+            sel_end_m = fm_order[fm_labels.index(sel_end_label)]
+
+        # 暦年を算出
+        start_cal_y = sel_fy if sel_start_m >= FISCAL_YEAR_START_MONTH else sel_fy + 1
+        end_cal_y = sel_fy if sel_end_m >= FISCAL_YEAR_START_MONTH else sel_fy + 1
+
+        start_date = get_fiscal_month_range(start_cal_y, sel_start_m, CLOSING_DAY)[0]
+        end_date = get_fiscal_month_range(end_cal_y, sel_end_m, CLOSING_DAY)[1]
+
+        if start_date > end_date:
+            st.error("開始月度が終了月度より後です")
+            st.stop()
+
+        st.session_state["period_start"] = start_date
+        st.session_state["period_end"] = end_date
+        if sel_start_m == sel_end_m:
+            st.session_state["period_label"] = f"{sel_fy}年度 {sel_start_m}月度"
+        else:
+            st.session_state["period_label"] = f"{sel_fy}年度 {sel_start_m}月度〜{sel_end_m}月度"
+
+    else:  # カスタム
+        col_s, col_e = st.columns(2)
+        start_date = col_s.date_input("開始", value=st.session_state["period_start"],
+                                      label_visibility="collapsed")
+        end_date = col_e.date_input("終了", value=st.session_state["period_end"],
+                                    label_visibility="collapsed")
+
+        if start_date > end_date:
+            st.error("開始日 > 終了日")
+            st.stop()
+
+        st.session_state["period_start"] = start_date
+        st.session_state["period_end"] = end_date
+        st.session_state["period_label"] = "カスタム"
+
+    # 選択中の期間を表示
+    st.caption(
+        f"{start_date.strftime('%Y/%m/%d')} 〜 {end_date.strftime('%Y/%m/%d')}"
+        f"　({CLOSING_DAY}日締め)"
+    )
 
     st.markdown("---")
 
@@ -312,6 +438,11 @@ def load_weekly(s: str, e: str):
 @st.cache_data(ttl=600, show_spinner=False)
 def load_monthly(s: str, e: str):
     return fetch_monthly_breakdown(s, e)
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def load_fiscal_monthly(s: str, e: str, closing_day: int = 15):
+    return fetch_fiscal_monthly_breakdown(s, e, closing_day)
 
 
 with st.spinner("データ取得中..."):
@@ -521,66 +652,77 @@ elif page == "📂 工程別":
 # ────────────────────────────────────
 elif page == "⏰ 残業・36協定":
     st.markdown('<p class="main-header">残業・36協定管理</p>', unsafe_allow_html=True)
-    st.markdown(f'<p class="sub-header">{start_date.strftime("%Y/%m/%d")} — {end_date.strftime("%Y/%m/%d")}</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="sub-header">{start_date.strftime("%Y/%m/%d")} — {end_date.strftime("%Y/%m/%d")}　|　{CLOSING_DAY}日締め</p>', unsafe_allow_html=True)
 
-    ot_df = (
-        df.groupby("author", as_index=False)
-        .agg(残業=("hoursOT", "sum"))
-    )
-    ot_df = sort_by_author(ot_df)
+    # ── 月度別データを取得（15日締め） ──
+    with st.spinner("月度別データ取得中..."):
+        try:
+            fiscal_df = load_fiscal_monthly(str(start_date), str(end_date), CLOSING_DAY)
+        except Exception as e:
+            st.error(f"月度別データ取得エラー: {e}")
+            fiscal_df = pd.DataFrame()
 
-    fig5 = go.Figure()
-    fig5.add_trace(go.Bar(
-        x=ot_df["author"], y=ot_df["残業"],
-        marker=dict(
-            color=ot_df["残業"],
-            colorscale=[[0, "#4ECDC4"], [0.5, "#FBBF24"], [1, "#EF4444"]],
-        ),
-        text=[f"{v:.1f}h" for v in ot_df["残業"]],
-        textposition="outside",
-        textfont=dict(color="#C8CDDF"),
-    ))
-    fig5.update_layout(title="担当者別 残業時間", yaxis_title="残業時間 (h)", height=400)
-    fig5.add_hline(y=45, line_dash="dash", line_color="#EF4444",
-                   annotation_text="月上限 45h", annotation_font_color="#EF4444")
-    apply_dark(fig5)
-    st.plotly_chart(fig5, use_container_width=True)
+    if not fiscal_df.empty:
+        if selected_authors:
+            fiscal_df = fiscal_df[fiscal_df["author"].isin(selected_authors)].copy()
 
-    # 残業比率テーブル
-    auth_full = (
-        df.groupby("author", as_index=False)
-        .agg(通常=("hoursNormal", "sum"), 残業=("hoursOT", "sum"))
-    )
-    auth_full["合計"] = auth_full["通常"] + auth_full["残業"]
-    auth_full["残業率"] = (auth_full["残業"] / auth_full["合計"] * 100).round(1)
-    auth_full = sort_by_author(auth_full)
+        # ── 月度別 残業棒グラフ（担当者×月度） ──
+        fm_ot = (
+            fiscal_df.groupby(["fiscal_label", "fiscal_month", "author"], as_index=False)
+            .agg(残業=("hoursOT", "sum"))
+        )
+        fm_ot = fm_ot.sort_values("fiscal_month")
 
-    section_header("📊", "担当者別 残業比率")
-    st.dataframe(
-        auth_full[["author", "通常", "残業", "合計", "残業率"]].rename(
-            columns={"author": "担当者", "残業率": "残業率 (%)"}
-        ),
-        use_container_width=True, hide_index=True
-    )
+        fig5 = px.bar(
+            fm_ot, x="author", y="残業", color="fiscal_label",
+            barmode="group",
+            title="担当者別 月度残業時間（15日締め）",
+            labels={"残業": "残業時間 (h)", "author": "担当者", "fiscal_label": "月度"},
+            color_discrete_sequence=NEON_COLORS,
+        )
+        fig5.add_hline(y=45, line_dash="dash", line_color="#EF4444",
+                       annotation_text="月上限 45h", annotation_font_color="#EF4444")
+        fig5.update_layout(height=450)
+        apply_dark(fig5)
+        st.plotly_chart(fig5, use_container_width=True)
 
-    # ── 36協定アラート ──
+        # ── 月度別 残業比率テーブル ──
+        section_header("📊", "月度別 残業比率")
+        fm_summary = (
+            fiscal_df.groupby(["author", "fiscal_label", "fiscal_month"], as_index=False)
+            .agg(通常=("hoursNormal", "sum"), 残業=("hoursOT", "sum"))
+        )
+        fm_summary["合計"] = fm_summary["通常"] + fm_summary["残業"]
+        fm_summary["残業率"] = (fm_summary["残業"] / fm_summary["合計"] * 100).round(1)
+        fm_summary = fm_summary.sort_values(["fiscal_month", "author"])
+        st.dataframe(
+            fm_summary[["author", "fiscal_label", "通常", "残業", "合計", "残業率"]].rename(
+                columns={"author": "担当者", "fiscal_label": "月度", "残業率": "残業率 (%)"}
+            ),
+            use_container_width=True, hide_index=True
+        )
+    else:
+        st.info("月度別データがありません。")
+
+    # ── 36協定アラート（月度別） ──
     st.markdown("---")
-    section_header("⚡", "36協定 残業上限チェック")
+    section_header("⚡", "36協定 残業上限チェック（15日締め月度別）")
     st.caption("月45h / 年360h が上限（特別条項: 月100h / 年720h）")
 
-    ot_by_author = (
-        df.groupby("author", as_index=False)
-        .agg(月残業=("hoursOT", "sum"))
-    )
-    ot_by_author = sort_by_author(ot_by_author)
-
-    year_start = date(end_date.year, 1, 1)
+    # 年間累計（1月度〜現在の月度まで、15日締めベース）
+    # 年度開始 = 前年12/16（1月度の開始）
+    cur_fy_36 = get_fiscal_year(end_date, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+    fiscal_year_start_date = get_fiscal_year_range(cur_fy_36, CLOSING_DAY, FISCAL_YEAR_START_MONTH)[0]
     with st.spinner("年間残業データ取得中..."):
         try:
-            year_monthly = load_monthly(year_start.isoformat(), str(end_date))
-            if not year_monthly.empty:
+            year_fiscal = load_fiscal_monthly(
+                fiscal_year_start_date.isoformat(), str(end_date), CLOSING_DAY
+            )
+            if not year_fiscal.empty:
+                if selected_authors:
+                    year_fiscal = year_fiscal[year_fiscal["author"].isin(selected_authors)].copy()
                 year_ot = (
-                    year_monthly.groupby("author", as_index=False)
+                    year_fiscal.groupby("author", as_index=False)
                     .agg(年間累計=("hoursOT", "sum"))
                 )
             else:
@@ -588,32 +730,62 @@ elif page == "⏰ 残業・36協定":
         except Exception:
             year_ot = pd.DataFrame(columns=["author", "年間累計"])
 
-    limit_df = ot_by_author.merge(year_ot, on="author", how="left").fillna(0)
+    if not fiscal_df.empty:
+        # 月度リスト（選択範囲内）
+        fiscal_months = (
+            fiscal_df[["fiscal_year", "fiscal_month", "fiscal_label"]]
+            .drop_duplicates()
+            .sort_values("fiscal_month")
+        )
 
-    for _, row in limit_df.iterrows():
-        name = row["author"]
-        monthly_ot = row["月残業"]
-        yearly_ot = row["年間累計"]
+        for _, fm_row in fiscal_months.iterrows():
+            fy = fm_row["fiscal_year"]
+            fm = fm_row["fiscal_month"]
+            fl = fm_row["fiscal_label"]
 
-        col_name, col_month, col_year = st.columns([1, 2, 2])
-        with col_name:
-            st.markdown(f"**{name}**")
-        with col_month:
-            pct_m = min(monthly_ot / 45 * 100, 100)
-            st.markdown(f"月: **{monthly_ot:.1f}h** / 45h")
-            st.progress(min(pct_m / 100, 1.0))
-            if monthly_ot > 45:
-                st.markdown(f'<div class="alert-card danger">月上限超過 (+{monthly_ot - 45:.1f}h)</div>', unsafe_allow_html=True)
-            elif monthly_ot > 36:
-                st.markdown(f'<div class="alert-card warning">月上限まで残り {45 - monthly_ot:.1f}h</div>', unsafe_allow_html=True)
-        with col_year:
-            pct_y = min(yearly_ot / 360 * 100, 100)
-            st.markdown(f"年: **{yearly_ot:.1f}h** / 360h")
-            st.progress(min(pct_y / 100, 1.0))
-            if yearly_ot > 360:
-                st.markdown(f'<div class="alert-card danger">年上限超過 (+{yearly_ot - 360:.1f}h)</div>', unsafe_allow_html=True)
-            elif yearly_ot > 300:
-                st.markdown(f'<div class="alert-card warning">年上限まで残り {360 - yearly_ot:.1f}h</div>', unsafe_allow_html=True)
+            fm_start, fm_end = get_fiscal_month_range(fy, fm, CLOSING_DAY)
+
+            st.markdown(f"### {fy}年 {fl}（{fm_start.strftime('%m/%d')}〜{fm_end.strftime('%m/%d')}）")
+
+            # この月度のデータ
+            month_data = fiscal_df[
+                (fiscal_df["fiscal_year"] == fy) & (fiscal_df["fiscal_month"] == fm)
+            ]
+            month_ot = (
+                month_data.groupby("author", as_index=False)
+                .agg(月残業=("hoursOT", "sum"))
+            )
+            month_ot = sort_by_author(month_ot)
+
+            # 年間累計をマージ
+            month_limit = month_ot.merge(year_ot, on="author", how="left").fillna(0)
+
+            for _, row in month_limit.iterrows():
+                name = row["author"]
+                m_ot = row["月残業"]
+                y_ot = row["年間累計"]
+
+                col_name, col_month, col_year = st.columns([1, 2, 2])
+                with col_name:
+                    st.markdown(f"**{name}**")
+                with col_month:
+                    pct_m = min(m_ot / 45 * 100, 100)
+                    st.markdown(f"月度: **{m_ot:.1f}h** / 45h")
+                    st.progress(min(pct_m / 100, 1.0))
+                    if m_ot > 45:
+                        st.markdown(f'<div class="alert-card danger">月上限超過 (+{m_ot - 45:.1f}h)</div>', unsafe_allow_html=True)
+                    elif m_ot > 36:
+                        st.markdown(f'<div class="alert-card warning">月上限まで残り {45 - m_ot:.1f}h</div>', unsafe_allow_html=True)
+                with col_year:
+                    pct_y = min(y_ot / 360 * 100, 100)
+                    st.markdown(f"年累計: **{y_ot:.1f}h** / 360h")
+                    st.progress(min(pct_y / 100, 1.0))
+                    if y_ot > 360:
+                        st.markdown(f'<div class="alert-card danger">年上限超過 (+{y_ot - 360:.1f}h)</div>', unsafe_allow_html=True)
+                    elif y_ot > 300:
+                        st.markdown(f'<div class="alert-card warning">年上限まで残り {360 - y_ot:.1f}h</div>', unsafe_allow_html=True)
+
+            st.markdown("---")
 
 # ────────────────────────────────────
 # 推移分析
@@ -780,7 +952,12 @@ elif page == "📊 稼働・偏り":
             title="チーム平均との差分（赤=平均以上 / 青=平均以下）"
         )
 
-    fig_heat.update_layout(height=max(350, len(ordered_authors) * 50))
+    fig_heat.update_layout(
+        height=max(500, len(ordered_authors) * 70),
+        xaxis=dict(tickfont=dict(size=13)),
+        yaxis=dict(tickfont=dict(size=13)),
+    )
+    fig_heat.update_traces(textfont=dict(size=13))
     apply_dark(fig_heat)
     st.plotly_chart(fig_heat, use_container_width=True)
 
@@ -856,9 +1033,11 @@ elif page == "📊 稼働・偏り":
         title="担当者 × 中分類 ヒートマップ"
     )
     fig_sub_heat.update_layout(
-        height=max(400, len(ordered_authors) * 50),
-        xaxis=dict(tickangle=-45)
+        height=max(550, len(ordered_authors) * 70),
+        xaxis=dict(tickangle=-45, tickfont=dict(size=12)),
+        yaxis=dict(tickfont=dict(size=13)),
     )
+    fig_sub_heat.update_traces(textfont=dict(size=12))
     apply_dark(fig_sub_heat)
     st.plotly_chart(fig_sub_heat, use_container_width=True)
 
@@ -951,7 +1130,12 @@ elif page == "📊 稼働・偏り":
         labels={"x": "担当者", "y": "担当者", "color": "類似度"},
         title="作業パターン類似度マトリクス"
     )
-    fig_sim.update_layout(height=max(400, len(authors_list) * 55))
+    fig_sim.update_layout(
+        height=max(550, len(authors_list) * 70),
+        xaxis=dict(tickfont=dict(size=13)),
+        yaxis=dict(tickfont=dict(size=13)),
+    )
+    fig_sim.update_traces(textfont=dict(size=13))
     apply_dark(fig_sim)
     st.plotly_chart(fig_sim, use_container_width=True)
 
@@ -1178,29 +1362,50 @@ elif page == "🔍 個人サマリ":
                 st.plotly_chart(fig_p_pie, use_container_width=True)
 
             with col_right:
-                section_header("⚡", f"{person} 36協定進捗")
+                section_header("⚡", f"{person} 36協定進捗（{CLOSING_DAY}日締め）")
 
-                st.markdown(f"**月残業: {p_ot:.1f}h / 45h**")
-                st.progress(min(p_ot / 45, 1.0))
-                if p_ot > 45:
-                    st.markdown(f'<div class="alert-card danger">月上限超過 (+{p_ot - 45:.1f}h)</div>', unsafe_allow_html=True)
-                elif p_ot > 36:
-                    st.markdown(f'<div class="alert-card warning">残り {45 - p_ot:.1f}h</div>', unsafe_allow_html=True)
+                # 現在の月度を特定（終了日ベース）
+                cur_fy, cur_fm = get_fiscal_month(end_date, CLOSING_DAY)
+                cur_fm_start, cur_fm_end = get_fiscal_month_range(cur_fy, cur_fm, CLOSING_DAY)
+
+                # 当月度の残業を取得
+                try:
+                    cur_month_data = load_fiscal_monthly(
+                        str(max(cur_fm_start, start_date)),
+                        str(min(cur_fm_end, end_date)),
+                        CLOSING_DAY
+                    )
+                    if not cur_month_data.empty:
+                        p_cur_ot = cur_month_data[cur_month_data["author"] == person]["hoursOT"].sum()
+                    else:
+                        p_cur_ot = 0.0
+                except Exception:
+                    p_cur_ot = 0.0
+
+                st.markdown(f"**{cur_fm}月度残業: {p_cur_ot:.1f}h / 45h**")
+                st.caption(f"{cur_fm_start.strftime('%m/%d')}〜{cur_fm_end.strftime('%m/%d')}")
+                st.progress(min(p_cur_ot / 45, 1.0))
+                if p_cur_ot > 45:
+                    st.markdown(f'<div class="alert-card danger">月上限超過 (+{p_cur_ot - 45:.1f}h)</div>', unsafe_allow_html=True)
+                elif p_cur_ot > 36:
+                    st.markdown(f'<div class="alert-card warning">残り {45 - p_cur_ot:.1f}h</div>', unsafe_allow_html=True)
                 else:
                     st.markdown('<div class="alert-card success">正常範囲</div>', unsafe_allow_html=True)
 
+                # 年間累計（10月度〜現在月度、15日締めベース）
                 try:
-                    yr_data = load_monthly(
-                        date(end_date.year, 1, 1).isoformat(),
-                        str(end_date)
+                    cur_fy_p = get_fiscal_year(end_date, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+                    yr_fiscal_start = get_fiscal_year_range(cur_fy_p, CLOSING_DAY, FISCAL_YEAR_START_MONTH)[0]
+                    yr_data = load_fiscal_monthly(
+                        yr_fiscal_start.isoformat(), str(end_date), CLOSING_DAY
                     )
                     if not yr_data.empty:
                         yr_person = yr_data[yr_data["author"] == person]
                         yr_ot = yr_person["hoursOT"].sum()
                     else:
-                        yr_ot = p_ot
+                        yr_ot = p_cur_ot
                 except Exception:
-                    yr_ot = p_ot
+                    yr_ot = p_cur_ot
 
                 st.markdown(f"**年間累計残業: {yr_ot:.1f}h / 360h**")
                 st.progress(min(yr_ot / 360, 1.0))
@@ -1228,27 +1433,33 @@ elif page == "🔍 個人サマリ":
             )
 
             # 月別残業推移（個人）
-            section_header("📈", f"{person} 月別推移")
+            section_header("📈", f"{person} 月度別推移")
             try:
-                yr_data_full = load_monthly(
-                    date(end_date.year, 1, 1).isoformat(),
-                    str(end_date)
+                cur_fy_pm = get_fiscal_year(end_date, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+                fy_pm_start = get_fiscal_year_range(cur_fy_pm, CLOSING_DAY, FISCAL_YEAR_START_MONTH)[0]
+                yr_data_full = load_fiscal_monthly(
+                    fy_pm_start.isoformat(), str(end_date), CLOSING_DAY
                 )
                 if not yr_data_full.empty:
                     p_monthly = (
                         yr_data_full[yr_data_full["author"] == person]
-                        .groupby("month", as_index=False)
+                        .groupby(["fiscal_month", "fiscal_label"], as_index=False)
                         .agg(残業=("hoursOT", "sum"), 通常=("hoursNormal", "sum"))
                     )
-                    p_monthly["月名"] = p_monthly["month"].map(lambda m: f"{m}月")
+                    # 年度順にソート
+                    fm_order = _fiscal_month_order(FISCAL_YEAR_START_MONTH)
+                    p_monthly["_order"] = p_monthly["fiscal_month"].map(
+                        lambda m: fm_order.index(m) if m in fm_order else 99
+                    )
+                    p_monthly = p_monthly.sort_values("_order")
 
                     fig_p_month = go.Figure()
                     fig_p_month.add_trace(go.Bar(
-                        x=p_monthly["月名"], y=p_monthly["通常"],
+                        x=p_monthly["fiscal_label"], y=p_monthly["通常"],
                         name="通常", marker_color="#60A5FA"
                     ))
                     fig_p_month.add_trace(go.Bar(
-                        x=p_monthly["月名"], y=p_monthly["残業"],
+                        x=p_monthly["fiscal_label"], y=p_monthly["残業"],
                         name="残業", marker_color="#F87171"
                     ))
                     fig_p_month.add_hline(
@@ -1257,13 +1468,13 @@ elif page == "🔍 個人サマリ":
                     )
                     fig_p_month.update_layout(
                         barmode="stack",
-                        title=f"{person} {end_date.year}年 月別工数",
+                        title=f"{person} {cur_fy_pm}年度 月度別工数",
                         yaxis_title="時間 (h)", height=400
                     )
                     apply_dark(fig_p_month)
                     st.plotly_chart(fig_p_month, use_container_width=True)
             except Exception:
-                st.info("月別データを取得できませんでした。")
+                st.info("月度別データを取得できませんでした。")
 
 # ────────────────────────────────────
 # データ一覧
