@@ -2,7 +2,7 @@
 NPA - GAS APIからデータ取得してDataFrameに変換
 
 GAS Web App（組織内限定）へのアクセスにはGoogle OAuth2認証が必要。
-access_token をクエリパラメータとして付与してリクエストする。
+Authorization: Bearer ヘッダーで認証し、リダイレクトを手動で処理する。
 """
 
 import json
@@ -28,6 +28,29 @@ def _try_parse_json(text: str) -> dict | None:
     return None
 
 
+def _fetch_with_auth(url: str, params: dict, token: str, max_redirects: int = 10) -> requests.Response:
+    """
+    Authorization: Bearer ヘッダー付きでGETリクエストを送信。
+    GAS Web Appはリダイレクト（302）するため、手動でリダイレクトを辿り
+    各リクエストにAuthorizationヘッダーを再付与する。
+    """
+    headers = {"Authorization": f"Bearer {token}"}
+
+    resp = requests.get(url, params=params, headers=headers,
+                        allow_redirects=False, timeout=60)
+
+    for _ in range(max_redirects):
+        if resp.status_code not in (301, 302, 303, 307, 308):
+            break
+        redirect_url = resp.headers.get("Location")
+        if not redirect_url:
+            break
+        resp = requests.get(redirect_url, headers=headers,
+                            allow_redirects=False, timeout=60)
+
+    return resp
+
+
 def fetch_date_range(start_date: str, end_date: str) -> dict:
     """
     GAS getDateRange APIを呼び出し、生JSONを返す。
@@ -47,11 +70,9 @@ def fetch_date_range(start_date: str, end_date: str) -> dict:
         "startDate": start_date,
         "endDate": end_date,
         "noCache": "1",
-        "access_token": token,
     }
 
-    resp = requests.get(GAS_URL, params=params, timeout=60,
-                        allow_redirects=True)
+    resp = _fetch_with_auth(GAS_URL, params, token)
     resp.raise_for_status()
 
     data = _try_parse_json(resp.text)
