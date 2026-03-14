@@ -1,5 +1,6 @@
 """
 NPA (日報分析) - Streamlit ダッシュボード
+ダークモダン UI
 
 起動: streamlit run npa/app.py
 """
@@ -16,32 +17,260 @@ from config import MAIN_CATEGORIES, AUTHORS, SUB_CATEGORIES, REGULAR_HOURS, get_
 from fetch_data import fetch_date_range, to_dataframe, fetch_weekly_breakdown, fetch_monthly_breakdown
 
 # ── ページ設定 ──
-st.set_page_config(page_title="日報分析 (NPA)", page_icon="📊", layout="wide")
-st.title("📊 日報分析ダッシュボード")
+st.set_page_config(page_title="NPA Dashboard", page_icon="📊", layout="wide")
 
-# ── サイドバー：期間・フィルタ ──
-st.sidebar.header("分析条件")
+# ══════════════════════════════════════════
+# カスタム CSS
+# ══════════════════════════════════════════
+st.markdown("""
+<style>
+/* --- グローバル --- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-today = date.today()
-default_start = today.replace(day=1)
-default_end = today
+.stApp {
+    font-family: 'Inter', sans-serif;
+}
 
-col_s, col_e = st.sidebar.columns(2)
-start_date = col_s.date_input("開始日", value=default_start)
-end_date = col_e.date_input("終了日", value=default_end)
+/* --- ヘッダー --- */
+.main-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 2.2rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+.sub-header {
+    color: #8B8FA3;
+    font-size: 0.9rem;
+    margin-top: -8px;
+    margin-bottom: 24px;
+}
 
-if start_date > end_date:
-    st.sidebar.error("開始日が終了日より後です")
-    st.stop()
+/* --- KPI カード --- */
+.kpi-card {
+    background: linear-gradient(145deg, #1E2030 0%, #171926 100%);
+    border: 1px solid rgba(108, 99, 255, 0.15);
+    border-radius: 16px;
+    padding: 20px 24px;
+    text-align: center;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #6C63FF, #4ECDC4);
+}
+.kpi-card:hover {
+    border-color: rgba(108, 99, 255, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(108, 99, 255, 0.15);
+}
+.kpi-label {
+    color: #8B8FA3;
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+.kpi-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #E8E8F0;
+    line-height: 1.2;
+}
+.kpi-delta {
+    font-size: 0.8rem;
+    margin-top: 4px;
+    font-weight: 500;
+}
+.kpi-delta.warn { color: #F59E0B; }
+.kpi-delta.good { color: #4ECDC4; }
+.kpi-delta.bad  { color: #EF4444; }
 
-# 担当者フィルタ
-selected_authors = st.sidebar.multiselect(
-    "担当者（空=全員）", options=AUTHORS, default=[]
+/* アクセントカラーバリエーション */
+.kpi-card.purple::before { background: linear-gradient(90deg, #6C63FF, #A78BFA); }
+.kpi-card.blue::before   { background: linear-gradient(90deg, #3B82F6, #60A5FA); }
+.kpi-card.red::before    { background: linear-gradient(90deg, #EF4444, #F87171); }
+.kpi-card.teal::before   { background: linear-gradient(90deg, #14B8A6, #4ECDC4); }
+.kpi-card.amber::before  { background: linear-gradient(90deg, #F59E0B, #FBBF24); }
+
+/* --- セクションカード --- */
+.section-card {
+    background: linear-gradient(145deg, #1A1D2E 0%, #151725 100%);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 20px;
+}
+.section-title {
+    color: #C8CDDF;
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.section-title .icon {
+    background: linear-gradient(135deg, #6C63FF 0%, #4ECDC4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 1.3rem;
+}
+
+/* --- サイドバー ナビゲーション --- */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0D0F18 0%, #131520 100%);
+    border-right: 1px solid rgba(108, 99, 255, 0.1);
+}
+section[data-testid="stSidebar"] .stRadio > label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #8B8FA3;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* --- テーブル --- */
+.stDataFrame {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* --- 区切り線 --- */
+hr {
+    border-color: rgba(108, 99, 255, 0.15) !important;
+    margin: 28px 0 !important;
+}
+
+/* --- アラートカード --- */
+.alert-card {
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+}
+.alert-card.danger {
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 4px solid #EF4444;
+}
+.alert-card.warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-left: 4px solid #F59E0B;
+}
+.alert-card.success {
+    background: rgba(34, 197, 94, 0.1);
+    border-left: 4px solid #22C55E;
+}
+
+/* --- プログレスバー --- */
+.stProgress > div > div > div {
+    background: linear-gradient(90deg, #6C63FF, #4ECDC4);
+}
+
+/* --- Streamlit デフォルト非表示 --- */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
+
+# ══════════════════════════════════════════
+# Plotly 共通テンプレート
+# ══════════════════════════════════════════
+PLOTLY_LAYOUT = dict(
+    template="plotly_dark",
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    font=dict(family="Inter, sans-serif", color="#C8CDDF"),
+    title_font=dict(size=16, color="#E8E8F0"),
+    legend=dict(
+        bgcolor="rgba(0,0,0,0)",
+        font=dict(size=11, color="#8B8FA3"),
+    ),
+    margin=dict(l=40, r=20, t=50, b=40),
+    xaxis=dict(gridcolor="rgba(108,99,255,0.08)", zerolinecolor="rgba(108,99,255,0.12)"),
+    yaxis=dict(gridcolor="rgba(108,99,255,0.08)", zerolinecolor="rgba(108,99,255,0.12)"),
 )
+
+# ダーク用カラーパレット（ネオン系）
+NEON_COLORS = ["#6C63FF", "#4ECDC4", "#FF6B9D", "#C084FC", "#FBBF24",
+               "#34D399", "#F87171", "#60A5FA", "#A78BFA"]
+
+
+def apply_dark(fig):
+    """Plotly図にダークテーマを適用"""
+    fig.update_layout(**PLOTLY_LAYOUT)
+    return fig
+
+
+# ══════════════════════════════════════════
+# サイドバー
+# ══════════════════════════════════════════
+with st.sidebar:
+    st.markdown('<p class="main-header" style="font-size:1.5rem;">NPA</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color:#8B8FA3;font-size:0.75rem;margin-top:-12px;">Daily Report Analytics</p>', unsafe_allow_html=True)
+    st.markdown("---")
+
+    # ナビゲーション
+    page = st.radio(
+        "NAVIGATION",
+        [
+            "🏠 ダッシュボード",
+            "👤 担当者別",
+            "📂 工程別",
+            "⏰ 残業・36協定",
+            "📈 推移分析",
+            "📊 稼働・偏り",
+            "📅 月別・前年比",
+            "🔍 個人サマリ",
+            "📋 データ一覧",
+        ],
+        label_visibility="collapsed",
+    )
+
+    st.markdown("---")
+
+    # 期間設定
+    st.markdown("**📅 分析期間**")
+    today = date.today()
+    default_start = today.replace(day=1)
+    default_end = today
+
+    col_s, col_e = st.columns(2)
+    start_date = col_s.date_input("開始", value=default_start, label_visibility="collapsed")
+    end_date = col_e.date_input("終了", value=default_end, label_visibility="collapsed")
+
+    if start_date > end_date:
+        st.error("開始日 > 終了日")
+        st.stop()
+
+    st.markdown("---")
+
+    # 担当者フィルタ
+    st.markdown("**👥 担当者フィルタ**")
+    selected_authors = st.multiselect(
+        "担当者（空=全員）", options=AUTHORS, default=[], label_visibility="collapsed"
+    )
 
 # ── 共通ユーティリティ ──
 author_order = {a: i for i, a in enumerate(AUTHORS)}
 cat_colors = {v["label"]: v["color"] for k, v in MAIN_CATEGORIES.items()}
+# ダーク向けカラーマップ（明るめ調整）
+cat_colors_dark = {
+    "計画": "#60A5FA", "手配": "#34D399", "受注": "#F87171",
+    "BOMメンテ": "#C084FC", "打合せ": "#FBBF24", "改善": "#22D3EE",
+    "その他": "#9CA3AF", "アフター": "#F472B6",
+}
 
 
 def sort_by_author(frame: pd.DataFrame) -> pd.DataFrame:
@@ -50,8 +279,22 @@ def sort_by_author(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def business_days(start: date, end: date) -> int:
-    """期間内の営業日数（土日除外）"""
     return int(np.busday_count(start, end + timedelta(days=1)))
+
+
+def kpi_card(label: str, value: str, delta: str = "", delta_class: str = "good", accent: str = "purple") -> str:
+    delta_html = f'<div class="kpi-delta {delta_class}">{delta}</div>' if delta else ""
+    return f"""
+    <div class="kpi-card {accent}">
+        <div class="kpi-label">{label}</div>
+        <div class="kpi-value">{value}</div>
+        {delta_html}
+    </div>
+    """
+
+
+def section_header(icon: str, title: str):
+    st.markdown(f'<div class="section-title"><span class="icon">{icon}</span> {title}</div>', unsafe_allow_html=True)
 
 
 # ── データ取得 ──
@@ -101,9 +344,7 @@ if selected_authors:
         st.warning("選択した担当者のデータがありません。")
         st.stop()
 
-# ══════════════════════════════════════════
-# KPI カード
-# ══════════════════════════════════════════
+# 共通集計
 total_normal = df["hoursNormal"].sum()
 total_ot = df["hoursOT"].sum()
 total_all = total_normal + total_ot
@@ -111,29 +352,95 @@ n_authors = df["author"].nunique()
 bdays = business_days(start_date, end_date)
 avg_per_day = total_all / bdays if bdays else 0
 
-k1, k2, k3, k4, k5 = st.columns(5)
-k1.metric("総工数", f"{total_all:.1f}h")
-k2.metric("通常時間", f"{total_normal:.1f}h")
-k3.metric("残業時間", f"{total_ot:.1f}h",
-          delta=f"{total_ot/total_all*100:.0f}%" if total_all else None)
-k4.metric("担当者数", f"{n_authors}名")
-k5.metric("1日平均/人", f"{avg_per_day/n_authors:.1f}h" if n_authors else "-")
+# ══════════════════════════════════════════
+# ページルーティング
+# ══════════════════════════════════════════
 
-st.divider()
+# ────────────────────────────────────
+# ダッシュボード（ホーム）
+# ────────────────────────────────────
+if page == "🏠 ダッシュボード":
+    st.markdown('<p class="main-header">Daily Report Dashboard</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="sub-header">{start_date.strftime("%Y/%m/%d")} — {end_date.strftime("%Y/%m/%d")}　|　営業日 {bdays}日　|　{n_authors}名</p>', unsafe_allow_html=True)
 
-# ══════════════════════════════════════════
-# タブ構成
-# ══════════════════════════════════════════
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
-    "👤 担当者別", "📂 工程別", "⏰ 残業・36協定",
-    "📈 推移分析", "📊 稼働・偏り",
-    "📅 月別・前年比", "🔍 個人サマリ", "📋 データ一覧"
-])
+    # KPI カード
+    ot_pct = f"{total_ot/total_all*100:.0f}%" if total_all else "0%"
+    avg_val = f"{avg_per_day/n_authors:.1f}h" if n_authors else "-"
 
-# ══════════════════════════════════════════
-# タブ1: 担当者別（既存）
-# ══════════════════════════════════════════
-with tab1:
+    k1, k2, k3, k4, k5 = st.columns(5)
+    with k1:
+        st.markdown(kpi_card("総工数", f"{total_all:.1f}h", accent="purple"), unsafe_allow_html=True)
+    with k2:
+        st.markdown(kpi_card("通常時間", f"{total_normal:.1f}h", accent="blue"), unsafe_allow_html=True)
+    with k3:
+        st.markdown(kpi_card("残業時間", f"{total_ot:.1f}h", f"全体の {ot_pct}",
+                             "warn" if total_ot/total_all*100 > 15 else "good" if total_all else "good",
+                             "red"), unsafe_allow_html=True)
+    with k4:
+        st.markdown(kpi_card("担当者数", f"{n_authors}名", accent="teal"), unsafe_allow_html=True)
+    with k5:
+        st.markdown(kpi_card("1日平均/人", avg_val, accent="amber"), unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # 概要チャート2列
+    col_left, col_right = st.columns(2)
+
+    with col_left:
+        # 担当者別工数（積み上げ棒）
+        auth_df = (
+            df.groupby("author", as_index=False)
+            .agg(通常=("hoursNormal", "sum"), 残業=("hoursOT", "sum"))
+        )
+        auth_df["合計"] = auth_df["通常"] + auth_df["残業"]
+        auth_df = sort_by_author(auth_df)
+
+        fig = go.Figure()
+        fig.add_trace(go.Bar(x=auth_df["author"], y=auth_df["通常"],
+                             name="通常", marker_color="#60A5FA"))
+        fig.add_trace(go.Bar(x=auth_df["author"], y=auth_df["残業"],
+                             name="残業", marker_color="#F87171"))
+        fig.update_layout(barmode="stack", title="担当者別工数",
+                          yaxis_title="時間 (h)", height=400)
+        apply_dark(fig)
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_right:
+        # 大分類別 工数比率（ドーナツ）
+        cat_df = (
+            df.groupby(["mainCd", "mainLabel"], as_index=False)
+            .agg(hours=("hoursTotal", "sum"))
+        )
+        cat_df = cat_df[cat_df["hours"] > 0]
+
+        fig3 = px.pie(cat_df, values="hours", names="mainLabel",
+                      color="mainLabel", color_discrete_map=cat_colors_dark,
+                      title="大分類別 工数比率", hole=0.45)
+        fig3.update_traces(textinfo="label+percent", textfont_size=11)
+        apply_dark(fig3)
+        st.plotly_chart(fig3, use_container_width=True)
+
+    # 担当者×大分類 積み上げ
+    cross = (
+        df.groupby(["author", "mainLabel"], as_index=False)
+        .agg(hours=("hoursTotal", "sum"))
+    )
+    fig2 = px.bar(cross, x="author", y="hours", color="mainLabel",
+                  color_discrete_map=cat_colors_dark,
+                  title="担当者 × 大分類 工数内訳",
+                  labels={"hours": "時間 (h)", "author": "担当者", "mainLabel": "大分類"})
+    fig2.update_layout(barmode="stack", height=420)
+    apply_dark(fig2)
+    st.plotly_chart(fig2, use_container_width=True)
+
+
+# ────────────────────────────────────
+# 担当者別
+# ────────────────────────────────────
+elif page == "👤 担当者別":
+    st.markdown('<p class="main-header">担当者別分析</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="sub-header">{start_date.strftime("%Y/%m/%d")} — {end_date.strftime("%Y/%m/%d")}</p>', unsafe_allow_html=True)
+
     auth_df = (
         df.groupby("author", as_index=False)
         .agg(通常=("hoursNormal", "sum"), 残業=("hoursOT", "sum"))
@@ -143,11 +450,12 @@ with tab1:
 
     fig = go.Figure()
     fig.add_trace(go.Bar(x=auth_df["author"], y=auth_df["通常"],
-                         name="通常", marker_color="#3b82f6"))
+                         name="通常", marker_color="#60A5FA"))
     fig.add_trace(go.Bar(x=auth_df["author"], y=auth_df["残業"],
-                         name="残業", marker_color="#ef4444"))
+                         name="残業", marker_color="#F87171"))
     fig.update_layout(barmode="stack", title="担当者別工数",
                       yaxis_title="時間 (h)", height=450)
+    apply_dark(fig)
     st.plotly_chart(fig, use_container_width=True)
 
     cross = (
@@ -155,16 +463,20 @@ with tab1:
         .agg(hours=("hoursTotal", "sum"))
     )
     fig2 = px.bar(cross, x="author", y="hours", color="mainLabel",
-                  color_discrete_map=cat_colors,
+                  color_discrete_map=cat_colors_dark,
                   title="担当者×大分類 工数内訳",
                   labels={"hours": "時間 (h)", "author": "担当者", "mainLabel": "大分類"})
     fig2.update_layout(barmode="stack", height=450)
+    apply_dark(fig2)
     st.plotly_chart(fig2, use_container_width=True)
 
-# ══════════════════════════════════════════
-# タブ2: 工程別（既存）
-# ══════════════════════════════════════════
-with tab2:
+# ────────────────────────────────────
+# 工程別
+# ────────────────────────────────────
+elif page == "📂 工程別":
+    st.markdown('<p class="main-header">工程別分析</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="sub-header">{start_date.strftime("%Y/%m/%d")} — {end_date.strftime("%Y/%m/%d")}</p>', unsafe_allow_html=True)
+
     col_a, col_b = st.columns(2)
 
     cat_df = (
@@ -175,9 +487,10 @@ with tab2:
 
     with col_a:
         fig3 = px.pie(cat_df, values="hours", names="mainLabel",
-                      color="mainLabel", color_discrete_map=cat_colors,
-                      title="大分類別 工数比率")
+                      color="mainLabel", color_discrete_map=cat_colors_dark,
+                      title="大分類別 工数比率", hole=0.4)
         fig3.update_traces(textinfo="label+percent+value")
+        apply_dark(fig3)
         st.plotly_chart(fig3, use_container_width=True)
 
     with col_b:
@@ -185,10 +498,11 @@ with tab2:
         cat_df["_o"] = cat_df["mainCd"].map(lambda c: cat_order.index(c) if c in cat_order else 99)
         cat_df = cat_df.sort_values("_o")
         fig4 = px.bar(cat_df, x="mainLabel", y="hours",
-                      color="mainLabel", color_discrete_map=cat_colors,
+                      color="mainLabel", color_discrete_map=cat_colors_dark,
                       title="大分類別 工数",
                       labels={"hours": "時間 (h)", "mainLabel": "大分類"})
         fig4.update_layout(showlegend=False)
+        apply_dark(fig4)
         st.plotly_chart(fig4, use_container_width=True)
 
     sub_df = (
@@ -198,25 +512,38 @@ with tab2:
     sub_df["合計"] = sub_df["通常"] + sub_df["残業"]
     sub_df = sub_df.sort_values("cdSub")
     sub_df = sub_df.rename(columns={"cdSub": "コード", "subLabel": "作業内容", "mainLabel": "大分類"})
-    st.subheader("中分類別 工数一覧")
+
+    section_header("📋", "中分類別 工数一覧")
     st.dataframe(sub_df, use_container_width=True, hide_index=True)
 
-# ══════════════════════════════════════════
-# タブ3: 残業・36協定
-# ══════════════════════════════════════════
-with tab3:
-    # 担当者別残業棒グラフ
+# ────────────────────────────────────
+# 残業・36協定
+# ────────────────────────────────────
+elif page == "⏰ 残業・36協定":
+    st.markdown('<p class="main-header">残業・36協定管理</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="sub-header">{start_date.strftime("%Y/%m/%d")} — {end_date.strftime("%Y/%m/%d")}</p>', unsafe_allow_html=True)
+
     ot_df = (
         df.groupby("author", as_index=False)
         .agg(残業=("hoursOT", "sum"))
     )
     ot_df = sort_by_author(ot_df)
 
-    fig5 = px.bar(ot_df, x="author", y="残業",
-                  title="担当者別 残業時間",
-                  labels={"残業": "残業時間 (h)", "author": "担当者"},
-                  color_discrete_sequence=["#ef4444"])
-    fig5.update_layout(height=400)
+    fig5 = go.Figure()
+    fig5.add_trace(go.Bar(
+        x=ot_df["author"], y=ot_df["残業"],
+        marker=dict(
+            color=ot_df["残業"],
+            colorscale=[[0, "#4ECDC4"], [0.5, "#FBBF24"], [1, "#EF4444"]],
+        ),
+        text=[f"{v:.1f}h" for v in ot_df["残業"]],
+        textposition="outside",
+        textfont=dict(color="#C8CDDF"),
+    ))
+    fig5.update_layout(title="担当者別 残業時間", yaxis_title="残業時間 (h)", height=400)
+    fig5.add_hline(y=45, line_dash="dash", line_color="#EF4444",
+                   annotation_text="月上限 45h", annotation_font_color="#EF4444")
+    apply_dark(fig5)
     st.plotly_chart(fig5, use_container_width=True)
 
     # 残業比率テーブル
@@ -228,7 +555,7 @@ with tab3:
     auth_full["残業率"] = (auth_full["残業"] / auth_full["合計"] * 100).round(1)
     auth_full = sort_by_author(auth_full)
 
-    st.subheader("担当者別 残業比率")
+    section_header("📊", "担当者別 残業比率")
     st.dataframe(
         auth_full[["author", "通常", "残業", "合計", "残業率"]].rename(
             columns={"author": "担当者", "残業率": "残業率 (%)"}
@@ -237,17 +564,16 @@ with tab3:
     )
 
     # ── 36協定アラート ──
-    st.subheader("36協定 残業上限チェック")
+    st.markdown("---")
+    section_header("⚡", "36協定 残業上限チェック")
     st.caption("月45h / 年360h が上限（特別条項: 月100h / 年720h）")
 
-    # 当月の残業（選択期間が1ヶ月以内ならそのまま使用）
     ot_by_author = (
         df.groupby("author", as_index=False)
         .agg(月残業=("hoursOT", "sum"))
     )
     ot_by_author = sort_by_author(ot_by_author)
 
-    # 年間累計（1月〜現在の選択終了月まで）
     year_start = date(end_date.year, 1, 1)
     with st.spinner("年間残業データ取得中..."):
         try:
@@ -274,27 +600,27 @@ with tab3:
             st.markdown(f"**{name}**")
         with col_month:
             pct_m = min(monthly_ot / 45 * 100, 100)
-            color_m = "red" if monthly_ot > 45 else ("orange" if monthly_ot > 36 else "green")
             st.markdown(f"月: **{monthly_ot:.1f}h** / 45h")
             st.progress(min(pct_m / 100, 1.0))
             if monthly_ot > 45:
-                st.error(f"月上限超過 (+{monthly_ot - 45:.1f}h)")
+                st.markdown(f'<div class="alert-card danger">月上限超過 (+{monthly_ot - 45:.1f}h)</div>', unsafe_allow_html=True)
             elif monthly_ot > 36:
-                st.warning(f"月上限まで残り {45 - monthly_ot:.1f}h")
+                st.markdown(f'<div class="alert-card warning">月上限まで残り {45 - monthly_ot:.1f}h</div>', unsafe_allow_html=True)
         with col_year:
             pct_y = min(yearly_ot / 360 * 100, 100)
             st.markdown(f"年: **{yearly_ot:.1f}h** / 360h")
             st.progress(min(pct_y / 100, 1.0))
             if yearly_ot > 360:
-                st.error(f"年上限超過 (+{yearly_ot - 360:.1f}h)")
+                st.markdown(f'<div class="alert-card danger">年上限超過 (+{yearly_ot - 360:.1f}h)</div>', unsafe_allow_html=True)
             elif yearly_ot > 300:
-                st.warning(f"年上限まで残り {360 - yearly_ot:.1f}h")
+                st.markdown(f'<div class="alert-card warning">年上限まで残り {360 - yearly_ot:.1f}h</div>', unsafe_allow_html=True)
 
-# ══════════════════════════════════════════
-# タブ4: 推移分析
-# ══════════════════════════════════════════
-with tab4:
-    st.subheader("週別推移")
+# ────────────────────────────────────
+# 推移分析
+# ────────────────────────────────────
+elif page == "📈 推移分析":
+    st.markdown('<p class="main-header">推移分析</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="sub-header">{start_date.strftime("%Y/%m/%d")} — {end_date.strftime("%Y/%m/%d")}</p>', unsafe_allow_html=True)
 
     with st.spinner("週別データ取得中..."):
         try:
@@ -318,9 +644,10 @@ with tab4:
             wk_ot, x="week_start", y="残業", color="author",
             title="週別 残業推移（担当者別）",
             labels={"week_start": "週", "残業": "残業時間 (h)", "author": "担当者"},
-            markers=True
+            markers=True, color_discrete_sequence=NEON_COLORS
         )
         fig_trend_ot.update_layout(height=400)
+        apply_dark(fig_trend_ot)
         st.plotly_chart(fig_trend_ot, use_container_width=True)
 
         # 週別 合計工数推移
@@ -333,16 +660,17 @@ with tab4:
         fig_trend_total = go.Figure()
         fig_trend_total.add_trace(go.Bar(
             x=wk_total["week_start"], y=wk_total["通常"],
-            name="通常", marker_color="#3b82f6"
+            name="通常", marker_color="#60A5FA"
         ))
         fig_trend_total.add_trace(go.Bar(
             x=wk_total["week_start"], y=wk_total["残業"],
-            name="残業", marker_color="#ef4444"
+            name="残業", marker_color="#F87171"
         ))
         fig_trend_total.update_layout(
             barmode="stack", title="週別 全体工数推移",
             xaxis_title="週", yaxis_title="時間 (h)", height=400
         )
+        apply_dark(fig_trend_total)
         st.plotly_chart(fig_trend_total, use_container_width=True)
 
         # 週別×大分類 推移
@@ -352,23 +680,22 @@ with tab4:
         )
         fig_trend_cat = px.bar(
             wk_cat, x="week_start", y="hours", color="mainLabel",
-            color_discrete_map=cat_colors,
+            color_discrete_map=cat_colors_dark,
             title="週別 大分類別工数推移",
             labels={"week_start": "週", "hours": "時間 (h)", "mainLabel": "大分類"}
         )
         fig_trend_cat.update_layout(barmode="stack", height=400)
+        apply_dark(fig_trend_cat)
         st.plotly_chart(fig_trend_cat, use_container_width=True)
     else:
         st.info("週別データがありません。")
 
-# ══════════════════════════════════════════
-# タブ5: 稼働率・偏り分析
-# ══════════════════════════════════════════
-with tab5:
-    # ── 稼働率 ──
-    st.success("✅ 最新コード反映テスト - この文字が見えたら反映OK")
-    st.subheader("稼働率（所定労働時間に対する実績）")
-    st.caption(f"所定: 営業日{bdays}日 × {REGULAR_HOURS}h = {bdays * REGULAR_HOURS:.0f}h/人")
+# ────────────────────────────────────
+# 稼働・偏り
+# ────────────────────────────────────
+elif page == "📊 稼働・偏り":
+    st.markdown('<p class="main-header">稼働率・偏り分析</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="sub-header">{start_date.strftime("%Y/%m/%d")} — {end_date.strftime("%Y/%m/%d")}　|　所定: {bdays}日 × {REGULAR_HOURS}h = {bdays * REGULAR_HOURS:.0f}h/人</p>', unsafe_allow_html=True)
 
     expected_hours = bdays * REGULAR_HOURS
 
@@ -381,26 +708,24 @@ with tab5:
     util_df["稼働率"] = (util_df["合計"] / expected_hours * 100).round(1) if expected_hours else 0
     util_df = sort_by_author(util_df)
 
-    # 稼働率棒グラフ
+    # 稼働率ゲージ風棒グラフ
     fig_util = go.Figure()
     fig_util.add_trace(go.Bar(
         x=util_df["author"], y=util_df["稼働率"],
         marker_color=[
-            "#ef4444" if r > 120 else "#eab308" if r > 105 else "#22c55e"
+            "#EF4444" if r > 120 else "#FBBF24" if r > 105 else "#4ECDC4"
             for r in util_df["稼働率"]
         ],
         text=[f"{r:.0f}%" for r in util_df["稼働率"]],
-        textposition="outside"
+        textposition="outside",
+        textfont=dict(color="#C8CDDF"),
     ))
-    fig_util.add_hline(y=100, line_dash="dash", line_color="gray",
-                       annotation_text="所定100%")
-    fig_util.update_layout(
-        title="担当者別 稼働率",
-        yaxis_title="稼働率 (%)", height=400
-    )
+    fig_util.add_hline(y=100, line_dash="dash", line_color="#8B8FA3",
+                       annotation_text="所定100%", annotation_font_color="#8B8FA3")
+    fig_util.update_layout(title="担当者別 稼働率", yaxis_title="稼働率 (%)", height=400)
+    apply_dark(fig_util)
     st.plotly_chart(fig_util, use_container_width=True)
 
-    # 稼働率テーブル
     st.dataframe(
         util_df[["author", "通常", "残業", "合計", "所定", "稼働率"]].rename(
             columns={"author": "担当者", "稼働率": "稼働率 (%)"}
@@ -408,12 +733,9 @@ with tab5:
         use_container_width=True, hide_index=True
     )
 
-    # ══════════════════════════════════════════
-    # 作業偏り分析（稼働タブ内に統合）
-    # ══════════════════════════════════════════
     st.markdown("---")
 
-    # ── 共通データ準備 ──
+    # ── ヒートマップ ──
     heat_df = (
         df.groupby(["author", "mainLabel"], as_index=False)
         .agg(hours=("hoursTotal", "sum"))
@@ -426,8 +748,7 @@ with tab5:
     ordered_cats = [v["label"] for v in MAIN_CATEGORIES.values() if v["label"] in heat_pivot.columns]
     heat_pivot = heat_pivot[ordered_cats]
 
-    # ── 1. 工数ヒートマップ（実時間） ──
-    st.subheader("担当者 × 大分類 ヒートマップ")
+    section_header("🔥", "担当者 × 大分類 ヒートマップ")
 
     heat_mode = st.radio(
         "表示モード", ["実時間 (h)", "構成比 (%)", "チーム平均との差分"],
@@ -437,7 +758,7 @@ with tab5:
     if heat_mode == "実時間 (h)":
         fig_heat = px.imshow(
             heat_pivot, text_auto=".1f",
-            color_continuous_scale="YlOrRd",
+            color_continuous_scale="Plasma",
             labels={"x": "大分類", "y": "担当者", "color": "時間 (h)"},
             title="工数ヒートマップ（実時間）"
         )
@@ -445,7 +766,7 @@ with tab5:
         heat_pct = heat_pivot.div(heat_pivot.sum(axis=1), axis=0) * 100
         fig_heat = px.imshow(
             heat_pct.round(1), text_auto=".1f",
-            color_continuous_scale="Blues",
+            color_continuous_scale="Viridis",
             labels={"x": "大分類", "y": "担当者", "color": "比率 (%)"},
             title="工数ヒートマップ（構成比）"
         )
@@ -460,12 +781,13 @@ with tab5:
         )
 
     fig_heat.update_layout(height=max(350, len(ordered_authors) * 50))
+    apply_dark(fig_heat)
     st.plotly_chart(fig_heat, use_container_width=True)
 
-    st.divider()
+    st.markdown("---")
 
-    # ── 2. レーダーチャート（担当者比較） ──
-    st.subheader("作業バランス レーダーチャート")
+    # ── レーダーチャート ──
+    section_header("🎯", "作業バランス レーダーチャート")
 
     radar_authors = st.multiselect(
         "比較する担当者（空=全員）",
@@ -474,43 +796,47 @@ with tab5:
     )
     radar_targets = radar_authors if radar_authors else ordered_authors
 
-    # 構成比に正規化
     heat_pct_radar = heat_pivot.div(heat_pivot.sum(axis=1), axis=0) * 100
     heat_pct_radar = heat_pct_radar.fillna(0)
 
     fig_radar = go.Figure()
-    for person in radar_targets:
+    for i, person in enumerate(radar_targets):
         if person in heat_pct_radar.index:
             vals = heat_pct_radar.loc[person].tolist()
-            vals.append(vals[0])  # 閉じる
+            vals.append(vals[0])
             cats_loop = ordered_cats + [ordered_cats[0]]
             fig_radar.add_trace(go.Scatterpolar(
                 r=vals, theta=cats_loop, name=person,
-                fill="toself", opacity=0.3
+                fill="toself", opacity=0.3,
+                line=dict(color=NEON_COLORS[i % len(NEON_COLORS)])
             ))
 
-    # チーム平均をオーバーレイ
     team_avg_pct = heat_pct_radar.mean(axis=0).tolist()
     team_avg_pct.append(team_avg_pct[0])
     fig_radar.add_trace(go.Scatterpolar(
         r=team_avg_pct,
         theta=ordered_cats + [ordered_cats[0]],
         name="チーム平均",
-        line=dict(dash="dash", color="black", width=2),
+        line=dict(dash="dash", color="#E8E8F0", width=2),
         opacity=0.8
     ))
 
     fig_radar.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0, 100], gridcolor="rgba(108,99,255,0.15)"),
+            angularaxis=dict(gridcolor="rgba(108,99,255,0.15)"),
+            bgcolor="rgba(0,0,0,0)",
+        ),
         title="作業構成比レーダー（チーム平均は破線）",
         height=500
     )
+    apply_dark(fig_radar)
     st.plotly_chart(fig_radar, use_container_width=True)
 
-    st.divider()
+    st.markdown("---")
 
-    # ── 3. 中分類ヒートマップ（ドリルダウン） ──
-    st.subheader("中分類ヒートマップ（詳細）")
+    # ── 中分類ヒートマップ ──
+    section_header("🔍", "中分類ヒートマップ（詳細）")
 
     sub_heat = (
         df.groupby(["author", "subLabel"], as_index=False)
@@ -520,13 +846,12 @@ with tab5:
         index="author", columns="subLabel", values="hours", fill_value=0
     )
     sub_pivot = sub_pivot.reindex(ordered_authors)
-    # 合計が大きい順に列ソート
     col_order = sub_pivot.sum().sort_values(ascending=False).index.tolist()
     sub_pivot = sub_pivot[col_order]
 
     fig_sub_heat = px.imshow(
         sub_pivot, text_auto=".1f",
-        color_continuous_scale="Viridis",
+        color_continuous_scale="Cividis",
         labels={"x": "中分類", "y": "担当者", "color": "時間 (h)"},
         title="担当者 × 中分類 ヒートマップ"
     )
@@ -534,26 +859,25 @@ with tab5:
         height=max(400, len(ordered_authors) * 50),
         xaxis=dict(tickangle=-45)
     )
+    apply_dark(fig_sub_heat)
     st.plotly_chart(fig_sub_heat, use_container_width=True)
 
-    st.divider()
+    st.markdown("---")
 
-    # ── 4. 作業集中度分析 ──
-    st.subheader("作業集中度")
+    # ── 作業集中度 ──
+    section_header("📡", "作業集中度")
     st.caption("一つの大分類に工数が集中している度合いを分析")
 
     conc_df = heat_df.copy()
     author_totals = conc_df.groupby("author")["hours"].transform("sum")
     conc_df["比率"] = (conc_df["hours"] / author_totals * 100).round(1)
 
-    # HHI（ハーフィンダール指数）で集中度を数値化
     hhi_df = conc_df.groupby("author").apply(
         lambda g: (g["比率"] ** 2).sum(), include_groups=False
     ).reset_index(name="HHI")
     hhi_df = sort_by_author(hhi_df)
-    # HHIの目安: 10000=完全集中（1つだけ）、~1250=均等（8分類）
     hhi_df["集中レベル"] = hhi_df["HHI"].map(
-        lambda h: "⚠️ 高い" if h > 5000 else ("△ やや高い" if h > 3000 else "○ 分散")
+        lambda h: "高い" if h > 5000 else ("やや高い" if h > 3000 else "分散")
     )
 
     col_hhi_chart, col_hhi_table = st.columns([2, 1])
@@ -563,18 +887,17 @@ with tab5:
         fig_hhi.add_trace(go.Bar(
             x=hhi_df["author"], y=hhi_df["HHI"],
             marker_color=[
-                "#ef4444" if h > 5000 else "#eab308" if h > 3000 else "#22c55e"
+                "#EF4444" if h > 5000 else "#FBBF24" if h > 3000 else "#4ECDC4"
                 for h in hhi_df["HHI"]
             ],
             text=hhi_df["集中レベル"],
-            textposition="outside"
+            textposition="outside",
+            textfont=dict(color="#C8CDDF"),
         ))
-        fig_hhi.add_hline(y=3000, line_dash="dash", line_color="orange",
-                          annotation_text="集中度しきい値")
-        fig_hhi.update_layout(
-            title="作業集中度 (HHI指数)",
-            yaxis_title="HHI", height=400
-        )
+        fig_hhi.add_hline(y=3000, line_dash="dash", line_color="#FBBF24",
+                          annotation_text="集中度しきい値", annotation_font_color="#FBBF24")
+        fig_hhi.update_layout(title="作業集中度 (HHI指数)", yaxis_title="HHI", height=400)
+        apply_dark(fig_hhi)
         st.plotly_chart(fig_hhi, use_container_width=True)
 
     with col_hhi_table:
@@ -586,7 +909,6 @@ with tab5:
         - **10,000**: 1つの作業のみ
         """)
 
-        # 50%超の集中リスト
         high_conc = conc_df[conc_df["比率"] >= 50].sort_values("比率", ascending=False)
         if not high_conc.empty:
             st.markdown("**50%超の集中:**")
@@ -598,12 +920,12 @@ with tab5:
                 use_container_width=True, hide_index=True
             )
         else:
-            st.success("50%超の集中なし")
+            st.markdown('<div class="alert-card success">50%超の集中なし</div>', unsafe_allow_html=True)
 
-    st.divider()
+    st.markdown("---")
 
-    # ── 5. 担当者間の類似度 ──
-    st.subheader("担当者間 作業パターン類似度")
+    # ── 担当者間の類似度 ──
+    section_header("🔗", "担当者間 作業パターン類似度")
     st.caption("作業構成比のコサイン類似度。1.0に近いほど似た作業パターン")
 
     heat_pct_sim = heat_pivot.div(heat_pivot.sum(axis=1), axis=0).fillna(0)
@@ -624,21 +946,22 @@ with tab5:
 
     fig_sim = px.imshow(
         sim_df, text_auto=".2f",
-        color_continuous_scale="Greens",
+        color_continuous_scale="Magma",
         zmin=0, zmax=1,
         labels={"x": "担当者", "y": "担当者", "color": "類似度"},
         title="作業パターン類似度マトリクス"
     )
     fig_sim.update_layout(height=max(400, len(authors_list) * 55))
+    apply_dark(fig_sim)
     st.plotly_chart(fig_sim, use_container_width=True)
 
-# ══════════════════════════════════════════
-# タブ6: 月別・前年比
-# ══════════════════════════════════════════
-with tab6:
-    st.subheader("月別比較")
+# ────────────────────────────────────
+# 月別・前年比
+# ────────────────────────────────────
+elif page == "📅 月別・前年比":
+    st.markdown('<p class="main-header">月別・前年比</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="sub-header">{start_date.strftime("%Y/%m/%d")} — {end_date.strftime("%Y/%m/%d")}</p>', unsafe_allow_html=True)
 
-    # 当年の月別データ
     year_start_str = date(end_date.year, 1, 1).isoformat()
     with st.spinner("月別データ取得中..."):
         try:
@@ -651,7 +974,6 @@ with tab6:
         if selected_authors:
             monthly_df = monthly_df[monthly_df["author"].isin(selected_authors)].copy()
 
-        # 月別 通常/残業 推移
         m_agg = (
             monthly_df.groupby("month", as_index=False)
             .agg(通常=("hoursNormal", "sum"), 残業=("hoursOT", "sum"))
@@ -660,14 +982,14 @@ with tab6:
 
         fig_month = go.Figure()
         fig_month.add_trace(go.Bar(x=m_agg["月名"], y=m_agg["通常"],
-                                   name="通常", marker_color="#3b82f6"))
+                                   name="通常", marker_color="#60A5FA"))
         fig_month.add_trace(go.Bar(x=m_agg["月名"], y=m_agg["残業"],
-                                   name="残業", marker_color="#ef4444"))
+                                   name="残業", marker_color="#F87171"))
         fig_month.update_layout(barmode="stack", title=f"{end_date.year}年 月別工数推移",
                                 yaxis_title="時間 (h)", height=400)
+        apply_dark(fig_month)
         st.plotly_chart(fig_month, use_container_width=True)
 
-        # 月別×担当者 残業推移
         m_ot = (
             monthly_df.groupby(["month", "author"], as_index=False)
             .agg(残業=("hoursOT", "sum"))
@@ -678,16 +1000,17 @@ with tab6:
             m_ot, x="月名", y="残業", color="author",
             title=f"{end_date.year}年 月別残業推移（担当者別）",
             labels={"月名": "月", "残業": "残業時間 (h)", "author": "担当者"},
-            markers=True
+            markers=True, color_discrete_sequence=NEON_COLORS
         )
         fig_m_ot.update_layout(height=400)
+        apply_dark(fig_m_ot)
         st.plotly_chart(fig_m_ot, use_container_width=True)
     else:
         st.info("月別データがありません。")
 
     # ── 前年比 ──
-    st.divider()
-    st.subheader("前年比")
+    st.markdown("---")
+    section_header("📊", "前年比")
 
     prev_year = end_date.year - 1
     prev_start = date(prev_year, start_date.month, start_date.day)
@@ -706,7 +1029,6 @@ with tab6:
             df_prev = df_prev[df_prev["author"].isin(selected_authors)].copy()
 
     if not df_prev.empty:
-        # 当年 vs 前年 サマリ
         cur_summary = {
             "年": str(end_date.year),
             "通常": df["hoursNormal"].sum(),
@@ -721,34 +1043,38 @@ with tab6:
         }
         prev_summary["合計"] = prev_summary["通常"] + prev_summary["残業"]
 
-        cmp_df = pd.DataFrame([prev_summary, cur_summary])
-        cmp_df["残業率"] = (cmp_df["残業"] / cmp_df["合計"] * 100).round(1)
-
-        yoy_c1, yoy_c2, yoy_c3 = st.columns(3)
         diff_total = cur_summary["合計"] - prev_summary["合計"]
         diff_ot = cur_summary["残業"] - prev_summary["残業"]
+        pct_change = ((cur_summary["残業"] / prev_summary["残業"] - 1) * 100
+                      if prev_summary["残業"] else 0)
+
+        yoy_c1, yoy_c2, yoy_c3 = st.columns(3)
         with yoy_c1:
-            st.metric(
+            delta_class = "good" if diff_total >= 0 else "warn"
+            st.markdown(kpi_card(
                 f"総工数 ({start_date.month}月〜{end_date.month}月)",
                 f"{cur_summary['合計']:.1f}h",
-                delta=f"{diff_total:+.1f}h vs {prev_year}年"
-            )
+                f"{diff_total:+.1f}h vs {prev_year}年",
+                delta_class, "purple"
+            ), unsafe_allow_html=True)
         with yoy_c2:
-            st.metric(
+            delta_class = "bad" if diff_ot > 0 else "good"
+            st.markdown(kpi_card(
                 "残業時間",
                 f"{cur_summary['残業']:.1f}h",
-                delta=f"{diff_ot:+.1f}h vs {prev_year}年",
-                delta_color="inverse"
-            )
+                f"{diff_ot:+.1f}h vs {prev_year}年",
+                delta_class, "red"
+            ), unsafe_allow_html=True)
         with yoy_c3:
-            pct_change = ((cur_summary["残業"] / prev_summary["残業"] - 1) * 100
-                          if prev_summary["残業"] else 0)
-            st.metric(
+            delta_class = "bad" if pct_change > 0 else "good"
+            st.markdown(kpi_card(
                 "残業増減率",
                 f"{pct_change:+.1f}%",
-                delta=f"前年比",
-                delta_color="inverse"
-            )
+                f"前年比",
+                delta_class, "amber"
+            ), unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
 
         # 担当者別 前年比棒グラフ
         cur_auth = (
@@ -765,20 +1091,20 @@ with tab6:
         fig_yoy = go.Figure()
         fig_yoy.add_trace(go.Bar(
             x=yoy_auth["author"], y=yoy_auth["残業_前年"],
-            name=f"{prev_year}年 残業", marker_color="#93c5fd"
+            name=f"{prev_year}年 残業", marker_color="rgba(96,165,250,0.5)"
         ))
         fig_yoy.add_trace(go.Bar(
             x=yoy_auth["author"], y=yoy_auth["残業_当年"],
-            name=f"{end_date.year}年 残業", marker_color="#ef4444"
+            name=f"{end_date.year}年 残業", marker_color="#F87171"
         ))
         fig_yoy.update_layout(
             barmode="group",
             title=f"担当者別 残業時間 前年比（{start_date.month}月〜{end_date.month}月）",
             yaxis_title="残業時間 (h)", height=450
         )
+        apply_dark(fig_yoy)
         st.plotly_chart(fig_yoy, use_container_width=True)
 
-        # 前年比テーブル
         yoy_auth["残業増減"] = yoy_auth["残業_当年"] - yoy_auth["残業_前年"]
         yoy_auth["合計増減"] = yoy_auth["合計_当年"] - yoy_auth["合計_前年"]
         st.dataframe(
@@ -797,10 +1123,12 @@ with tab6:
     else:
         st.info(f"{prev_year}年の同期間データがありません。")
 
-# ══════════════════════════════════════════
-# タブ7: 個人サマリ
-# ══════════════════════════════════════════
-with tab7:
+# ────────────────────────────────────
+# 個人サマリ
+# ────────────────────────────────────
+elif page == "🔍 個人サマリ":
+    st.markdown('<p class="main-header">個人サマリ</p>', unsafe_allow_html=True)
+
     target_authors = selected_authors if selected_authors else AUTHORS
     available = [a for a in target_authors if a in df["author"].values]
 
@@ -820,15 +1148,21 @@ with tab7:
 
             # 個人KPI
             pc1, pc2, pc3, pc4 = st.columns(4)
-            pc1.metric("総工数", f"{p_total:.1f}h")
-            pc2.metric("通常", f"{p_normal:.1f}h")
-            pc3.metric("残業", f"{p_ot:.1f}h")
-            pc4.metric("残業率", f"{p_ot_rate:.1f}%")
+            with pc1:
+                st.markdown(kpi_card("総工数", f"{p_total:.1f}h", accent="purple"), unsafe_allow_html=True)
+            with pc2:
+                st.markdown(kpi_card("通常", f"{p_normal:.1f}h", accent="blue"), unsafe_allow_html=True)
+            with pc3:
+                st.markdown(kpi_card("残業", f"{p_ot:.1f}h", accent="red"), unsafe_allow_html=True)
+            with pc4:
+                delta_class = "bad" if p_ot_rate > 20 else "warn" if p_ot_rate > 10 else "good"
+                st.markdown(kpi_card("残業率", f"{p_ot_rate:.1f}%", delta_class=delta_class, accent="amber"), unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
 
             col_left, col_right = st.columns(2)
 
             with col_left:
-                # 作業構成（円グラフ）
                 p_cat = (
                     pdf.groupby("mainLabel", as_index=False)
                     .agg(hours=("hoursTotal", "sum"))
@@ -836,27 +1170,25 @@ with tab7:
                 p_cat = p_cat[p_cat["hours"] > 0]
                 fig_p_pie = px.pie(
                     p_cat, values="hours", names="mainLabel",
-                    color="mainLabel", color_discrete_map=cat_colors,
-                    title=f"{person} 作業構成"
+                    color="mainLabel", color_discrete_map=cat_colors_dark,
+                    title=f"{person} 作業構成", hole=0.4
                 )
                 fig_p_pie.update_traces(textinfo="label+percent+value")
+                apply_dark(fig_p_pie)
                 st.plotly_chart(fig_p_pie, use_container_width=True)
 
             with col_right:
-                # 36協定進捗
-                st.markdown(f"### {person} 36協定進捗")
+                section_header("⚡", f"{person} 36協定進捗")
 
-                # 月残業
                 st.markdown(f"**月残業: {p_ot:.1f}h / 45h**")
                 st.progress(min(p_ot / 45, 1.0))
                 if p_ot > 45:
-                    st.error(f"月上限超過 (+{p_ot - 45:.1f}h)")
+                    st.markdown(f'<div class="alert-card danger">月上限超過 (+{p_ot - 45:.1f}h)</div>', unsafe_allow_html=True)
                 elif p_ot > 36:
-                    st.warning(f"残り {45 - p_ot:.1f}h")
+                    st.markdown(f'<div class="alert-card warning">残り {45 - p_ot:.1f}h</div>', unsafe_allow_html=True)
                 else:
-                    st.success("正常範囲")
+                    st.markdown('<div class="alert-card success">正常範囲</div>', unsafe_allow_html=True)
 
-                # 年間累計
                 try:
                     yr_data = load_monthly(
                         date(end_date.year, 1, 1).isoformat(),
@@ -873,14 +1205,14 @@ with tab7:
                 st.markdown(f"**年間累計残業: {yr_ot:.1f}h / 360h**")
                 st.progress(min(yr_ot / 360, 1.0))
                 if yr_ot > 360:
-                    st.error(f"年上限超過 (+{yr_ot - 360:.1f}h)")
+                    st.markdown(f'<div class="alert-card danger">年上限超過 (+{yr_ot - 360:.1f}h)</div>', unsafe_allow_html=True)
                 elif yr_ot > 300:
-                    st.warning(f"残り {360 - yr_ot:.1f}h")
+                    st.markdown(f'<div class="alert-card warning">残り {360 - yr_ot:.1f}h</div>', unsafe_allow_html=True)
                 else:
-                    st.success("正常範囲")
+                    st.markdown('<div class="alert-card success">正常範囲</div>', unsafe_allow_html=True)
 
             # 中分類別テーブル
-            st.subheader(f"{person} 作業内訳")
+            section_header("📋", f"{person} 作業内訳")
             p_sub = (
                 pdf.groupby(["cdSub", "subLabel", "mainLabel"], as_index=False)
                 .agg(通常=("hoursNormal", "sum"), 残業=("hoursOT", "sum"))
@@ -896,7 +1228,7 @@ with tab7:
             )
 
             # 月別残業推移（個人）
-            st.subheader(f"{person} 月別残業推移")
+            section_header("📈", f"{person} 月別推移")
             try:
                 yr_data_full = load_monthly(
                     date(end_date.year, 1, 1).isoformat(),
@@ -913,30 +1245,33 @@ with tab7:
                     fig_p_month = go.Figure()
                     fig_p_month.add_trace(go.Bar(
                         x=p_monthly["月名"], y=p_monthly["通常"],
-                        name="通常", marker_color="#3b82f6"
+                        name="通常", marker_color="#60A5FA"
                     ))
                     fig_p_month.add_trace(go.Bar(
                         x=p_monthly["月名"], y=p_monthly["残業"],
-                        name="残業", marker_color="#ef4444"
+                        name="残業", marker_color="#F87171"
                     ))
                     fig_p_month.add_hline(
-                        y=45, line_dash="dash", line_color="red",
-                        annotation_text="月上限 45h"
+                        y=45, line_dash="dash", line_color="#EF4444",
+                        annotation_text="月上限 45h", annotation_font_color="#EF4444"
                     )
                     fig_p_month.update_layout(
                         barmode="stack",
                         title=f"{person} {end_date.year}年 月別工数",
                         yaxis_title="時間 (h)", height=400
                     )
+                    apply_dark(fig_p_month)
                     st.plotly_chart(fig_p_month, use_container_width=True)
             except Exception:
                 st.info("月別データを取得できませんでした。")
 
-# ══════════════════════════════════════════
-# タブ8: データ一覧（既存）
-# ══════════════════════════════════════════
-with tab8:
-    st.subheader("生データ")
+# ────────────────────────────────────
+# データ一覧
+# ────────────────────────────────────
+elif page == "📋 データ一覧":
+    st.markdown('<p class="main-header">データ一覧</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="sub-header">{start_date.strftime("%Y/%m/%d")} — {end_date.strftime("%Y/%m/%d")}　|　{len(df)} 件</p>', unsafe_allow_html=True)
+
     display_df = df[["author", "cdSub", "subLabel", "mainLabel",
                      "hoursNormal", "hoursOT", "hoursTotal"]].copy()
     display_df.columns = ["担当者", "コード", "作業内容", "大分類", "通常(h)", "残業(h)", "合計(h)"]
