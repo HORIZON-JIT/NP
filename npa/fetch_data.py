@@ -138,6 +138,84 @@ def fetch_as_dataframe(start_date: str, end_date: str) -> pd.DataFrame:
     return df
 
 
+def fetch_weekly_breakdown(start_date: str, end_date: str) -> pd.DataFrame:
+    """
+    期間を週ごとに分割してデータ取得。week_start列を付与。
+    推移分析用。
+    """
+    from datetime import date as dt_date, timedelta
+
+    start = dt_date.fromisoformat(start_date)
+    end = dt_date.fromisoformat(end_date)
+
+    all_dfs = []
+    # 週の開始を月曜に揃える
+    current = start - timedelta(days=start.weekday())
+
+    while current <= end:
+        ws = max(current, start)
+        we = min(current + timedelta(days=6), end)
+
+        try:
+            raw = fetch_date_range(ws.isoformat(), we.isoformat())
+            df = to_dataframe(raw)
+            if not df.empty:
+                df["week_start"] = ws.isoformat()
+                all_dfs.append(df)
+        except Exception:
+            pass
+
+        current += timedelta(days=7)
+
+    if not all_dfs:
+        return pd.DataFrame()
+    return pd.concat(all_dfs, ignore_index=True)
+
+
+def fetch_monthly_breakdown(start_date: str, end_date: str) -> pd.DataFrame:
+    """
+    期間を月ごとに分割してデータ取得。year, month列を付与。
+    月別比較・前年比用。
+    """
+    import calendar
+    from datetime import date as dt_date
+
+    start = dt_date.fromisoformat(start_date)
+    end = dt_date.fromisoformat(end_date)
+
+    all_dfs = []
+    year, month = start.year, start.month
+
+    while (year, month) <= (end.year, end.month):
+        _, last_day = calendar.monthrange(year, month)
+        ms = dt_date(year, month, 1)
+        me = dt_date(year, month, last_day)
+        # 期間でクリップ
+        ms = max(ms, start)
+        me = min(me, end)
+
+        try:
+            raw = fetch_date_range(ms.isoformat(), me.isoformat())
+            df = to_dataframe(raw)
+            if not df.empty:
+                df["year"] = year
+                df["month"] = month
+                all_dfs.append(df)
+        except Exception:
+            pass
+
+        # 次の月
+        if month == 12:
+            year += 1
+            month = 1
+        else:
+            month += 1
+
+    if not all_dfs:
+        return pd.DataFrame()
+    return pd.concat(all_dfs, ignore_index=True)
+
+
 def get_leave_map(data: dict) -> dict:
     """
     GASレスポンスから退勤時間マップを取得。
