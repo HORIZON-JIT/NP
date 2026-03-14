@@ -124,10 +124,10 @@ st.divider()
 # ══════════════════════════════════════════
 # タブ構成
 # ══════════════════════════════════════════
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab5b, tab6, tab7, tab8 = st.tabs([
     "👤 担当者別", "📂 工程別", "⏰ 残業・36協定",
-    "📈 推移分析", "📊 稼働・偏り", "📅 月別・前年比",
-    "🔍 個人サマリ", "📋 データ一覧"
+    "📈 推移分析", "📊 稼働率", "🔥 作業偏り",
+    "📅 月別・前年比", "🔍 個人サマリ", "📋 データ一覧"
 ])
 
 # ══════════════════════════════════════════
@@ -407,11 +407,12 @@ with tab5:
         use_container_width=True, hide_index=True
     )
 
-    st.divider()
+# ══════════════════════════════════════════
+# タブ5b: 作業偏り分析（専用タブ）
+# ══════════════════════════════════════════
+with tab5b:
 
-    # ── 作業偏りヒートマップ ──
-    st.subheader("作業偏り分析（担当者 × 大分類 ヒートマップ）")
-
+    # ── 共通データ準備 ──
     heat_df = (
         df.groupby(["author", "mainLabel"], as_index=False)
         .agg(hours=("hoursTotal", "sum"))
@@ -419,40 +420,216 @@ with tab5:
     heat_pivot = heat_df.pivot_table(
         index="author", columns="mainLabel", values="hours", fill_value=0
     )
-    # AUTHORS順に並べる
     ordered_authors = [a for a in AUTHORS if a in heat_pivot.index]
     heat_pivot = heat_pivot.reindex(ordered_authors)
-    # 大分類順に並べる
     ordered_cats = [v["label"] for v in MAIN_CATEGORIES.values() if v["label"] in heat_pivot.columns]
     heat_pivot = heat_pivot[ordered_cats]
 
-    fig_heat = px.imshow(
-        heat_pivot,
-        text_auto=".1f",
-        color_continuous_scale="YlOrRd",
-        labels={"x": "大分類", "y": "担当者", "color": "時間 (h)"},
-        title="担当者×大分類 工数ヒートマップ"
-    )
-    fig_heat.update_layout(height=400)
-    st.plotly_chart(fig_heat, use_container_width=True)
+    # ── 1. 工数ヒートマップ（実時間） ──
+    st.subheader("担当者 × 大分類 ヒートマップ")
 
-    # 作業集中度（一人が特定作業に偏っている度合い）
-    st.subheader("作業集中度")
-    st.caption("一つの大分類に50%以上の工数を費やしている場合、集中度が高い")
-    conc_df = heat_df.copy()
-    author_total = conc_df.groupby("author")["hours"].transform("sum")
-    conc_df["比率"] = (conc_df["hours"] / author_total * 100).round(1)
-    high_conc = conc_df[conc_df["比率"] >= 50].sort_values("比率", ascending=False)
-    if not high_conc.empty:
-        st.dataframe(
-            high_conc[["author", "mainLabel", "hours", "比率"]].rename(
-                columns={"author": "担当者", "mainLabel": "大分類",
-                         "hours": "時間 (h)", "比率": "比率 (%)"}
-            ),
-            use_container_width=True, hide_index=True
+    heat_mode = st.radio(
+        "表示モード", ["実時間 (h)", "構成比 (%)", "チーム平均との差分"],
+        horizontal=True, key="heat_mode"
+    )
+
+    if heat_mode == "実時間 (h)":
+        fig_heat = px.imshow(
+            heat_pivot, text_auto=".1f",
+            color_continuous_scale="YlOrRd",
+            labels={"x": "大分類", "y": "担当者", "color": "時間 (h)"},
+            title="工数ヒートマップ（実時間）"
+        )
+    elif heat_mode == "構成比 (%)":
+        heat_pct = heat_pivot.div(heat_pivot.sum(axis=1), axis=0) * 100
+        fig_heat = px.imshow(
+            heat_pct.round(1), text_auto=".1f",
+            color_continuous_scale="Blues",
+            labels={"x": "大分類", "y": "担当者", "color": "比率 (%)"},
+            title="工数ヒートマップ（構成比）"
         )
     else:
-        st.success("特定作業への高い集中は見られません。")
+        team_avg = heat_pivot.mean(axis=0)
+        heat_diff = heat_pivot.sub(team_avg, axis=1)
+        fig_heat = px.imshow(
+            heat_diff.round(1), text_auto="+.1f",
+            color_continuous_scale="RdBu_r", color_continuous_midpoint=0,
+            labels={"x": "大分類", "y": "担当者", "color": "差分 (h)"},
+            title="チーム平均との差分（赤=平均以上 / 青=平均以下）"
+        )
+
+    fig_heat.update_layout(height=max(350, len(ordered_authors) * 50))
+    st.plotly_chart(fig_heat, use_container_width=True)
+
+    st.divider()
+
+    # ── 2. レーダーチャート（担当者比較） ──
+    st.subheader("作業バランス レーダーチャート")
+
+    radar_authors = st.multiselect(
+        "比較する担当者（空=全員）",
+        options=ordered_authors, default=[],
+        key="radar_authors"
+    )
+    radar_targets = radar_authors if radar_authors else ordered_authors
+
+    # 構成比に正規化
+    heat_pct_radar = heat_pivot.div(heat_pivot.sum(axis=1), axis=0) * 100
+    heat_pct_radar = heat_pct_radar.fillna(0)
+
+    fig_radar = go.Figure()
+    for person in radar_targets:
+        if person in heat_pct_radar.index:
+            vals = heat_pct_radar.loc[person].tolist()
+            vals.append(vals[0])  # 閉じる
+            cats_loop = ordered_cats + [ordered_cats[0]]
+            fig_radar.add_trace(go.Scatterpolar(
+                r=vals, theta=cats_loop, name=person,
+                fill="toself", opacity=0.3
+            ))
+
+    # チーム平均をオーバーレイ
+    team_avg_pct = heat_pct_radar.mean(axis=0).tolist()
+    team_avg_pct.append(team_avg_pct[0])
+    fig_radar.add_trace(go.Scatterpolar(
+        r=team_avg_pct,
+        theta=ordered_cats + [ordered_cats[0]],
+        name="チーム平均",
+        line=dict(dash="dash", color="black", width=2),
+        opacity=0.8
+    ))
+
+    fig_radar.update_layout(
+        polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+        title="作業構成比レーダー（チーム平均は破線）",
+        height=500
+    )
+    st.plotly_chart(fig_radar, use_container_width=True)
+
+    st.divider()
+
+    # ── 3. 中分類ヒートマップ（ドリルダウン） ──
+    st.subheader("中分類ヒートマップ（詳細）")
+
+    sub_heat = (
+        df.groupby(["author", "subLabel"], as_index=False)
+        .agg(hours=("hoursTotal", "sum"))
+    )
+    sub_pivot = sub_heat.pivot_table(
+        index="author", columns="subLabel", values="hours", fill_value=0
+    )
+    sub_pivot = sub_pivot.reindex(ordered_authors)
+    # 合計が大きい順に列ソート
+    col_order = sub_pivot.sum().sort_values(ascending=False).index.tolist()
+    sub_pivot = sub_pivot[col_order]
+
+    fig_sub_heat = px.imshow(
+        sub_pivot, text_auto=".1f",
+        color_continuous_scale="Viridis",
+        labels={"x": "中分類", "y": "担当者", "color": "時間 (h)"},
+        title="担当者 × 中分類 ヒートマップ"
+    )
+    fig_sub_heat.update_layout(
+        height=max(400, len(ordered_authors) * 50),
+        xaxis=dict(tickangle=-45)
+    )
+    st.plotly_chart(fig_sub_heat, use_container_width=True)
+
+    st.divider()
+
+    # ── 4. 作業集中度分析 ──
+    st.subheader("作業集中度")
+    st.caption("一つの大分類に工数が集中している度合いを分析")
+
+    conc_df = heat_df.copy()
+    author_totals = conc_df.groupby("author")["hours"].transform("sum")
+    conc_df["比率"] = (conc_df["hours"] / author_totals * 100).round(1)
+
+    # HHI（ハーフィンダール指数）で集中度を数値化
+    hhi_df = conc_df.groupby("author").apply(
+        lambda g: (g["比率"] ** 2).sum(), include_groups=False
+    ).reset_index(name="HHI")
+    hhi_df = sort_by_author(hhi_df)
+    # HHIの目安: 10000=完全集中（1つだけ）、~1250=均等（8分類）
+    hhi_df["集中レベル"] = hhi_df["HHI"].map(
+        lambda h: "⚠️ 高い" if h > 5000 else ("△ やや高い" if h > 3000 else "○ 分散")
+    )
+
+    col_hhi_chart, col_hhi_table = st.columns([2, 1])
+
+    with col_hhi_chart:
+        fig_hhi = go.Figure()
+        fig_hhi.add_trace(go.Bar(
+            x=hhi_df["author"], y=hhi_df["HHI"],
+            marker_color=[
+                "#ef4444" if h > 5000 else "#eab308" if h > 3000 else "#22c55e"
+                for h in hhi_df["HHI"]
+            ],
+            text=hhi_df["集中レベル"],
+            textposition="outside"
+        ))
+        fig_hhi.add_hline(y=3000, line_dash="dash", line_color="orange",
+                          annotation_text="集中度しきい値")
+        fig_hhi.update_layout(
+            title="作業集中度 (HHI指数)",
+            yaxis_title="HHI", height=400
+        )
+        st.plotly_chart(fig_hhi, use_container_width=True)
+
+    with col_hhi_table:
+        st.markdown("**HHI指数の見方**")
+        st.markdown("""
+        - **~1,250**: 全分類に均等配分
+        - **3,000超**: やや集中傾向
+        - **5,000超**: 特定作業に偏り
+        - **10,000**: 1つの作業のみ
+        """)
+
+        # 50%超の集中リスト
+        high_conc = conc_df[conc_df["比率"] >= 50].sort_values("比率", ascending=False)
+        if not high_conc.empty:
+            st.markdown("**50%超の集中:**")
+            st.dataframe(
+                high_conc[["author", "mainLabel", "hours", "比率"]].rename(
+                    columns={"author": "担当者", "mainLabel": "大分類",
+                             "hours": "時間 (h)", "比率": "比率 (%)"}
+                ),
+                use_container_width=True, hide_index=True
+            )
+        else:
+            st.success("50%超の集中なし")
+
+    st.divider()
+
+    # ── 5. 担当者間の類似度 ──
+    st.subheader("担当者間 作業パターン類似度")
+    st.caption("作業構成比のコサイン類似度。1.0に近いほど似た作業パターン")
+
+    heat_pct_sim = heat_pivot.div(heat_pivot.sum(axis=1), axis=0).fillna(0)
+    from numpy.linalg import norm
+    sim_data = []
+    authors_list = heat_pct_sim.index.tolist()
+    for i, a1 in enumerate(authors_list):
+        row = []
+        v1 = heat_pct_sim.loc[a1].values
+        for j, a2 in enumerate(authors_list):
+            v2 = heat_pct_sim.loc[a2].values
+            n1, n2 = norm(v1), norm(v2)
+            cos_sim = float(np.dot(v1, v2) / (n1 * n2)) if n1 and n2 else 0
+            row.append(round(cos_sim, 2))
+        sim_data.append(row)
+
+    sim_df = pd.DataFrame(sim_data, index=authors_list, columns=authors_list)
+
+    fig_sim = px.imshow(
+        sim_df, text_auto=".2f",
+        color_continuous_scale="Greens",
+        zmin=0, zmax=1,
+        labels={"x": "担当者", "y": "担当者", "color": "類似度"},
+        title="作業パターン類似度マトリクス"
+    )
+    fig_sim.update_layout(height=max(400, len(authors_list) * 55))
+    st.plotly_chart(fig_sim, use_container_width=True)
 
 # ══════════════════════════════════════════
 # タブ6: 月別・前年比
