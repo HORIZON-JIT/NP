@@ -432,18 +432,25 @@ def load_data(s: str, e: str):
 
 
 @st.cache_data(ttl=600, show_spinner=False)
+def _exclude_help(df: pd.DataFrame) -> pd.DataFrame:
+    """ヘルプ行を除外する"""
+    if not df.empty and "author" in df.columns:
+        return df[df["author"] != "ヘルプ"].copy()
+    return df
+
+
 def load_weekly(s: str, e: str):
-    return fetch_weekly_breakdown(s, e)
+    return _exclude_help(fetch_weekly_breakdown(s, e))
 
 
 @st.cache_data(ttl=600, show_spinner=False)
 def load_monthly(s: str, e: str):
-    return fetch_monthly_breakdown(s, e)
+    return _exclude_help(fetch_monthly_breakdown(s, e))
 
 
 @st.cache_data(ttl=600, show_spinner=False)
 def load_fiscal_monthly(s: str, e: str, closing_day: int = 15):
-    return fetch_fiscal_monthly_breakdown(s, e, closing_day)
+    return _exclude_help(fetch_fiscal_monthly_breakdown(s, e, closing_day))
 
 
 with st.spinner("データ取得中..."):
