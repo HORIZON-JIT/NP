@@ -178,9 +178,23 @@ hr {
     border-left: 4px solid #22C55E;
 }
 
-/* --- プログレスバー --- */
+/* --- プログレスバー（残業以外の汎用） --- */
 .stProgress > div > div > div {
     background: linear-gradient(90deg, #6C63FF, #4ECDC4);
+}
+
+/* --- 残業プログレスバー --- */
+.ot-bar-container {
+    background: rgba(255,255,255,0.08);
+    border-radius: 6px;
+    height: 10px;
+    width: 100%;
+    overflow: hidden;
+}
+.ot-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.3s ease;
 }
 
 /* --- Streamlit デフォルト非表示 --- */
@@ -451,6 +465,30 @@ def load_monthly(s: str, e: str):
 @st.cache_data(ttl=600, show_spinner=False)
 def load_fiscal_monthly(s: str, e: str, closing_day: int = 15):
     return _exclude_help(fetch_fiscal_monthly_breakdown(s, e, closing_day))
+
+
+def _ot_bar_color(ratio: float) -> str:
+    """残業率に応じたバー色を返す"""
+    if ratio > 1.0:
+        return "#EF4444"      # 赤: 超過
+    elif ratio > 0.8:
+        return "#F59E0B"      # オレンジ: 警告 (80%超)
+    elif ratio > 0.5:
+        return "#3B82F6"      # 青: 注意 (50%超)
+    else:
+        return "#22C55E"      # 緑: 安全
+
+
+def _ot_bar_html(value: float, limit: float) -> str:
+    """残業プログレスバーのHTMLを生成"""
+    ratio = value / limit if limit else 0
+    pct = min(ratio * 100, 100)
+    color = _ot_bar_color(ratio)
+    return (
+        f'<div class="ot-bar-container">'
+        f'<div class="ot-bar-fill" style="width:{pct:.1f}%;background:{color};"></div>'
+        f'</div>'
+    )
 
 
 with st.spinner("データ取得中..."):
@@ -792,17 +830,15 @@ elif page == "⏰ 残業・36協定":
                 with col_name:
                     st.markdown(f"**{name}**")
                 with col_month:
-                    pct_m = min(m_ot / 45 * 100, 100)
                     st.markdown(f"月度: **{m_ot:.1f}h** / 45h")
-                    st.progress(min(pct_m / 100, 1.0))
+                    st.markdown(_ot_bar_html(m_ot, 45), unsafe_allow_html=True)
                     if m_ot > 45:
                         st.markdown(f'<div class="alert-card danger">月上限超過 (+{m_ot - 45:.1f}h)</div>', unsafe_allow_html=True)
                     elif m_ot > 36:
                         st.markdown(f'<div class="alert-card warning">月上限まで残り {45 - m_ot:.1f}h</div>', unsafe_allow_html=True)
                 with col_year:
-                    pct_y = min(y_ot / 360 * 100, 100)
                     st.markdown(f"年累計: **{y_ot:.1f}h** / 360h")
-                    st.progress(min(pct_y / 100, 1.0))
+                    st.markdown(_ot_bar_html(y_ot, 360), unsafe_allow_html=True)
                     if y_ot > 360:
                         st.markdown(f'<div class="alert-card danger">年上限超過 (+{y_ot - 360:.1f}h)</div>', unsafe_allow_html=True)
                     elif y_ot > 300:
@@ -1407,7 +1443,7 @@ elif page == "🔍 個人サマリ":
 
                 st.markdown(f"**{cur_fm}月度残業: {p_cur_ot:.1f}h / 45h**")
                 st.caption(f"{cur_fm_start.strftime('%m/%d')}〜{cur_fm_end.strftime('%m/%d')}")
-                st.progress(min(p_cur_ot / 45, 1.0))
+                st.markdown(_ot_bar_html(p_cur_ot, 45), unsafe_allow_html=True)
                 if p_cur_ot > 45:
                     st.markdown(f'<div class="alert-card danger">月上限超過 (+{p_cur_ot - 45:.1f}h)</div>', unsafe_allow_html=True)
                 elif p_cur_ot > 36:
@@ -1431,7 +1467,7 @@ elif page == "🔍 個人サマリ":
                     yr_ot = p_cur_ot
 
                 st.markdown(f"**年間累計残業: {yr_ot:.1f}h / 360h**")
-                st.progress(min(yr_ot / 360, 1.0))
+                st.markdown(_ot_bar_html(yr_ot, 360), unsafe_allow_html=True)
                 if yr_ot > 360:
                     st.markdown(f'<div class="alert-card danger">年上限超過 (+{yr_ot - 360:.1f}h)</div>', unsafe_allow_html=True)
                 elif yr_ot > 300:
