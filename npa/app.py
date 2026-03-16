@@ -250,15 +250,16 @@ with st.sidebar:
     st.markdown("**📅 分析期間**")
     today = date.today()
 
-    # デフォルト: 当月度
+    # デフォルト: 当年度
     cur_fy_m = get_fiscal_month(today, CLOSING_DAY)
-    default_fm_start, default_fm_end = get_fiscal_month_range(cur_fy_m[0], cur_fy_m[1], CLOSING_DAY)
+    cur_fy_default = get_fiscal_year(today, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
+    default_fy_start, default_fy_end = get_fiscal_year_range(cur_fy_default, CLOSING_DAY, FISCAL_YEAR_START_MONTH)
 
     # session_state 初期化
     if "period_start" not in st.session_state:
-        st.session_state["period_start"] = default_fm_start
-        st.session_state["period_end"] = default_fm_end
-        st.session_state["period_label"] = f"当月度（{cur_fy_m[1]}月度）"
+        st.session_state["period_start"] = default_fy_start
+        st.session_state["period_end"] = default_fy_end
+        st.session_state["period_label"] = f"{cur_fy_default}年度"
 
     date_mode = st.radio(
         "選択方法", ["プリセット", "月度指定", "カスタム"],
