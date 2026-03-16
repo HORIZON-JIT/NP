@@ -675,14 +675,20 @@ elif page == "⏰ 残業・36協定":
             fiscal_df.groupby(["fiscal_label", "fiscal_month", "author"], as_index=False)
             .agg(残業=("hoursOT", "sum"))
         )
-        fm_ot = fm_ot.sort_values("fiscal_month")
+        _fm_order = _fiscal_month_order(FISCAL_YEAR_START_MONTH)
+        fm_ot["_order"] = fm_ot["fiscal_month"].map(
+            lambda m: _fm_order.index(m) if m in _fm_order else 99
+        )
+        fm_ot = fm_ot.sort_values("_order").drop(columns="_order")
 
+        _fiscal_label_order = [f"{m}月度" for m in _fm_order]
         fig5 = px.bar(
             fm_ot, x="author", y="残業", color="fiscal_label",
             barmode="group",
             title="担当者別 月度残業時間（15日締め）",
             labels={"残業": "残業時間 (h)", "author": "担当者", "fiscal_label": "月度"},
             color_discrete_sequence=NEON_COLORS,
+            category_orders={"fiscal_label": _fiscal_label_order},
         )
         fig5.add_hline(y=45, line_dash="dash", line_color="#EF4444",
                        annotation_text="月上限 45h", annotation_font_color="#EF4444")
@@ -698,7 +704,10 @@ elif page == "⏰ 残業・36協定":
         )
         fm_summary["合計"] = fm_summary["通常"] + fm_summary["残業"]
         fm_summary["残業率"] = (fm_summary["残業"] / fm_summary["合計"] * 100).round(1)
-        fm_summary = fm_summary.sort_values(["fiscal_month", "author"])
+        fm_summary["_order"] = fm_summary["fiscal_month"].map(
+            lambda m: _fm_order.index(m) if m in _fm_order else 99
+        )
+        fm_summary = fm_summary.sort_values(["_order", "author"]).drop(columns="_order")
         st.dataframe(
             fm_summary[["author", "fiscal_label", "通常", "残業", "合計", "残業率"]].rename(
                 columns={"author": "担当者", "fiscal_label": "月度", "残業率": "残業率 (%)"}
@@ -739,8 +748,11 @@ elif page == "⏰ 残業・36協定":
         fiscal_months = (
             fiscal_df[["fiscal_year", "fiscal_month", "fiscal_label"]]
             .drop_duplicates()
-            .sort_values("fiscal_month")
         )
+        fiscal_months["_order"] = fiscal_months["fiscal_month"].map(
+            lambda m: _fm_order.index(m) if m in _fm_order else 99
+        )
+        fiscal_months = fiscal_months.sort_values("_order").drop(columns="_order")
 
         for _, fm_row in fiscal_months.iterrows():
             fy = fm_row["fiscal_year"]
