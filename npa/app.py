@@ -469,6 +469,9 @@ if df.empty:
     st.warning("この期間のデータがありません。")
     st.stop()
 
+# ヘルプを常に除外
+df = df[df["author"] != "ヘルプ"].copy()
+
 # 担当者フィルタ適用
 if selected_authors:
     df = df[df["author"].isin(selected_authors)].copy()
