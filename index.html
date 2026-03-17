@@ -525,7 +525,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 <div class="tabs no-print">
   <button class="tab active" id="tab-input" onclick="showTab('input')">✏️ 入力</button>
   <button class="tab" id="tab-dash"  onclick="showTab('dash')">📊 ダッシュボード</button>
-  <button class="tab" id="tab-analysis" onclick="showTab('analysis')">🔬 業務分析(作成中)</button>
+  <a href="http://172.25.10.39:8501" target="_blank" class="tab-link no-print" title="業務分析(作成中)">🔬 業務分析(作成中)</a>
   <div style="flex:1;"></div>
   <a href="#" onclick="window.open('https://horizon-jit.github.io/NP-TASK/','kokuban','width=560,height=700,scrollbars=yes,resizable=yes');return false;" class="tab-link no-print" title="黒板">📋 黒板</a>
   <a href="https://horizon-jit.github.io/JDS/" target="_blank" class="tab-link no-print" title="生産管理-資料検索システム">🔍 資料検索</a>
@@ -587,14 +587,6 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 
 </div><!-- /view-input -->
 
-<!-- ═══ 業務分析タブ ═══ -->
-<div id="view-analysis" class="tab-content">
-  <div style="padding:40px 20px;text-align:center;">
-    <div style="font-size:48px;margin-bottom:16px;">🔬</div>
-    <h2 style="color:var(--g700);margin-bottom:8px;">業務分析</h2>
-    <p style="color:var(--g400);font-size:14px;">現在作成中です。今後のアップデートをお待ちください。</p>
-  </div>
-</div><!-- /view-analysis -->
 
 <!-- ═══ ダッシュボードタブ ═══ -->
 <!-- PDF印刷用タイトルバー（通常時は非表示） -->
