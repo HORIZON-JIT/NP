@@ -540,7 +540,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 <div id="view-input" class="tab-content active">
   <div class="submit-card">
     <div class="submit-header">
-      <h2>作業時間入力 <small style="font-weight:400;color:var(--g500);font-size:11px;">中分類名をクリックで +0.5h</small></h2>
+      <h2>作業時間入力 <small style="font-weight:400;color:var(--g500);font-size:11px;">中分類名をクリックで +0.25h</small></h2>
       <span class="data-status" id="data-status">未入力</span>
     </div>
     <div class="table-wrap">
@@ -549,7 +549,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
           <tr>
             <th class="th-main">大分類</th>
             <th class="th-cd">コード</th>
-            <th class="th-name">中分類（クリックで +0.5h）</th>
+            <th class="th-name">中分類（クリックで +0.25h）</th>
             <th class="th-hours">通常時間 (h)</th>
             <th class="th-hours">残業時間 (h)</th>
           </tr>
@@ -1613,7 +1613,7 @@ async function saveLeaveTime(date, author, leaveTime) {
 // 昼休憩: 奇数月=12:40〜13:30(50分) / 偶数月=12:20〜13:10(50分)  ※月初めに自動切替
 // 夕方休憩: 17:20〜17:30(10分) ※normalEnd=17:20で自動除外
 // 残業: 17:30以降
-// 丸め: 通常・残業ともに15分未満切り捨て、15分以上は0.5h単位切り上げ
+// 丸め: 通常・残業ともに15分未満切り捨て、15分以上は0.25h単位切り上げ
 
 // 月から昼休憩時刻を返す（dateStr='YYYY-MM-DD'、省略時は今日）
 function getLunchBreak(dateStr) {
@@ -1638,11 +1638,11 @@ function calcFromLeave(leaveHHMM, dateStr) {
   if (leaveMins <= startMins) return {normal:0, ot:0};
 
   // ── 残業計算 ──
-  // 15分未満切り捨て、以降30分ごとに0.5h切り上げ
+  // 15分未満切り捨て、以降15分ごとに0.25h切り上げ
   let ot = 0;
   if (leaveMins > otStart) {
     const otMins = leaveMins - otStart;
-    ot = otMins < 15 ? 0 : Math.ceil((otMins - 14) / 30) * 0.5;
+    ot = otMins < 15 ? 0 : Math.ceil(otMins / 15) * 0.25;
   }
 
   // ── 通常時間計算 ──
@@ -1657,8 +1657,8 @@ function calcFromLeave(leaveHHMM, dateStr) {
   }
 
   const workMins = Math.max(0, workEnd - startMins - lunchDeduct);
-  // 15分未満切り捨て、15分以上は0.5h単位切り上げ（バイアスなし）
-  let normal = workMins < 15 ? 0 : Math.ceil(workMins / 30) * 0.5;
+  // 15分未満切り捨て、15分以上は0.25h単位切り上げ（バイアスなし）
+  let normal = workMins < 15 ? 0 : Math.ceil(workMins / 15) * 0.25;
   normal = Math.max(0, normal);
 
   const _result = {normal, ot};
@@ -2113,7 +2113,7 @@ function buildTable() {
       }
       const tdCd=document.createElement('td'); tdCd.className='td-cd'; tdCd.textContent=sub.cd; tr.appendChild(tdCd);
       const tdName=document.createElement('td'); tdName.className='td-name'; tdName.textContent=sub.label;
-      tdName.setAttribute('data-cd', sub.cd); tdName.title=`クリックで ${sub.label} の通常時間 +0.5h`; tdName.onclick=()=>addHalf(sub.cd); tr.appendChild(tdName);
+      tdName.setAttribute('data-cd', sub.cd); tdName.title=`クリックで ${sub.label} の通常時間 +0.25h`; tdName.onclick=()=>addQuarter(sub.cd); tr.appendChild(tdName);
       tr.appendChild(makeHoursCell(`h_${sub.cd}`,  sub.cd, false));
       tr.appendChild(makeHoursCell(`ot_${sub.cd}`, sub.cd, true));
       tbody.appendChild(tr);
@@ -2125,7 +2125,7 @@ function makeHoursCell(id, cdSub, isOT) {
   const td=document.createElement('td'); td.style.textAlign='center';
   const wrap=document.createElement('div'); wrap.className='hours-wrap';
   const inp=document.createElement('input');
-  inp.type='number'; inp.id=id; inp.min=0; inp.step=0.5; inp.value='0';
+  inp.type='number'; inp.id=id; inp.min=0; inp.step=0.25; inp.value='0';
   if (isOT) {
     // 残業列：通常が8h未満のときは読み取り専用表示（入力は可）
     inp.oninput=()=>{ refreshCellStyle(inp); scheduleUpdateTotals(); };
@@ -2135,7 +2135,7 @@ function makeHoursCell(id, cdSub, isOT) {
   }
   wrap.appendChild(inp); td.appendChild(wrap); return td;
 }
-function addHalf(cdSub) {
+function addQuarter(cdSub) {
   // 通常合計が8h未満なら通常に加算、8h以上なら残業に加算
   const normalTotal = getTotalNormal();
   const remaining = Math.max(0, REGULAR_H - normalTotal); // 通常に入れられる残り
@@ -2143,17 +2143,17 @@ function addHalf(cdSub) {
     // 通常列に加算（残り枠内に収まるよう制限）
     const inp = document.getElementById(`h_${cdSub}`);
     const v = parseFloat(inp.value) || 0;
-    const add = Math.min(0.5, remaining); // 余裕がなければ端数だけ
-    inp.value = (Math.round((v + add) * 10) / 10).toFixed(1);
+    const add = Math.min(0.25, remaining); // 余裕がなければ端数だけ
+    inp.value = (Math.round((v + add) * 100) / 100).toFixed(2);
     refreshCellStyle(inp);
     inp.style.transition = 'background .2s'; inp.style.background = '#bfdbfe';
     setTimeout(() => { inp.style.background = ''; }, 300);
-    // 0.5h加算で8hを超えた残り分を残業へ
-    if (add < 0.5) {
+    // 0.25h加算で8hを超えた残り分を残業へ
+    if (add < 0.25) {
       const otInp = document.getElementById(`ot_${cdSub}`);
       const ov = parseFloat(otInp.value) || 0;
-      const otAdd = Math.round((0.5 - add) * 10) / 10;
-      otInp.value = (Math.round((ov + otAdd) * 10) / 10).toFixed(1);
+      const otAdd = Math.round((0.25 - add) * 100) / 100;
+      otInp.value = (Math.round((ov + otAdd) * 100) / 100).toFixed(2);
       refreshCellStyle(otInp);
       otInp.style.transition = 'background .2s'; otInp.style.background = '#fecdd3';
       setTimeout(() => { otInp.style.background = ''; }, 300);
@@ -2162,7 +2162,7 @@ function addHalf(cdSub) {
     // 通常が満杯 → 残業に加算
     const otInp = document.getElementById(`ot_${cdSub}`);
     const ov = parseFloat(otInp.value) || 0;
-    otInp.value = (Math.round((ov + 0.5) * 10) / 10).toFixed(1);
+    otInp.value = (Math.round((ov + 0.25) * 100) / 100).toFixed(2);
     refreshCellStyle(otInp);
     otInp.style.transition = 'background .2s'; otInp.style.background = '#fecdd3';
     setTimeout(() => { otInp.style.background = ''; }, 300);
@@ -2197,14 +2197,14 @@ function clampNormal(cdSub) {
     if (cd === cdSub) continue;
     otherNormal += parseFloat(_INP_CACHE[cd].h?.value) || 0;
   }
-  otherNormal = Math.round(otherNormal * 10) / 10;
+  otherNormal = Math.round(otherNormal * 100) / 100;
 
-  const cap = Math.max(0, Math.round((REGULAR_H - otherNormal) * 10) / 10);
+  const cap = Math.max(0, Math.round((REGULAR_H - otherNormal) * 100) / 100);
   if (v > cap) {
-    const excess = Math.round((v - cap) * 10) / 10;
-    inp.value = cap.toFixed(1);
+    const excess = Math.round((v - cap) * 100) / 100;
+    inp.value = cap.toFixed(2);
     const ov = parseFloat(otInp.value) || 0;
-    otInp.value = (Math.round((ov + excess) * 10) / 10).toFixed(1);
+    otInp.value = (Math.round((ov + excess) * 100) / 100).toFixed(2);
     refreshCellStyle(otInp);
   }
   refreshCellStyle(inp);
@@ -2213,7 +2213,7 @@ function clampNormal(cdSub) {
 function getTotalNormal() {
   let n = 0;
   for (const cd in _INP_CACHE) { n += parseFloat(_INP_CACHE[cd].h?.value) || 0; }
-  return Math.round(n * 10) / 10;
+  return Math.round(n * 100) / 100;
 }
 function refreshCellStyle(inp){ inp.classList.toggle('has-val', parseFloat(inp.value)>0); }
 function updateTotals() {
@@ -2223,15 +2223,15 @@ function updateTotals() {
     normal += parseFloat(_INP_CACHE[cd].h?.value)  || 0;
     ot     += parseFloat(_INP_CACHE[cd].ot?.value) || 0;
   }
-  normal = Math.round(normal * 10) / 10;
-  ot     = Math.round(ot * 10) / 10;
+  normal = Math.round(normal * 100) / 100;
+  ot     = Math.round(ot * 100) / 100;
   const atMax = normal >= REGULAR_H;
-  const hint  = atMax ? '残業時間 +0.5h' : '通常時間 +0.5h';
+  const hint  = atMax ? '残業時間 +0.25h' : '通常時間 +0.25h';
 
   // 合計表示（変化があるときだけ書き換えでリフロー抑制）
   const tnEl = document.getElementById('total-normal');
   const toEl = document.getElementById('total-ot');
-  const nStr = normal.toFixed(1), oStr = ot.toFixed(1);
+  const nStr = normal.toFixed(2), oStr = ot.toFixed(2);
   if (tnEl.textContent !== nStr) tnEl.textContent = nStr;
   if (toEl.textContent !== oStr) toEl.textContent = oStr;
   tnEl.classList.toggle('at-max', atMax);
@@ -2261,10 +2261,10 @@ function checkHoursSafety(normal, ot) {
   const calc = calcFromLeave(leaveTime);
   if (!calc) { if (warnEl.style.display !== 'none') warnEl.style.display = 'none'; checkHoursSafety._lastKey = ''; return; }
 
-  // 実勤務時間上限 = 通常 + 残業（0.5刻みに切り捨て）
+  // 実勤務時間上限 = 通常 + 残業（0.25刻みに切り捨て）
   const limitRaw = (calc.normal + calc.ot);
-  const limit = Math.floor(limitRaw * 2) / 2;  // 0.5刻み切り捨て
-  const total = Math.round((normal + ot) * 10) / 10;
+  const limit = Math.floor(limitRaw * 4) / 4;  // 0.25刻み切り捨て
+  const total = Math.round((normal + ot) * 100) / 100;
 
   const state = total > limit ? 'over' : total < limit ? 'under' : 'match';
   const key = `${state}_${limit}_${total}`;
@@ -2279,8 +2279,8 @@ function checkHoursSafety(normal, ot) {
       ? 'display:block;margin:4px 0 2px;padding:5px 10px;border-radius:7px;font-size:12px;font-weight:700;background:#fff7ed;border:1px solid #fb923c;color:#ea580c;'
       : 'display:block;margin:4px 0 2px;padding:5px 10px;border-radius:7px;font-size:12px;font-weight:700;background:#eff6ff;border:1px solid #60a5fa;color:#1d4ed8;';
     warnEl.innerHTML = isOver
-      ? `⚠ 入力合計時間が退勤時刻から計算した実勤務時間を<strong>超えています</strong>（上限: <span id="safety-limit">${limit.toFixed(1)}</span>h、入力: <span id="safety-input">${total.toFixed(1)}</span>h）`
-      : `ℹ 入力合計時間が退勤時刻から計算した実勤務時間より<strong>少ない</strong>です（上限: <span id="safety-limit">${limit.toFixed(1)}</span>h、入力: <span id="safety-input">${total.toFixed(1)}</span>h）`;
+      ? `⚠ 入力合計時間が退勤時刻から計算した実勤務時間を<strong>超えています</strong>（上限: <span id="safety-limit">${limit.toFixed(2)}</span>h、入力: <span id="safety-input">${total.toFixed(2)}</span>h）`
+      : `ℹ 入力合計時間が退勤時刻から計算した実勤務時間より<strong>少ない</strong>です（上限: <span id="safety-limit">${limit.toFixed(2)}</span>h、入力: <span id="safety-input">${total.toFixed(2)}</span>h）`;
   }
 }
 function clearInputs() {
@@ -2313,8 +2313,8 @@ async function loadDay_and_render() {
     if (rows2.length>0) {
       rows2.forEach(r=>{
         const cache=_INP_CACHE[r.cdSub]||{}; const h=cache.h||document.getElementById(`h_${r.cdSub}`), ot=cache.ot||document.getElementById(`ot_${r.cdSub}`);
-        if(h&&r.hoursNormal>0){ h.value=r.hoursNormal.toFixed(1); refreshCellStyle(h); }
-        if(ot&&r.hoursOT>0)   { ot.value=r.hoursOT.toFixed(1);   refreshCellStyle(ot); }
+        if(h&&r.hoursNormal>0){ h.value=r.hoursNormal.toFixed(2); refreshCellStyle(h); }
+        if(ot&&r.hoursOT>0)   { ot.value=r.hoursOT.toFixed(2);   refreshCellStyle(ot); }
       });
       updateTotals();
       document.getElementById('data-status').textContent=`${currentDate} のデータを読み込み済み`;
@@ -2403,7 +2403,7 @@ function onLeaveChange() {
     el.textContent = '';
     el.className   = 'leave-ot-preview';
   } else if (ot > 0) {
-    el.textContent = `→ 残業 ${ot.toFixed(1)}h`;
+    el.textContent = `→ 残業 ${ot.toFixed(2)}h`;
     el.className   = 'leave-ot-preview';
   } else {
     el.textContent = '→ 定時内（残業なし）';
@@ -2545,9 +2545,9 @@ async function renderDash() {
     const persons = allAuthorsD.size;
     const avgPerPerson = personsExHelp>0 ? totalOTExHelp/personsExHelp : 0;
     document.getElementById('ds-persons').textContent =persons||0;
-    document.getElementById('ds-normal').textContent  =totalN.toFixed(1)+'h';
-    document.getElementById('ds-ot').textContent      =totalOT.toFixed(1)+'h';
-    document.getElementById('ds-ot-avg').textContent  =avgPerPerson.toFixed(1)+'h';
+    document.getElementById('ds-normal').textContent  =totalN.toFixed(2)+'h';
+    document.getElementById('ds-ot').textContent      =totalOT.toFixed(2)+'h';
+    document.getElementById('ds-ot-avg').textContent  =avgPerPerson.toFixed(2)+'h';
     document.getElementById('ds-entries').textContent =totalRows;
     // 円グラフ用
     const filteredDaily={};
@@ -2691,9 +2691,9 @@ async function renderMonthlyDash() {
     const avgTotal = totalOT; // 月期1期分の全員合計
 
     document.getElementById('ms-persons').textContent        =personsM||0;
-    document.getElementById('ms-normal').textContent         =totalN.toFixed(1)+'h';
-    document.getElementById('ms-ot').textContent             =totalOT.toFixed(1)+'h';
-    document.getElementById('ms-ot-avg-person').textContent  =avgPerPerson.toFixed(1)+'h';
+    document.getElementById('ms-normal').textContent         =totalN.toFixed(2)+'h';
+    document.getElementById('ms-ot').textContent             =totalOT.toFixed(2)+'h';
+    document.getElementById('ms-ot-avg-person').textContent  =avgPerPerson.toFixed(2)+'h';
     document.getElementById('ms-days').textContent           =days+'日';
 
     // 作業内訳グラフ用
@@ -2899,10 +2899,10 @@ async function renderYearlyDash() {
     const avgMonthOTPerson = (activeMonths>0&&persons>0) ? totalOT/activeMonths/persons : 0; // 1人1ヶ月平均
 
     document.getElementById('ys-persons').textContent         = persons||0;
-    document.getElementById('ys-normal').textContent          = totalN.toFixed(1)+'h';
-    document.getElementById('ys-ot').textContent              = totalOT.toFixed(1)+'h';
-    document.getElementById('ys-ot-avg-person').textContent   = avgMonthOTPerson.toFixed(1)+'h';
-    document.getElementById('ys-ot-avg-total').textContent    = avgMonthOTTotal.toFixed(1)+'h';
+    document.getElementById('ys-normal').textContent          = totalN.toFixed(2)+'h';
+    document.getElementById('ys-ot').textContent              = totalOT.toFixed(2)+'h';
+    document.getElementById('ys-ot-avg-person').textContent   = avgMonthOTPerson.toFixed(2)+'h';
+    document.getElementById('ys-ot-avg-total').textContent    = avgMonthOTTotal.toFixed(2)+'h';
     document.getElementById('ys-months').textContent          = activeMonths+'ヶ月';
 
     const yearByAuthorFlat = {};
@@ -3049,7 +3049,7 @@ function renderYearlyOTLine(monthOT, canvasId, emptyId, avgOT=0, prevMonthOT=nul
       ctx.fillRect(x-barW/2+2, PT+cH-bH, barW-2, bH);
       ctx.fillStyle='#f43f5e'; ctx.font='bold 9px sans-serif';
       ctx.textAlign='center'; ctx.textBaseline='bottom';
-      ctx.fillText(d.totalOT.toFixed(1)+'h', x, PT+cH-bH-2);
+      ctx.fillText(d.totalOT.toFixed(2)+'h', x, PT+cH-bH-2);
     }
     // 月ラベル
     ctx.fillStyle='#334155'; ctx.font='10px sans-serif';
@@ -3115,7 +3115,7 @@ function renderYearlyOTLine(monthOT, canvasId, emptyId, avgOT=0, prevMonthOT=nul
     ctx.restore();
     ctx.fillStyle='#d97706'; ctx.font='bold 9px sans-serif';
     ctx.textAlign='left'; ctx.textBaseline='bottom';
-    ctx.fillText(`月平均${avgOT.toFixed(1)}h`,PL+2,avgY-2);
+    ctx.fillText(`月平均${avgOT.toFixed(2)}h`,PL+2,avgY-2);
   }
 
   // 凡例
@@ -3215,7 +3215,7 @@ function renderStackBar(byAuthor, canvasId, emptyId) {
     // 合計時間（右端）
     if (d.total > 0) {
       ctx.fillStyle = '#374151'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-      ctx.fillText(d.total.toFixed(1) + 'h', cW + PL + 4, y + barH / 2);
+      ctx.fillText(d.total.toFixed(2) + 'h', cW + PL + 4, y + barH / 2);
     }
   });
 
@@ -3269,7 +3269,7 @@ function renderCatBar(byAuthor, canvasId, emptyId) {
     const y=PT+cH*(1-i/4);
     ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(PL+cW,y); ctx.stroke();
     ctx.fillStyle='#9ca3af'; ctx.font='9px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
-    ctx.fillText((maxVal*i/4).toFixed(1)+'h',PL-4,y);
+    ctx.fillText((maxVal*i/4).toFixed(2)+'h',PL-4,y);
   }
 
   // バー
@@ -3285,7 +3285,7 @@ function renderCatBar(byAuthor, canvasId, emptyId) {
     // 値ラベル（バー上部）
     ctx.fillStyle='#374151'; ctx.font='bold 9px sans-serif';
     ctx.textAlign='center'; ctx.textBaseline='bottom';
-    ctx.fillText(c.total.toFixed(1)+'h', x, PT+cH-bH-2);
+    ctx.fillText(c.total.toFixed(2)+'h', x, PT+cH-bH-2);
     // X軸ラベル（斜め表示）
     ctx.save();
     ctx.translate(x, PT+cH+6);
@@ -3343,8 +3343,8 @@ function renderPersonPies(byAuthor, gridId, leaveNormal=null, leaveOT=null) {
     card.innerHTML=`
       <h3>👤 ${esc(author)}</h3>
       <div class="p-badges">
-        <span class="b-work">通常 ${totalN.toFixed(1)}h</span>
-        ${totalOT>0?`<span class="b-ot">残業 ${totalOT.toFixed(1)}h</span>`:`<span class="b-ok">✅ 定時内</span>`}
+        <span class="b-work">通常 ${totalN.toFixed(2)}h</span>
+        ${totalOT>0?`<span class="b-ot">残業 ${totalOT.toFixed(2)}h</span>`:`<span class="b-ok">✅ 定時内</span>`}
       </div>
       <canvas id="${uid}" width="110" height="110" style="display:block;margin:0 auto;"></canvas>
       <div class="mini-legend" id="leg_${uid}"></div>`;
@@ -3379,7 +3379,7 @@ function drawPie(uid,rows) {
   });
   ctx.beginPath(); ctx.arc(55,55,22,0,Math.PI*2); ctx.fillStyle='white'; ctx.fill();
   ctx.fillStyle='#374151'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(total.toFixed(1)+'h',55,55); // 通常+残業合計
+  ctx.fillText(total.toFixed(2)+'h',55,55); // 通常+残業合計
   legend.innerHTML=Object.entries(catMap).sort((a,b)=>b[1]-a[1]).map(([k,v])=>{
     const pct=Math.round(v/total*100);
     return `<div class="ml-row"><div style="width:8px;height:8px;border-radius:2px;background:${CAT_COLOR[k]||'#9ca3af'};flex-shrink:0;"></div><span style="flex:1;">${CAT_LABEL[k]||k}</span><span style="font-weight:700;">${pct}%</span></div>`;
@@ -3432,7 +3432,7 @@ function renderOTBar(byAuthor, canvasId, emptyId, avgOT=0) {
     ctx.fillStyle='#374151'; ctx.font='bold 12px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
     ctx.fillText(d.name.length>5?d.name.slice(0,5)+'…':d.name,PL-6,y+BH/2);
     // 残業値
-    if(d.ot>0){ ctx.fillStyle='#dc2626'; ctx.font='bold 12px sans-serif'; ctx.textAlign='left'; ctx.fillText(`+${d.ot.toFixed(1)}h`,PL+bW+5,y+BH/2); }
+    if(d.ot>0){ ctx.fillStyle='#dc2626'; ctx.font='bold 12px sans-serif'; ctx.textAlign='left'; ctx.fillText(`+${d.ot.toFixed(2)}h`,PL+bW+5,y+BH/2); }
     else       { ctx.fillStyle='#22c55e'; ctx.font='11px sans-serif'; ctx.textAlign='left'; ctx.fillText('定時内',PL+5,y+BH/2); }
   });
   // 平均破線
@@ -3443,7 +3443,7 @@ function renderOTBar(byAuthor, canvasId, emptyId, avgOT=0) {
     ctx.beginPath(); ctx.moveTo(avgX,PT-8); ctx.lineTo(avgX,H-PB+3); ctx.stroke();
     ctx.restore();
     ctx.fillStyle='#d97706'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center';
-    ctx.fillText(`平均 ${avgOT.toFixed(1)}h`,avgX,PT-12);
+    ctx.fillText(`平均 ${avgOT.toFixed(2)}h`,avgX,PT-12);
   }
   // X軸ラベル
   ctx.fillStyle='#9ca3af'; ctx.font='10px sans-serif'; ctx.textAlign='center';
@@ -3483,7 +3483,7 @@ function renderRankings(normalByAuthor, byAuthorRows, prefix) {
             <div class="rank-name">${esc(x.name)}</div>
             <div class="rank-bar-wrap">
               <div class="rank-bar-bg"><div class="rank-bar-fg" style="width:${Math.round(x.h/maxPerson*100)}%"></div></div>
-              <div class="rank-val">${x.h.toFixed(1)}h</div>
+              <div class="rank-val">${x.h.toFixed(2)}h</div>
             </div>
           </div>
         </div>`).join('');
@@ -3512,7 +3512,7 @@ function renderRankings(normalByAuthor, byAuthorRows, prefix) {
             <div class="rank-name">${esc(x.label)}</div>
             <div class="rank-bar-wrap">
               <div class="rank-bar-bg"><div class="rank-bar-fg" style="width:${Math.round(x.h/maxSub*100)}%"></div></div>
-              <div class="rank-val">${x.h.toFixed(1)}h</div>
+              <div class="rank-val">${x.h.toFixed(2)}h</div>
             </div>
           </div>
         </div>`).join('');
@@ -3542,7 +3542,7 @@ function renderRankings(normalByAuthor, byAuthorRows, prefix) {
             <div class="rank-name">${esc(x.label)}</div>
             <div class="rank-bar-wrap">
               <div class="rank-bar-bg"><div class="rank-bar-fg" style="width:${Math.round(x.h/maxMain*100)}%"></div></div>
-              <div class="rank-val">${x.h.toFixed(1)}h</div>
+              <div class="rank-val">${x.h.toFixed(2)}h</div>
             </div>
           </div>
         </div>`).join('');
@@ -3631,7 +3631,7 @@ function renderOTBarEnhanced(byAuthor, canvasId, emptyId, avgPerPerson=0, avgTot
     // 残業値ラベル（当期）
     if(d.ot>0){
       ctx.fillStyle='#f43f5e'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left';
-      ctx.fillText(`+${d.ot.toFixed(1)}h`, PL+bW+5, y+(hasPrev?BH*0.25:BH*0.5));
+      ctx.fillText(`+${d.ot.toFixed(2)}h`, PL+bW+5, y+(hasPrev?BH*0.25:BH*0.5));
     } else {
       ctx.fillStyle='#10b981'; ctx.font='11px sans-serif'; ctx.textAlign='left';
       ctx.fillText('定時内', PL+5, y+(hasPrev?BH*0.25:BH*0.5));
@@ -3640,7 +3640,7 @@ function renderOTBarEnhanced(byAuthor, canvasId, emptyId, avgPerPerson=0, avgTot
     if(hasPrev && d.prevOT!==null && d.prevOT>0){
       const pW=(d.prevOT/maxOT)*cW;
       ctx.fillStyle='#64748b'; ctx.font='10px sans-serif'; ctx.textAlign='left';
-      ctx.fillText(`前${d.prevOT.toFixed(1)}h`, PL+pW+5, y+BH*0.76);
+      ctx.fillText(`前${d.prevOT.toFixed(2)}h`, PL+pW+5, y+BH*0.76);
       // 前年比
       if(d.prevOT>0){
         const ratio = Math.round(d.ot/d.prevOT*100);
@@ -3661,7 +3661,7 @@ function renderOTBarEnhanced(byAuthor, canvasId, emptyId, avgPerPerson=0, avgTot
     ctx.fillStyle=color; ctx.font='bold 9px sans-serif'; ctx.textAlign='center';
     ctx.fillText(label, x, PT-14+yOff);
   }
-  drawDash(avgPerPerson,'#f59e0b',`個人avg ${avgPerPerson.toFixed(1)}h`, 0);
+  drawDash(avgPerPerson,'#f59e0b',`個人avg ${avgPerPerson.toFixed(2)}h`, 0);
   // 全員avg破線は非表示
 
   // X軸ラベル（適切な間隔で表示）
