@@ -1350,51 +1350,25 @@ function setLoading(on){ _lc=Math.max(0,_lc+(on?1:-1)); document.getElementById(
 // ── GAS通信（fetch版 / CORS対応・スマホ対応） ──
 // GASはリダイレクト先でCORSヘッダーを返さないため
 // redirect:'follow' + no-corsフォールバック方式を使用
-async function gasJsonp(url, params) {
-  // ══════════════════════════════════════════════════════════
-  //  GAS通信 3段階フォールバック
-  //  1. POST fetch（CORSなしでもWorksapce認証Cookieで通る）
-  //  2. GET fetch + credentials:include
-  //  3. JSONP（<script>タグ）
-  //  /a/macros/ はWorkspaceログイン必須だが
-  //  ブラウザにhorizon.co.jpセッションがあれば全方式で通る
-  // ══════════════════════════════════════════════════════════
+// 最初に成功した通信方式を記憶し、次回から優先する（無駄な試行を省く）
+let _gasPreferred = null;
 
-  // ① POST fetch（no-cors で Cookie を載せる）
-  try {
-    const res = await Promise.race([
-      fetch(url, {
-        method: 'POST',
-        credentials: 'include',
-        mode: 'no-cors',           // Workspaceドメイン制限を回避
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(params),
+function _gasGet(url, params) {
+  const qs = new URLSearchParams(params).toString();
+  return Promise.race([
+    fetch(url + '?' + qs, { method: 'GET', redirect: 'follow', credentials: 'include' })
+      .then(res => res.text())
+      .then(text => {
+        if (!text || text.trim().startsWith('<!')) throw new Error('HTML応答');
+        const clean = text.trim().replace(/^[^(]+\(/, '').replace(/\)\s*;?\s*$/, '');
+        return JSON.parse(clean);
       }),
-      new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 25000))
-    ]);
-    // no-cors は opaque なのでテキスト取得不可 → GETで再試行
-  } catch(_) {}
+    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 25000)),
+  ]);
+}
 
-  // ② GET fetch + credentials:include
-  try {
-    const qs  = new URLSearchParams(params).toString();
-    const res = await Promise.race([
-      fetch(url + '?' + qs, {
-        method: 'GET',
-        redirect: 'follow',
-        credentials: 'include',
-      }),
-      new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 25000))
-    ]);
-    const text = await res.text();
-    if (text && !text.trim().startsWith('<!')) {
-      const clean = text.trim().replace(/^[^(]+\(/, '').replace(/\)\s*;?\s*$/, '');
-      return JSON.parse(clean);
-    }
-  } catch(_) {}
-
-  // ③ JSONP（<script>タグ経由 — Cookieは自動付与）
-  const qs2 = new URLSearchParams(params).toString();
+function _gasJsonpTag(url, params) {
+  const qs = new URLSearchParams(params).toString();
   return new Promise((resolve, reject) => {
     const cb    = '_g_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const el    = document.createElement('script');
@@ -1407,10 +1381,34 @@ async function gasJsonp(url, params) {
       clearTimeout(timer); delete window[cb]; el.remove();
       reject(new Error('接続エラー（GASへ到達できません）'));
     };
-    el.src = url + '?' + qs2 + '&callback=' + cb;
+    el.src = url + '?' + qs + '&callback=' + cb;
     document.head.appendChild(el);
   });
 }
+
+async function gasJsonp(url, params) {
+  // ══════════════════════════════════════════════════════════
+  //  GAS通信: GET fetch → JSONP の2方式フォールバック。
+  //  最初に成功した方式を記憶し、次回からそれを優先する。
+  //  ※ 旧実装にあった no-cors POST は opaque で結果を読めず、
+  //    毎回GASを無駄に1回余分に実行させていた（＝読み込みが重い主因）
+  //    ため廃止した。
+  // ══════════════════════════════════════════════════════════
+  const methods = (_gasPreferred === 'jsonp')
+    ? [['jsonp', _gasJsonpTag], ['get', _gasGet]]
+    : [['get', _gasGet], ['jsonp', _gasJsonpTag]];
+
+  let lastErr;
+  for (const [name, fn] of methods) {
+    try {
+      const data = await fn(url, params);
+      _gasPreferred = name;   // 成功方式を記憶
+      return data;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('GAS通信失敗');
+}
+
 
 
 async function gasJsonpRetry(url, params, retries=1) {
