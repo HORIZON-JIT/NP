@@ -8,10 +8,15 @@ Authorization: Bearer ヘッダーで認証し、リダイレクトを手動で�
 import json
 import math
 import re
+from concurrent.futures import ThreadPoolExecutor
+
 import requests
 import pandas as pd
 from config import GAS_URL, SUB_CATEGORIES, get_main_cd, get_main_label
 from gas_auth import get_access_token
+
+# 内訳取得（週次/月次/月度）の並列取得ワーカー数
+_BREAKDOWN_MAX_WORKERS = 6
 
 
 # ── 退勤時刻 → 通常/残業 計算（index.html calcFromLeave と同一ロジック） ──
@@ -118,13 +123,15 @@ def _fetch_with_auth(url: str, params: dict, token: str, max_redirects: int = 10
     return resp
 
 
-def fetch_date_range(start_date: str, end_date: str) -> dict:
+def fetch_date_range(start_date: str, end_date: str, no_cache: bool = False) -> dict:
     """
     GAS getDateRange APIを呼び出し、生JSONを返す。
 
     Parameters:
         start_date: 開始日 (YYYY-MM-DD)
         end_date:   終了日 (YYYY-MM-DD)
+        no_cache:   Trueの場合のみGAS側キャッシュを無効化（noCache=1）。
+                    通常はFalseでGASサーバーキャッシュを活用し高速化する。
 
     Returns:
         GASレスポンスのdict
@@ -136,8 +143,9 @@ def fetch_date_range(start_date: str, end_date: str) -> dict:
         "action": "getDateRange",
         "startDate": start_date,
         "endDate": end_date,
-        "noCache": "1",
     }
+    if no_cache:
+        params["noCache"] = "1"
 
     resp = _fetch_with_auth(GAS_URL, params, token)
     resp.raise_for_status()
@@ -258,6 +266,51 @@ def fetch_as_dataframe(start_date: str, end_date: str) -> pd.DataFrame:
     return df
 
 
+def _fetch_slices_parallel(slices: list[dict]) -> pd.DataFrame:
+    """
+    期間スライス群を並列にAPI取得し、付加列を付けて結合する。
+
+    Parameters:
+        slices: [{"start": iso, "end": iso, "cols": {col: value, ...}}, ...]
+                "cols" は取得後のDataFrameに付与する列（week_start/year/month等）。
+
+    Returns:
+        全スライスを縦結合したDataFrame（順序はslices通り）。
+        失敗・空スライスはスキップする。
+    """
+    if not slices:
+        return pd.DataFrame()
+
+    # トークンを事前取得し、並列時に複数スレッドが同時にリフレッシュ＆
+    # token.json書き込みで競合するのを防ぐ（以降はキャッシュ済みを共有）。
+    try:
+        get_access_token()
+    except Exception:
+        pass
+
+    def _work(slc: dict):
+        try:
+            raw = fetch_date_range(slc["start"], slc["end"])
+            df = to_dataframe(raw)
+            if df.empty:
+                return None
+            for col, val in slc.get("cols", {}).items():
+                df[col] = val
+            return df
+        except Exception:
+            return None
+
+    max_workers = min(_BREAKDOWN_MAX_WORKERS, len(slices))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # map は入力順に結果を返すため、スライス順が維持される
+        results = list(executor.map(_work, slices))
+
+    all_dfs = [df for df in results if df is not None]
+    if not all_dfs:
+        return pd.DataFrame()
+    return pd.concat(all_dfs, ignore_index=True)
+
+
 def fetch_weekly_breakdown(start_date: str, end_date: str) -> pd.DataFrame:
     """
     期間を週ごとに分割してデータ取得。week_start列を付与。
@@ -268,28 +321,20 @@ def fetch_weekly_breakdown(start_date: str, end_date: str) -> pd.DataFrame:
     start = dt_date.fromisoformat(start_date)
     end = dt_date.fromisoformat(end_date)
 
-    all_dfs = []
+    slices = []
     # 週の開始を月曜に揃える
     current = start - timedelta(days=start.weekday())
-
     while current <= end:
         ws = max(current, start)
         we = min(current + timedelta(days=6), end)
-
-        try:
-            raw = fetch_date_range(ws.isoformat(), we.isoformat())
-            df = to_dataframe(raw)
-            if not df.empty:
-                df["week_start"] = ws.isoformat()
-                all_dfs.append(df)
-        except Exception:
-            pass
-
+        slices.append({
+            "start": ws.isoformat(),
+            "end": we.isoformat(),
+            "cols": {"week_start": ws.isoformat()},
+        })
         current += timedelta(days=7)
 
-    if not all_dfs:
-        return pd.DataFrame()
-    return pd.concat(all_dfs, ignore_index=True)
+    return _fetch_slices_parallel(slices)
 
 
 def fetch_monthly_breakdown(start_date: str, end_date: str) -> pd.DataFrame:
@@ -303,9 +348,8 @@ def fetch_monthly_breakdown(start_date: str, end_date: str) -> pd.DataFrame:
     start = dt_date.fromisoformat(start_date)
     end = dt_date.fromisoformat(end_date)
 
-    all_dfs = []
+    slices = []
     year, month = start.year, start.month
-
     while (year, month) <= (end.year, end.month):
         _, last_day = calendar.monthrange(year, month)
         ms = dt_date(year, month, 1)
@@ -313,17 +357,11 @@ def fetch_monthly_breakdown(start_date: str, end_date: str) -> pd.DataFrame:
         # 期間でクリップ
         ms = max(ms, start)
         me = min(me, end)
-
-        try:
-            raw = fetch_date_range(ms.isoformat(), me.isoformat())
-            df = to_dataframe(raw)
-            if not df.empty:
-                df["year"] = year
-                df["month"] = month
-                all_dfs.append(df)
-        except Exception:
-            pass
-
+        slices.append({
+            "start": ms.isoformat(),
+            "end": me.isoformat(),
+            "cols": {"year": year, "month": month},
+        })
         # 次の月
         if month == 12:
             year += 1
@@ -331,9 +369,7 @@ def fetch_monthly_breakdown(start_date: str, end_date: str) -> pd.DataFrame:
         else:
             month += 1
 
-    if not all_dfs:
-        return pd.DataFrame()
-    return pd.concat(all_dfs, ignore_index=True)
+    return _fetch_slices_parallel(slices)
 
 
 def get_fiscal_month(d, closing_day: int = 15) -> tuple[int, int]:
@@ -498,9 +534,8 @@ def fetch_fiscal_monthly_breakdown(start_date: str, end_date: str, closing_day: 
     fy_s, fm_s = get_fiscal_month(start, closing_day)
     fy_e, fm_e = get_fiscal_month(end, closing_day)
 
-    all_dfs = []
+    slices = []
     fy, fm = fy_s, fm_s
-
     while (fy, fm) <= (fy_e, fm_e):
         ms, me = get_fiscal_month_range(fy, fm, closing_day)
         # 選択期間でクリップ
@@ -508,16 +543,15 @@ def fetch_fiscal_monthly_breakdown(start_date: str, end_date: str, closing_day: 
         me = min(me, end)
 
         if ms <= me:
-            try:
-                raw = fetch_date_range(ms.isoformat(), me.isoformat())
-                df = to_dataframe(raw)
-                if not df.empty:
-                    df["fiscal_year"] = fy
-                    df["fiscal_month"] = fm
-                    df["fiscal_label"] = f"{fm}月度"
-                    all_dfs.append(df)
-            except Exception:
-                pass
+            slices.append({
+                "start": ms.isoformat(),
+                "end": me.isoformat(),
+                "cols": {
+                    "fiscal_year": fy,
+                    "fiscal_month": fm,
+                    "fiscal_label": f"{fm}月度",
+                },
+            })
 
         # 次の月度
         if fm == 12:
@@ -526,9 +560,7 @@ def fetch_fiscal_monthly_breakdown(start_date: str, end_date: str, closing_day: 
         else:
             fm += 1
 
-    if not all_dfs:
-        return pd.DataFrame()
-    return pd.concat(all_dfs, ignore_index=True)
+    return _fetch_slices_parallel(slices)
 
 
 def get_leave_map(data: dict) -> dict:
