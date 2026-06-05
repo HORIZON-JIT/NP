@@ -979,6 +979,8 @@ let _dashTab       = 'monthly';
 let currentPeriod  = getCurrentPeriodMonth();
 const _cache       = new Map(); // {key → data}
 let _debounceTimer = null;
+// レンダリングキャッシュ: 同一データで重複レンダリングを防ぐ
+const _renderCache = { monthly: null, yearly: null, daily: null };
 
 // ─── 日付ユーティリティ ─────────────────
 function todayStr() {
@@ -1622,10 +1624,12 @@ function getLunchBreak(dateStr) {
     : { start: 12*60+20, end: 13*60+10 }; // 偶数月: 12:20〜13:10
 }
 
+const _calcFromLeaveCache = new Map();
 function calcFromLeave(leaveHHMM, dateStr) {
   if (!leaveHHMM) return null;
   const _ck = `${leaveHHMM}|${dateStr||currentDate}`;
-  if (calcFromLeave._ck === _ck) return calcFromLeave._cv;
+  const cached = _calcFromLeaveCache.get(_ck);
+  if (cached) return cached;
   const [hh,mm] = leaveHHMM.split(':').map(Number);
   if (isNaN(hh)||isNaN(mm)) return null;
   const leaveMins = hh*60 + mm;
@@ -1633,7 +1637,7 @@ function calcFromLeave(leaveHHMM, dateStr) {
   const normalEnd = 17*60 + 20;  // 17:20（定時、夕方休憩前）
   const otStart   = 17*60 + 30;  // 17:30（残業開始）
 
-  if (leaveMins <= startMins) return {normal:0, ot:0};
+  if (leaveMins <= startMins) { const r={normal:0, ot:0}; _calcFromLeaveCache.set(_ck,r); return r; }
 
   // ── 残業計算 ──
   // 15分未満切り捨て、以降15分ごとに0.25h切り上げ
@@ -1660,8 +1664,7 @@ function calcFromLeave(leaveHHMM, dateStr) {
   normal = Math.max(0, normal);
 
   const _result = {normal, ot};
-  calcFromLeave._ck = _ck;
-  calcFromLeave._cv = _result;
+  _calcFromLeaveCache.set(_ck, _result);
   return _result;
 }
 
@@ -1877,11 +1880,9 @@ async function loadRangeData(startDate, endDate, periodYear, periodMonth) {
   if (ls) {
     // ★ _leaveMap がないキャッシュ（機能追加前に保存された古いキャッシュ）は無効扱い
     if (ls._leaveMap === undefined) {
-      lsCacheDelete(ck); // 古いキャッシュを削除して再取得
+      lsCacheDelete(ck);
     } else {
       cacheSet(ck, ls);
-      // バックグラウンド更新は当月期のみ（過去期=TTL:0は不要）
-      if (ttl > 0) _bgRefreshRange(startDate, endDate, ck, ttl);
       return ls;
     }
   }
@@ -2623,6 +2624,7 @@ async function forceRefreshDaily() {
   const ck = `daily_${currentDate}`;
   _cache.delete(ck);
   lsCacheDelete(ck);
+  _renderCache.daily = null;
   _forceNoCache = true;
   try { await renderDash(); } finally { _forceNoCache = false; }
 }
@@ -2630,20 +2632,22 @@ async function forceRefreshDaily() {
 async function refreshMonthly() {
   const {startDate,endDate}=getPeriodDates(currentPeriod.year,currentPeriod.month);
   const ck=`range_${startDate}_${endDate}`;
-  // メモリキャッシュ・LSキャッシュ両方を削除して強制再取得
   _cache.delete(ck);
   lsCacheDelete(ck);
-  // monthly用の集計キャッシュも削除
   _cache.delete(`monthly_${startDate}_${endDate}`);
   lsCacheDelete(`monthly_${startDate}_${endDate}`);
+  _renderCache.monthly = null;
   _forceNoCache = true;
   try { await renderMonthlyDash(); } finally { _forceNoCache = false; }
 }
 
 async function renderMonthlyDash() {
+  const {startDate,endDate,label,range}=getPeriodDates(currentPeriod.year,currentPeriod.month);
+  // レンダリングキャッシュ: 同一期間ならデータ再処理とDOM再構築をスキップ
+  const renderKey = `${startDate}_${endDate}`;
+  if (_renderCache.monthly === renderKey) return;
   setLoading(true);
   try {
-    const {startDate,endDate,label,range}=getPeriodDates(currentPeriod.year,currentPeriod.month);
     document.getElementById('period-range').textContent   =range;
     document.getElementById('monthly-ot-sub').textContent =`${range}　— 破線 = 平均残業時間`;
     syncPeriodSelectors();
@@ -2651,6 +2655,7 @@ async function renderMonthlyDash() {
     let byAuthor;
     try { byAuthor=await loadRangeData(startDate,endDate,currentPeriod.year,currentPeriod.month); }
     catch(e) {
+      _renderCache.monthly = null;
       document.getElementById('monthly-person-grid').innerHTML=
         `<p class="no-data-msg">⚠ データ読込失敗 — <a href="#" onclick="renderMonthlyDash();return false;" style="color:var(--primary);">🔄 再試行</a></p>`;
       return;
@@ -2732,6 +2737,7 @@ async function renderMonthlyDash() {
       otData[a]=[{cdSub:'_ot',hoursNormal:normalByAuthor[a]||0,hoursOT:otByAuthor[a]||0}];
     });
     requestAnimationFrame(()=>renderOTBarEnhanced(otData,'monthly-ot-canvas','monthly-ot-empty',avgPerPerson,0));
+    _renderCache.monthly = renderKey;
   } finally { setLoading(false); }
 }
 
@@ -2776,8 +2782,8 @@ async function refreshYearly() {
     _cache.delete(`monthly_${startDate}_${endDate}`);
     lsCacheDelete(`monthly_${startDate}_${endDate}`);
   });
-  // range_ プレフィックスのLSキャッシュも一括削除
   lsCacheDeleteRange();
+  _renderCache.yearly = null;
   _forceNoCache = true;
   try { await renderYearlyDash(); } finally { _forceNoCache = false; }
 }
@@ -2808,6 +2814,9 @@ function onYearSelChange() {
 }
 
 async function renderYearlyDash() {
+  // レンダリングキャッシュ: 同一年度ならデータ再処理とDOM再構築をスキップ
+  const renderKey = `fy_${currentFiscalYear}`;
+  if (_renderCache.yearly === renderKey) return;
   setLoading(true);
   try {
     // 会計年度（10月スタート）: currentFiscalYear=2025 → 10月期〜翌9月期
@@ -2819,17 +2828,22 @@ async function renderYearlyDash() {
     document.getElementById('yearly-ot-sub').textContent      = `全担当合計 ｜ 棒=残業 ｜ 破線=月平均 ｜ 折線=累計平均 ｜ グレー=前年`;
     document.getElementById('yearly-person-sub').textContent  = '作業時間合計（定時＋残業）';
 
-    // 12期分のデータを並列取得
-    let allData;
+    // 当年＋前年の24期分を同時並列取得（旧: 当年12→前年12の直列）
+    const prevFiscalPeriods = getFiscalPeriods(currentFiscalYear - 1);
+    let allData, prevAllData;
     try {
-      allData = await Promise.all(fiscalPeriods.map(({year,month}) =>
-        loadRangeData(
-          getPeriodDates(year,month).startDate,
-          getPeriodDates(year,month).endDate,
-          year, month
-        ).catch(()=>null)
-      ));
+      const [cur, prev] = await Promise.all([
+        Promise.all(fiscalPeriods.map(({year,month}) =>
+          loadRangeData(getPeriodDates(year,month).startDate, getPeriodDates(year,month).endDate, year, month).catch(()=>null)
+        )),
+        Promise.all(prevFiscalPeriods.map(({year,month}) =>
+          loadRangeData(getPeriodDates(year,month).startDate, getPeriodDates(year,month).endDate, year, month).catch(()=>null)
+        )),
+      ]);
+      allData = cur;
+      prevAllData = prev;
     } catch(e) {
+      _renderCache.yearly = null;
       document.getElementById('yearly-person-grid').innerHTML=
         `<p class="no-data-msg">⚠ データ読込失敗 — <a href="#" onclick="renderYearlyDash();return false;" style="color:var(--primary);">🔄 再試行</a></p>`;
       return;
@@ -2914,17 +2928,9 @@ async function renderYearlyDash() {
     // ランキング
     renderRankings(yearNormalByAuthor, yearByAuthorFlat, 'yearly');
 
-    // ── 前年度データ取得 ──
-    const prevFiscalPeriods = getFiscalPeriods(currentFiscalYear - 1);
+    // ── 前年度データ集計（すでに並列取得済みの prevAllData を使う） ──
     let prevMonthOT = null;
     try {
-      const prevAllData = await Promise.all(prevFiscalPeriods.map(({year,month}) =>
-        loadRangeData(
-          getPeriodDates(year,month).startDate,
-          getPeriodDates(year,month).endDate,
-          year, month
-        ).catch(()=>null)
-      ));
       prevMonthOT = prevFiscalPeriods.map(({year,month}, idx) => {
         const d = prevAllData[idx];
         if (!d) return {year, month, totalOT:0};
@@ -2986,6 +2992,7 @@ async function renderYearlyDash() {
       });
     });
     renderPersonPies(yearByAuthorFlat,'yearly-person-grid',leaveNormalY,leaveOTY);
+    _renderCache.yearly = renderKey;
   } finally { setLoading(false); }
 }
 
