@@ -1351,9 +1351,9 @@ function setLoading(on){ _lc=Math.max(0,_lc+(on?1:-1)); document.getElementById(
 // ═══════════════════════════════════════════
 // ── GAS通信（fetch版 / CORS対応・スマホ対応） ──
 // GASはリダイレクト先でCORSヘッダーを返さないため
-// redirect:'follow' + no-corsフォールバック方式を使用
-// 最初に成功した通信方式を記憶し、次回から優先する（無駄な試行を省く）
-let _gasPreferred = null;
+// GET fetchとJSONPを同時に走らせ、先に成功した方を採用する（レース方式）。
+// 成功方式をlocalStorageに記憶し、次回以降はそれだけ使う（無駄な試行を省く）。
+let _gasPreferred = localStorage.getItem('_gasPreferred') || null;
 
 function _gasGet(url, params) {
   const qs = new URLSearchParams(params).toString();
@@ -1365,7 +1365,7 @@ function _gasGet(url, params) {
         const clean = text.trim().replace(/^[^(]+\(/, '').replace(/\)\s*;?\s*$/, '');
         return JSON.parse(clean);
       }),
-    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 25000)),
+    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
   ]);
 }
 
@@ -1388,27 +1388,49 @@ function _gasJsonpTag(url, params) {
   });
 }
 
+function _setGasPreferred(name) {
+  _gasPreferred = name;
+  try { localStorage.setItem('_gasPreferred', name); } catch(_) {}
+}
+
 async function gasJsonp(url, params) {
   // ══════════════════════════════════════════════════════════
-  //  GAS通信: GET fetch → JSONP の2方式フォールバック。
-  //  最初に成功した方式を記憶し、次回からそれを優先する。
-  //  ※ 旧実装にあった no-cors POST は opaque で結果を読めず、
-  //    毎回GASを無駄に1回余分に実行させていた（＝読み込みが重い主因）
-  //    ため廃止した。
+  //  GAS通信: 学習済みなら単一方式、未学習なら GET と JSONP を
+  //  同時発射して先に成功した方を採用（レース方式）。
+  //  Workspace環境ではGETがCORSで失敗しJSONPだけ通ることが多い。
+  //  GETのタイムアウト（旧25秒）を待つ間の遅延が体感の重さの主因。
   // ══════════════════════════════════════════════════════════
-  const methods = (_gasPreferred === 'jsonp')
-    ? [['jsonp', _gasJsonpTag], ['get', _gasGet]]
-    : [['get', _gasGet], ['jsonp', _gasJsonpTag]];
 
-  let lastErr;
-  for (const [name, fn] of methods) {
-    try {
-      const data = await fn(url, params);
-      _gasPreferred = name;   // 成功方式を記憶
-      return data;
-    } catch (e) { lastErr = e; }
+  // 学習済み: 前回成功した方式だけ使う（無駄な通信なし）
+  if (_gasPreferred === 'jsonp') {
+    try { const d = await _gasJsonpTag(url, params); return d; }
+    catch(e) { _setGasPreferred(null); throw e; }
   }
-  throw lastErr || new Error('GAS通信失敗');
+  if (_gasPreferred === 'get') {
+    try { const d = await _gasGet(url, params); return d; }
+    catch(e) { _setGasPreferred(null); throw e; }
+  }
+
+  // 未学習: 両方同時に走らせて先に成功した方を採用
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let failures = 0;
+    const onSuccess = (name, data) => {
+      if (settled) return;
+      settled = true;
+      _setGasPreferred(name);
+      resolve(data);
+    };
+    const onFail = (e) => {
+      failures++;
+      if (failures >= 2 && !settled) {
+        settled = true;
+        reject(e || new Error('GAS通信失敗'));
+      }
+    };
+    _gasGet(url, params).then(d => onSuccess('get', d)).catch(onFail);
+    _gasJsonpTag(url, params).then(d => onSuccess('jsonp', d)).catch(onFail);
+  });
 }
 
 
@@ -3823,17 +3845,20 @@ function updateStickyOffsets() {
   }, 150);
 
   // ─── ダッシュボード用データをバックグラウンドプリフェッチ ───
+  // デフォルトの月次タブ用データを先行取得（キャッシュに入れておく）
   if (isShared()) {
     setTimeout(()=>{
-      loadDashData(currentDate).catch(()=>{});
+      const {startDate,endDate}=getPeriodDates(currentPeriod.year,currentPeriod.month);
+      loadRangeData(startDate,endDate,currentPeriod.year,currentPeriod.month).catch(()=>{});
     }, 300);
   }
 
   // ─── 起動時 差分更新（過去7日）───
+  // GAS負荷軽減のため、初回は5秒後、以降は十分な間隔を空けて実行
   if (isShared()) {
     setTimeout(() => {
       refreshRecentCache().catch(e => console.warn('[差分更新] エラー:', e));
-    }, 600);
+    }, 5000);
 
   }
 })();
