@@ -54,6 +54,13 @@ SUB_CATEGORIES = {
 # 所定労働時間
 REGULAR_HOURS = 8.0
 
+# ── アラート閾値 ──
+# 全体残業率（残業/総工数）の警告ライン
+OT_RATIO_WARN = 0.15
+# 36協定 月度残業上限（h）と接近警告ライン（h）
+OT_MONTH_LIMIT = 45.0
+OT_MONTH_WARN = 36.0
+
 # 締め日（15日締め = 16日〜翌15日が1ヶ月度）
 CLOSING_DAY = 15
 

@@ -10,11 +10,12 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import calendar
 
 from config import (MAIN_CATEGORIES, AUTHORS, SUB_CATEGORIES, REGULAR_HOURS,
-                    CLOSING_DAY, FISCAL_YEAR_START_MONTH, get_main_cd, get_main_label)
+                    CLOSING_DAY, FISCAL_YEAR_START_MONTH, get_main_cd, get_main_label,
+                    OT_RATIO_WARN, OT_MONTH_LIMIT, OT_MONTH_WARN)
 from fetch_data import (fetch_date_range, to_dataframe, fetch_weekly_breakdown,
                         fetch_monthly_breakdown, fetch_fiscal_monthly_breakdown,
                         get_fiscal_month, get_fiscal_month_range,
@@ -403,6 +404,20 @@ with st.sidebar:
         "担当者（空=全員）", options=AUTHORS, default=[], label_visibility="collapsed"
     )
 
+    st.markdown("---")
+
+    # データ更新（キャッシュをクリアして最新を再取得）
+    if st.button("🔄 データ更新", use_container_width=True):
+        st.cache_data.clear()
+        st.session_state["last_refresh"] = datetime.now()
+        st.rerun()
+
+    _refreshed = st.session_state.get("last_refresh")
+    if _refreshed:
+        st.caption(f"最終更新: {_refreshed.strftime('%H:%M:%S')}（最大{_CACHE_TTL // 60}分キャッシュ）")
+    else:
+        st.caption(f"最大{_CACHE_TTL // 60}分キャッシュ利用中")
+
 # ── 共通ユーティリティ ──
 author_order = {a: i for i, a in enumerate(AUTHORS)}
 cat_colors = {v["label"]: v["color"] for k, v in MAIN_CATEGORIES.items()}
@@ -439,7 +454,12 @@ def section_header(icon: str, title: str):
 
 
 # ── データ取得 ──
-@st.cache_data(ttl=300, show_spinner=False)
+# データ鮮度は数分の遅延を許容（GASサーバーキャッシュ＋Streamlitキャッシュ活用）。
+# 最新化はサイドバーの「🔄 データ更新」ボタンで明示的に行う。
+_CACHE_TTL = 900  # 15分
+
+
+@st.cache_data(ttl=_CACHE_TTL, show_spinner=False)
 def load_data(s: str, e: str):
     raw = fetch_date_range(s, e)
     return to_dataframe(raw), raw
@@ -453,16 +473,17 @@ def _exclude_help(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+@st.cache_data(ttl=_CACHE_TTL, show_spinner=False)
 def load_weekly(s: str, e: str):
     return _exclude_help(fetch_weekly_breakdown(s, e))
 
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=_CACHE_TTL, show_spinner=False)
 def load_monthly(s: str, e: str):
     return _exclude_help(fetch_monthly_breakdown(s, e))
 
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=_CACHE_TTL, show_spinner=False)
 def load_fiscal_monthly(s: str, e: str, closing_day: int = 15):
     return _exclude_help(fetch_fiscal_monthly_breakdown(s, e, closing_day))
 
@@ -489,6 +510,37 @@ def _ot_bar_html(value: float, limit: float) -> str:
         f'<div class="ot-bar-fill" style="width:{pct:.1f}%;background:{color};"></div>'
         f'</div>'
     )
+
+
+def prev_period_range(start: date, end: date) -> tuple[date, date]:
+    """直前の同一日数期間（前期）の開始・終了日を返す。"""
+    period_len = (end - start).days
+    prev_end = start - timedelta(days=1)
+    prev_start = prev_end - timedelta(days=period_len)
+    return prev_start, prev_end
+
+
+def delta_text(curr: float, prev: float, unit: str = "h", invert: bool = False):
+    """
+    前期比の表示文字列とdelta_class（good/bad）を返す。
+    invert=True の場合は増加を悪（残業など）として色分けする。
+    前期データが無い(prev<=0)場合は (None, None)。
+    """
+    if prev is None or prev <= 0:
+        return None, None
+    diff = curr - prev
+    pct = diff / prev * 100
+    arrow = "▲" if diff > 0 else ("▼" if diff < 0 else "→")
+    sign = "+" if diff >= 0 else ""
+    text = f"{arrow} {sign}{diff:.1f}{unit} ({sign}{pct:.0f}%)"
+    increased = diff > 0
+    if invert:
+        cls = "bad" if increased else "good"
+    else:
+        cls = "good" if increased else "bad"
+    if abs(diff) < 1e-9:
+        cls = "good"
+    return text, cls
 
 
 with st.spinner("データ取得中..."):
@@ -543,50 +595,136 @@ if page == "🏠 ダッシュボード":
     st.markdown('<p class="main-header">Daily Report Dashboard</p>', unsafe_allow_html=True)
     st.markdown(f'<p class="sub-header">{start_date.strftime("%Y/%m/%d")} — {end_date.strftime("%Y/%m/%d")}　|　営業日 {bdays}日　|　{n_authors}名</p>', unsafe_allow_html=True)
 
-    # KPI カード
+    # ── 前期（直前の同一日数期間）を取得して増減を算出 ──
+    prev_start, prev_end = prev_period_range(start_date, end_date)
+    p_normal = p_ot = p_all = 0.0
+    p_avg_person = None
+    try:
+        df_prev, _ = load_data(str(prev_start), str(prev_end))
+        if not df_prev.empty:
+            df_prev = df_prev[df_prev["author"] != "ヘルプ"]
+            if selected_authors:
+                df_prev = df_prev[df_prev["author"].isin(selected_authors)]
+        if not df_prev.empty:
+            p_normal = df_prev["hoursNormal"].sum()
+            p_ot = df_prev["hoursOT"].sum()
+            p_all = p_normal + p_ot
+            p_bdays = business_days(prev_start, prev_end)
+            p_nauth = df_prev["author"].nunique()
+            if p_bdays and p_nauth:
+                p_avg_person = (p_all / p_bdays) / p_nauth
+    except Exception:
+        pass  # 前期が取れない場合は増減非表示
+
+    # ── KPI カード（前期比つき） ──
     ot_pct = f"{total_ot/total_all*100:.0f}%" if total_all else "0%"
-    avg_val = f"{avg_per_day/n_authors:.1f}h" if n_authors else "-"
+    avg_person = avg_per_day / n_authors if n_authors else 0
+    avg_val = f"{avg_person:.1f}h" if n_authors else "-"
+
+    d_all, c_all = delta_text(total_all, p_all)
+    d_normal, c_normal = delta_text(total_normal, p_normal)
+    d_ot, c_ot = delta_text(total_ot, p_ot, invert=True)  # 残業は増加=悪
+    d_avg, c_avg = delta_text(avg_person, p_avg_person, invert=True)
 
     k1, k2, k3, k4, k5 = st.columns(5)
     with k1:
-        st.markdown(kpi_card("総工数", f"{total_all:.1f}h", accent="purple"), unsafe_allow_html=True)
+        st.markdown(kpi_card("総工数", f"{total_all:.1f}h", d_all or "", c_all or "good", "purple"), unsafe_allow_html=True)
     with k2:
-        st.markdown(kpi_card("通常時間", f"{total_normal:.1f}h", accent="blue"), unsafe_allow_html=True)
+        st.markdown(kpi_card("通常時間", f"{total_normal:.1f}h", d_normal or "", c_normal or "good", "blue"), unsafe_allow_html=True)
     with k3:
-        st.markdown(kpi_card("残業時間", f"{total_ot:.1f}h", f"全体の {ot_pct}",
-                             "warn" if total_ot/total_all*100 > 15 else "good" if total_all else "good",
-                             "red"), unsafe_allow_html=True)
+        # 前期比があればそれを、無ければ全体比率を表示
+        ot_delta = d_ot if d_ot else f"全体の {ot_pct}"
+        ot_cls = c_ot if d_ot else ("warn" if (total_all and total_ot/total_all*100 > 15) else "good")
+        st.markdown(kpi_card("残業時間", f"{total_ot:.1f}h", ot_delta, ot_cls, "red"), unsafe_allow_html=True)
     with k4:
         st.markdown(kpi_card("担当者数", f"{n_authors}名", accent="teal"), unsafe_allow_html=True)
     with k5:
-        st.markdown(kpi_card("1日平均/人", avg_val, accent="amber"), unsafe_allow_html=True)
+        st.markdown(kpi_card("1日平均/人", avg_val, d_avg or "", c_avg or "good", "amber"), unsafe_allow_html=True)
+
+    st.caption(f"増減は前期（{prev_start.strftime('%m/%d')}〜{prev_end.strftime('%m/%d')}）比")
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── アラートストリップ（要注意項目の自動強調） ──
+    section_header("⚠️", "アラート")
+    alerts_shown = False
+
+    # 全体残業率
+    ot_ratio = (total_ot / total_all) if total_all else 0
+    if ot_ratio > OT_RATIO_WARN:
+        st.markdown(
+            f'<div class="alert-card warning">⏰ 全体の残業率が <b>{ot_ratio*100:.0f}%</b> '
+            f'（警告ライン {OT_RATIO_WARN*100:.0f}%超）です。</div>',
+            unsafe_allow_html=True,
+        )
+        alerts_shown = True
+
+    # 担当者別の月度換算残業 × 36協定（月上限45h）
+    months_in_period = max(1.0, round((end_date - start_date).days / 30.44, 1))
+    ot_by_author = (
+        df.groupby("author", as_index=False).agg(残業=("hoursOT", "sum"))
+    )
+    ot_by_author["月換算"] = ot_by_author["残業"] / months_in_period
+    # 重大度の高い順（月換算残業の降順）に表示
+    risky = ot_by_author[ot_by_author["月換算"] > OT_MONTH_WARN].copy()
+    risky = risky.sort_values("月換算", ascending=False)
+
+    if not risky.empty:
+        st.caption(f"36協定 残業上限チェック（月換算 ≒ 期間残業 ÷ {months_in_period}ヶ月 / 上限 {OT_MONTH_LIMIT:.0f}h・警告 {OT_MONTH_WARN:.0f}h）")
+        for _, r in risky.iterrows():
+            over = r["月換算"] > OT_MONTH_LIMIT
+            cls = "danger" if over else "warning"
+            tag = "上限超過" if over else "上限接近"
+            st.markdown(
+                f'<div class="alert-card {cls}">'
+                f'<b>{r["author"]}</b>　月換算残業 <b>{r["月換算"]:.1f}h</b> / {OT_MONTH_LIMIT:.0f}h　'
+                f'<span style="opacity:.8">({tag})</span>'
+                f'{_ot_bar_html(r["月換算"], OT_MONTH_LIMIT)}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        alerts_shown = True
+
+    if not alerts_shown:
+        st.markdown('<div class="alert-card success">✅ 要注意項目はありません。</div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # 概要チャート2列
+    # ── 概要チャート2列 ──
     col_left, col_right = st.columns(2)
 
     with col_left:
-        # 担当者別工数（積み上げ棒）
+        # 担当者別工数（合計降順の横棒ランキング）
         auth_df = (
             df.groupby("author", as_index=False)
             .agg(通常=("hoursNormal", "sum"), 残業=("hoursOT", "sum"))
         )
         auth_df["合計"] = auth_df["通常"] + auth_df["残業"]
-        auth_df = sort_by_author(auth_df)
+        # 横棒は下が先頭なので、昇順に並べると最大が上に来る
+        auth_df = auth_df.sort_values("合計", ascending=True)
 
         fig = go.Figure()
-        fig.add_trace(go.Bar(x=auth_df["author"], y=auth_df["通常"],
-                             name="通常", marker_color="#60A5FA"))
-        fig.add_trace(go.Bar(x=auth_df["author"], y=auth_df["残業"],
-                             name="残業", marker_color="#F87171"))
-        fig.update_layout(barmode="stack", title="担当者別工数",
-                          yaxis_title="時間 (h)", height=400)
+        fig.add_trace(go.Bar(
+            y=auth_df["author"], x=auth_df["通常"], name="通常", orientation="h",
+            marker_color="#60A5FA", text=auth_df["通常"].round(1),
+            textposition="inside", insidetextanchor="middle",
+        ))
+        fig.add_trace(go.Bar(
+            y=auth_df["author"], x=auth_df["残業"], name="残業", orientation="h",
+            marker_color="#F87171", text=auth_df["残業"].round(1),
+            textposition="inside", insidetextanchor="middle",
+        ))
+        # 合計値を右端に注記
+        for _, r in auth_df.iterrows():
+            fig.add_annotation(x=r["合計"], y=r["author"], text=f"<b>{r['合計']:.1f}h</b>",
+                               showarrow=False, xanchor="left", xshift=6,
+                               font=dict(size=11, color="#C8CDDF"))
+        fig.update_layout(barmode="stack", title="担当者別工数ランキング",
+                          xaxis_title="時間 (h)", height=400)
         apply_dark(fig)
         st.plotly_chart(fig, use_container_width=True)
 
     with col_right:
-        # 大分類別 工数比率（ドーナツ）
+        # 大分類別 工数比率（中央に総工数を表示するドーナツ）
         cat_df = (
             df.groupby(["mainCd", "mainLabel"], as_index=False)
             .agg(hours=("hoursTotal", "sum"))
@@ -595,8 +733,11 @@ if page == "🏠 ダッシュボード":
 
         fig3 = px.pie(cat_df, values="hours", names="mainLabel",
                       color="mainLabel", color_discrete_map=cat_colors_dark,
-                      title="大分類別 工数比率", hole=0.45)
-        fig3.update_traces(textinfo="label+percent", textfont_size=11)
+                      title="大分類別 工数比率", hole=0.55)
+        fig3.update_traces(textinfo="label+percent", textfont_size=11,
+                           sort=False)
+        fig3.add_annotation(text=f"<b>総工数</b><br>{total_all:.0f}h", x=0.5, y=0.5,
+                            showarrow=False, font=dict(size=15, color="#E8E8F0"))
         apply_dark(fig3)
         st.plotly_chart(fig3, use_container_width=True)
 
@@ -605,6 +746,8 @@ if page == "🏠 ダッシュボード":
         df.groupby(["author", "mainLabel"], as_index=False)
         .agg(hours=("hoursTotal", "sum"))
     )
+    cross["_o"] = cross["author"].map(lambda a: author_order.get(a, 99))
+    cross = cross.sort_values("_o").drop(columns="_o")
     fig2 = px.bar(cross, x="author", y="hours", color="mainLabel",
                   color_discrete_map=cat_colors_dark,
                   title="担当者 × 大分類 工数内訳",
