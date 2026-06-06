@@ -67,6 +67,18 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 
 /* ─── SUBMIT CARD ────────────────────── */
 .submit-card{background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:14px;border:1px solid var(--g200);}
+/* ── 入力タブ 2カラム（テーブル＋ライブ円グラフ） ── */
+.input-layout{display:flex;gap:18px;align-items:flex-start;}
+.input-layout .submit-card{flex:1;min-width:0;max-width:780px;}
+.input-live-pie{position:sticky;top:70px;width:280px;flex-shrink:0;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--g200);padding:18px 14px;display:flex;flex-direction:column;align-items:center;gap:10px;}
+.input-live-pie h3{font-size:13px;font-weight:700;color:var(--g700);margin:0;text-align:center;}
+.live-pie-canvas{display:block;}
+.live-pie-total{font-size:22px;font-weight:800;color:var(--primary);letter-spacing:-.02em;}
+.live-pie-total-label{font-size:10px;color:var(--g400);margin-top:-2px;}
+.live-pie-legend{width:100%;display:flex;flex-direction:column;gap:4px;}
+.live-pie-legend .lpl-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--g600);}
+.live-pie-legend .lpl-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+.live-pie-legend .lpl-val{margin-left:auto;font-weight:700;color:var(--g700);}
 .submit-header{padding:10px 16px;border-bottom:1px solid var(--g100);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(90deg,var(--g50),var(--surface));}
 .submit-header h2{font-size:13px;font-weight:700;color:var(--g700);}
 .data-status{font-size:11px;color:var(--g400);}
@@ -291,6 +303,13 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   .btn-submit{font-size:13px;padding:8px 20px;}
   .btn-clear{font-size:12px;padding:7px 12px;}
   .submit-hint{display:none;}
+
+  /* ── 入力2カラム→1カラム ── */
+  .input-layout{flex-direction:column;}
+  .input-layout .submit-card{max-width:none;}
+  .input-live-pie{width:100%;position:static;flex-direction:row;flex-wrap:wrap;justify-content:center;}
+  .input-live-pie h3{width:100%;}
+  .live-pie-legend{width:auto;flex:1;min-width:140px;}
 
   /* ── ダッシュボード サブタブ ── */
   .dash-subtabs{padding:8px 10px 0;gap:3px;flex-wrap:wrap;}
@@ -611,6 +630,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 
 <!-- ═══ 入力タブ ═══ -->
 <div id="view-input" class="tab-content active">
+<div class="input-layout">
   <div class="submit-card">
     <div class="submit-header">
       <h2>作業時間入力 <small style="font-weight:400;color:var(--g500);font-size:11px;">中分類名をクリックで +0.25h</small></h2>
@@ -657,7 +677,15 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     </div>
   </div>
 
-
+  <!-- ── ライブ円グラフ（入力内容をリアルタイム反映） ── -->
+  <div class="input-live-pie no-print" id="input-live-pie">
+    <h3>本日の内訳</h3>
+    <canvas class="live-pie-canvas" id="live-pie-cv" width="220" height="220"></canvas>
+    <div class="live-pie-total" id="live-pie-total">0.00h</div>
+    <div class="live-pie-total-label">合計時間</div>
+    <div class="live-pie-legend" id="live-pie-legend"></div>
+  </div>
+</div><!-- /input-layout -->
 </div><!-- /view-input -->
 
 
@@ -2378,6 +2406,9 @@ function updateTotals() {
 
   // ── 退勤時刻セーフティチェック ──
   checkHoursSafety(normal, ot);
+
+  // ── ライブ円グラフを更新 ──
+  updateLivePie();
 }
 
 function checkHoursSafety(normal, ot) {
@@ -3529,13 +3560,129 @@ function drawPie(uid,rows) {
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rOuter,ang,ang+s); ctx.closePath();
     ctx.fillStyle=CAT_COLOR[k]||CHT_FAINT; ctx.fill(); ang+=s;
   });
-  ctx.beginPath(); ctx.arc(cx,cy,rInner,0,Math.PI*2); ctx.fillStyle='white'; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,rInner,0,Math.PI*2); ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--surface').trim()||'#fff'; ctx.fill();
   ctx.fillStyle=CHT_TEXT; ctx.font=`bold ${fontPx}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(total.toFixed(2)+'h',cx,cy); // 通常+残業合計
   legend.innerHTML=Object.entries(catMap).sort((a,b)=>b[1]-a[1]).map(([k,v])=>{
     const pct=Math.round(v/total*100);
     return `<div class="ml-row"><div style="width:8px;height:8px;border-radius:2px;background:${CAT_COLOR[k]||CHT_FAINT};flex-shrink:0;"></div><span style="flex:1;">${CAT_LABEL[k]||k}</span><span style="font-weight:700;">${pct}%</span></div>`;
   }).join('');
+}
+
+// ═══════════════════════════════════════════
+//  ライブ円グラフ（入力タブ右側）
+// ═══════════════════════════════════════════
+const _livePie = { prev: {}, anim: {}, raf: 0 };
+
+function updateLivePie() {
+  const canvas = document.getElementById('live-pie-cv');
+  const legendEl = document.getElementById('live-pie-legend');
+  const totalEl = document.getElementById('live-pie-total');
+  if (!canvas || !legendEl) return;
+
+  const byMain = {};
+  let grand = 0;
+  for (const cd in _INP_CACHE) {
+    const h  = parseFloat(_INP_CACHE[cd].h?.value)  || 0;
+    const ot = parseFloat(_INP_CACHE[cd].ot?.value) || 0;
+    const sum = h + ot;
+    if (sum <= 0) continue;
+    const mainCd = SUB_MAP[cd]?.mainCd || '?';
+    byMain[mainCd] = (byMain[mainCd] || 0) + sum;
+    grand += sum;
+  }
+  grand = Math.round(grand * 100) / 100;
+
+  totalEl.textContent = grand.toFixed(2) + 'h';
+
+  const target = {};
+  CATS.forEach(c => { if (byMain[c.cd]) target[c.cd] = byMain[c.cd]; });
+
+  const changed = Object.keys(target).length !== Object.keys(_livePie.prev).length ||
+    Object.keys(target).some(k => (target[k] || 0) !== (_livePie.prev[k] || 0));
+  if (!changed) return;
+
+  Object.keys(target).forEach(k => {
+    if (_livePie.anim[k] == null) _livePie.anim[k] = 0;
+  });
+  Object.keys(_livePie.anim).forEach(k => {
+    if (!target[k]) target[k] = 0;
+  });
+
+  _livePie.prev = { ...target };
+  const snap = { ...(_livePie.anim) };
+  const t0 = performance.now();
+  const DUR = 350;
+
+  if (_livePie.raf) cancelAnimationFrame(_livePie.raf);
+
+  function tick(now) {
+    const p = Math.min(1, (now - t0) / DUR);
+    const ease = 1 - Math.pow(1 - p, 3);
+    const cur = {};
+    let total = 0;
+    for (const k in target) {
+      cur[k] = (snap[k] || 0) + ((target[k] || 0) - (snap[k] || 0)) * ease;
+      total += cur[k];
+    }
+    _livePie.anim = { ...cur };
+    _drawLivePie(canvas, cur, total);
+
+    if (p < 1) { _livePie.raf = requestAnimationFrame(tick); }
+    else {
+      _livePie.raf = 0;
+      for (const k in cur) { if (cur[k] <= 0) delete _livePie.anim[k]; }
+    }
+  }
+  _livePie.raf = requestAnimationFrame(tick);
+
+  legendEl.innerHTML = CATS
+    .filter(c => target[c.cd] > 0)
+    .sort((a, b) => (target[b.cd] || 0) - (target[a.cd] || 0))
+    .map(c => {
+      const v = target[c.cd];
+      const pct = grand > 0 ? Math.round(v / grand * 100) : 0;
+      return `<div class="lpl-row"><div class="lpl-dot" style="background:${c.color};"></div><span>${c.label}</span><span class="lpl-val">${v.toFixed(2)}h (${pct}%)</span></div>`;
+    }).join('');
+}
+
+function _drawLivePie(canvas, data, total) {
+  const dpr = window.devicePixelRatio || 1;
+  const S = 220;
+  if (canvas.width !== S * dpr) { canvas.width = S * dpr; canvas.height = S * dpr; canvas.style.width = S + 'px'; canvas.style.height = S + 'px'; }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, S, S);
+  const cx = S / 2, cy = S / 2, rOuter = S * 0.44, rInner = S * 0.26;
+
+  if (total <= 0) {
+    ctx.beginPath(); ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+    ctx.fillStyle = CHT_GRID; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#fff';
+    ctx.fill();
+    ctx.fillStyle = CHT_FAINT; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('未入力', cx, cy);
+    return;
+  }
+
+  let ang = -Math.PI / 2;
+  const catColorMap = {};
+  CATS.forEach(c => { catColorMap[c.cd] = c.color; });
+  const keys = Object.keys(data).filter(k => data[k] > 0).sort((a, b) => data[b] - data[a]);
+  keys.forEach(k => {
+    const s = (data[k] / total) * Math.PI * 2;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, rOuter, ang, ang + s); ctx.closePath();
+    ctx.fillStyle = catColorMap[k] || CHT_FAINT; ctx.fill();
+    ang += s;
+  });
+
+  ctx.beginPath(); ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#fff';
+  ctx.fill();
+
+  ctx.fillStyle = CHT_TEXT; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(total.toFixed(2) + 'h', cx, cy);
 }
 
 // ═══════════════════════════════════════════
@@ -3922,6 +4069,7 @@ function updateStickyOffsets() {
 (async function init(){
   applyTheme(getTheme());   // ダーク/ライトのチャート色・トグル状態を初期化
   buildTable();
+  updateLivePie();
   updateDateLabel();
 
   // ── 初回起動チェック：launched_once がなければポップアップ表示 ──
