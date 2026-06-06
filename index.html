@@ -68,17 +68,19 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 /* ─── SUBMIT CARD ────────────────────── */
 .submit-card{background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:14px;border:1px solid var(--g200);}
 /* ── 入力タブ 2カラム（テーブル＋ライブ円グラフ） ── */
-.input-layout{display:flex;gap:18px;align-items:flex-start;}
-.input-layout .submit-card{flex:1;min-width:0;max-width:780px;}
-.input-live-pie{position:sticky;top:70px;width:280px;flex-shrink:0;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--g200);padding:18px 14px;display:flex;flex-direction:column;align-items:center;gap:10px;}
-.input-live-pie h3{font-size:13px;font-weight:700;color:var(--g700);margin:0;text-align:center;}
+.input-layout{display:flex;gap:20px;align-items:flex-start;max-width:1160px;margin:0 auto;}
+.input-layout .submit-card{flex:1;min-width:0;}
+.input-live-pie{position:sticky;top:70px;width:320px;flex-shrink:0;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--g200);padding:20px 18px;display:flex;flex-direction:column;align-items:center;gap:12px;}
+.input-live-pie h3{font-size:14px;font-weight:700;color:var(--g700);margin:0;text-align:center;}
 .live-pie-canvas{display:block;}
-.live-pie-total{font-size:22px;font-weight:800;color:var(--primary);letter-spacing:-.02em;}
+.live-pie-total{font-size:24px;font-weight:800;color:var(--primary);letter-spacing:-.02em;}
 .live-pie-total-label{font-size:10px;color:var(--g400);margin-top:-2px;}
-.live-pie-legend{width:100%;display:flex;flex-direction:column;gap:4px;}
-.live-pie-legend .lpl-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--g600);}
-.live-pie-legend .lpl-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+.live-pie-legend{width:100%;display:flex;flex-direction:column;gap:5px;margin-top:2px;}
+.live-pie-legend .lpl-row{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--g600);padding:3px 4px;border-radius:6px;}
+.live-pie-legend .lpl-row:nth-child(odd){background:var(--g50);}
+.live-pie-legend .lpl-dot{width:11px;height:11px;border-radius:3px;flex-shrink:0;}
 .live-pie-legend .lpl-val{margin-left:auto;font-weight:700;color:var(--g700);}
+.live-pie-empty{font-size:12px;color:var(--g400);text-align:center;padding:4px 0;}
 .submit-header{padding:10px 16px;border-bottom:1px solid var(--g100);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(90deg,var(--g50),var(--surface));}
 .submit-header h2{font-size:13px;font-weight:700;color:var(--g700);}
 .data-status{font-size:11px;color:var(--g400);}
@@ -92,7 +94,7 @@ table.entry-tbl th.th-main{width:80px;}
 table.entry-tbl th.th-cd{width:50px;}
 table.entry-tbl th.th-name{text-align:left;}
 table.entry-tbl th.th-hours{width:100px;}
-table.entry-tbl td{border-bottom:1px solid var(--g100);padding:5px 8px;vertical-align:middle;}
+table.entry-tbl td{border-bottom:1px solid var(--g100);padding:3px 8px;vertical-align:middle;}
 table.entry-tbl tr:hover td{background:#FAF6F0;}
 .td-main{text-align:center;font-weight:700;font-size:12px;border-right:3px solid;padding:4px 6px!important;vertical-align:middle!important;}
 .td-main .main-cd{display:block;font-size:16px;line-height:1.2;}
@@ -680,7 +682,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   <!-- ── ライブ円グラフ（入力内容をリアルタイム反映） ── -->
   <div class="input-live-pie no-print" id="input-live-pie">
     <h3>本日の内訳</h3>
-    <canvas class="live-pie-canvas" id="live-pie-cv" width="220" height="220"></canvas>
+    <canvas class="live-pie-canvas" id="live-pie-cv" width="240" height="240"></canvas>
     <div class="live-pie-total" id="live-pie-total">0.00h</div>
     <div class="live-pie-total-label">合計時間</div>
     <div class="live-pie-legend" id="live-pie-legend"></div>
@@ -3648,7 +3650,7 @@ function updateLivePie() {
 
 function _drawLivePie(canvas, data, total) {
   const dpr = window.devicePixelRatio || 1;
-  const S = 220;
+  const S = 240;
   if (canvas.width !== S * dpr) { canvas.width = S * dpr; canvas.height = S * dpr; canvas.style.width = S + 'px'; canvas.style.height = S + 'px'; }
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
