@@ -2708,9 +2708,22 @@ async function renderDash() {
     document.getElementById('ds-ot').textContent      =totalOT.toFixed(2)+'h';
     document.getElementById('ds-ot-avg').textContent  =avgPerPerson.toFixed(2)+'h';
     document.getElementById('ds-entries').textContent =totalRows;
-    // 円グラフ用
+    // 円グラフ・1日の総工数用（退勤ログ基準でスケール補正）
     const filteredDaily={};
-    allAuthorsD.forEach(a=>{ filteredDaily[a]=byAuthor[a]||[]; });
+    allAuthorsD.forEach(a=>{
+      const logRows = byAuthor[a]||[];
+      if (a === 'ヘルプ') { filteredDaily[a] = logRows; return; }
+      const logN = logRows.reduce((t,r)=>t+r.hoursNormal,0);
+      const aN = normalByAuthorD[a]||0;
+      const scale = logN > 0 ? aN / logN : 0;
+      if (logRows.length > 0 && scale > 0) {
+        filteredDaily[a] = logRows.map(r=>({...r, hoursNormal: r.hoursNormal * scale}));
+      } else if (aN > 0) {
+        filteredDaily[a] = [{cdSub:'O1', hoursNormal:aN, hoursOT:0}];
+      } else {
+        filteredDaily[a] = [];
+      }
+    });
     // 退勤ログ由来の通常・残業（ヘルプは作業ログのまま=null扱い）
     const leaveNormalD={}, leaveOTD={};
     allAuthorsD.forEach(a=>{
@@ -3024,7 +3037,8 @@ async function renderYearlyDash() {
       if (!allAuthors.size) { monthOT.push({year,month, totalOT:0, persons:0}); return; }
 
       activeMonths++;
-      yearTotalDays += d._days||0;
+      const {startDate:mStart, endDate:mEnd} = getPeriodDates(year, month);
+      yearTotalDays += d._days || countDays(mStart, mEnd);
       let mOT=0, mN=0;
       allAuthors.forEach(a=>{
         personSet.add(a);
@@ -3761,7 +3775,7 @@ function renderOTBar(byAuthor, canvasId, emptyId, avgOT=0) {
 function renderRankings(byAuthorRows, prefix, days) {
   const noData = '<p style="font-size:12px;color:var(--g400);text-align:center;padding:16px 0;">データなし</p>';
 
-  // ─ 大分類別 1日平均（全カテゴリ） ─
+  // ─ 大分類別 1日の総工数（全カテゴリ） ─
   const allMainTotals = {};
   Object.values(byAuthorRows).forEach(rows => rows.forEach(r => {
     const h = (r.hoursNormal||0) + (r.hoursOT||0);
