@@ -59,7 +59,7 @@ header{background:linear-gradient(90deg,#4f46e5 0%,#6366f1 50%,#818cf8 100%);col
 .dash-stab:hover:not(.active){color:var(--g600);}
 
 /* ─── CONTAINER ──────────────────────── */
-.container{max-width:1440px;margin:0 auto;padding:16px 20px;}
+.container{max-width:1800px;margin:0 auto;padding:16px 20px;}
 
 /* ─── SUBMIT CARD ────────────────────── */
 .submit-card{background:#fff;border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:14px;border:1px solid var(--g200);}
@@ -146,16 +146,16 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .btn-refresh:hover{background:var(--primary-lt);color:var(--primary);border-color:var(--primary);}
 
 /* ─── PERSON GRID & CHARTS ────────────── */
-.person-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:12px;align-items:stretch;}
-.person-card{background:#fff;border-radius:var(--r);box-shadow:var(--sh);padding:13px;text-align:center;border:1px solid var(--g100);transition:box-shadow .2s,transform .2s;display:flex;flex-direction:column;}
+.person-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;align-items:stretch;}
+.person-card{background:#fff;border-radius:var(--r);box-shadow:var(--sh);padding:15px;text-align:center;border:1px solid var(--g100);transition:box-shadow .2s,transform .2s;display:flex;flex-direction:column;}
 .person-card:hover{box-shadow:var(--sh-md);transform:translateY(-2px);}
-.person-card h3{font-size:12px;font-weight:700;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--g700);}
-.p-badges{display:flex;justify-content:center;gap:4px;margin-bottom:8px;flex-wrap:wrap;}
-.b-work{font-size:10px;background:var(--g100);color:var(--g600);padding:2px 7px;border-radius:10px;font-weight:600;}
-.b-ot{font-size:10px;background:#fff1f2;color:var(--danger);padding:2px 7px;border-radius:10px;font-weight:700;border:1px solid #fda4af;}
-.b-ok{font-size:10px;background:#ecfdf5;color:var(--success);padding:2px 7px;border-radius:10px;font-weight:700;border:1px solid #6ee7b7;}
-.mini-legend{text-align:left;margin-top:8px;flex:1;}
-.ml-row{display:flex;align-items:center;gap:3px;font-size:10px;color:var(--g500);margin-bottom:2px;}
+.person-card h3{font-size:13px;font-weight:700;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--g700);}
+.p-badges{display:flex;justify-content:center;gap:5px;margin-bottom:9px;flex-wrap:wrap;}
+.b-work{font-size:11px;background:var(--g100);color:var(--g600);padding:2px 8px;border-radius:10px;font-weight:600;}
+.b-ot{font-size:11px;background:#fff1f2;color:var(--danger);padding:2px 8px;border-radius:10px;font-weight:700;border:1px solid #fda4af;}
+.b-ok{font-size:11px;background:#ecfdf5;color:var(--success);padding:2px 8px;border-radius:10px;font-weight:700;border:1px solid #6ee7b7;}
+.mini-legend{text-align:left;margin-top:9px;flex:1;}
+.ml-row{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--g500);margin-bottom:3px;}
 .ot-empty{text-align:center;padding:24px;font-size:13px;color:var(--success);font-weight:700;}
 .no-data-msg{text-align:center;padding:30px;color:var(--g400);font-size:13px;grid-column:1/-1;}
 
@@ -3373,7 +3373,7 @@ function renderPersonPies(byAuthor, gridId, leaveNormal=null, leaveOT=null) {
         <span class="b-work">通常 ${totalN.toFixed(2)}h</span>
         ${totalOT>0?`<span class="b-ot">残業 ${totalOT.toFixed(2)}h</span>`:`<span class="b-ok">✅ 定時内</span>`}
       </div>
-      <canvas id="${uid}" width="110" height="110" style="display:block;margin:0 auto;"></canvas>
+      <canvas id="${uid}" width="${PIE_SIZE}" height="${PIE_SIZE}" style="display:block;margin:0 auto;max-width:100%;"></canvas>
       <div class="mini-legend" id="leg_${uid}"></div>`;
     grid.appendChild(card);
     requestAnimationFrame(()=>drawPie(uid,rows));
@@ -3382,31 +3382,36 @@ function renderPersonPies(byAuthor, gridId, leaveNormal=null, leaveOT=null) {
 
 const CAT_COLOR={'K':'#3b82f6','T':'#22c55e','J':'#ef4444','B':'#a855f7','S':'#eab308','Z':'#06b6d4','O':'#6b7280','A':'#ec4899'};
 const CAT_LABEL={'K':'計画','T':'手配','J':'受注','B':'BOM','S':'打合せ','Z':'改善','O':'その他','A':'アフター'};
+const PIE_SIZE=150; // 個人円グラフの描画サイズ(px)
 
 function drawPie(uid,rows) {
   const canvas=document.getElementById(uid), legend=document.getElementById('leg_'+uid);
   if(!canvas||!legend) return;
   const ctx=canvas.getContext('2d');
+  // canvasサイズ基準でジオメトリを算出（現状比率を維持: 110px時 中心55/外45/内22/文字9px）
+  const S=canvas.width||110;
+  const cx=S/2, cy=S/2, rOuter=S*0.41, rInner=S*0.20;
+  const fontPx=Math.max(9,Math.round(S*0.085));
   const catMap={};
   rows.forEach(r=>{
     const h=(r.hoursNormal||0)+(r.hoursOT||0);
     if(h>0){ const k=SUB_MAP[r.cdSub]?.mainCd||'O'; catMap[k]=(catMap[k]||0)+h; }
   });
   const total=Object.values(catMap).reduce((a,b)=>a+b,0);
-  ctx.clearRect(0,0,110,110);
+  ctx.clearRect(0,0,S,S);
   if(!total){
-    ctx.fillStyle='#e5e7eb'; ctx.beginPath(); ctx.arc(55,55,45,0,Math.PI*2); ctx.fill();
-    legend.innerHTML='<p style="font-size:10px;color:#9ca3af;text-align:center;">時間未入力</p>'; return;
+    ctx.fillStyle='#e5e7eb'; ctx.beginPath(); ctx.arc(cx,cy,rOuter,0,Math.PI*2); ctx.fill();
+    legend.innerHTML='<p style="font-size:11px;color:#9ca3af;text-align:center;">時間未入力</p>'; return;
   }
   let ang=-Math.PI/2;
   Object.entries(catMap).forEach(([k,v])=>{
     const s=(v/total)*Math.PI*2;
-    ctx.beginPath(); ctx.moveTo(55,55); ctx.arc(55,55,45,ang,ang+s); ctx.closePath();
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rOuter,ang,ang+s); ctx.closePath();
     ctx.fillStyle=CAT_COLOR[k]||'#9ca3af'; ctx.fill(); ang+=s;
   });
-  ctx.beginPath(); ctx.arc(55,55,22,0,Math.PI*2); ctx.fillStyle='white'; ctx.fill();
-  ctx.fillStyle='#374151'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(total.toFixed(2)+'h',55,55); // 通常+残業合計
+  ctx.beginPath(); ctx.arc(cx,cy,rInner,0,Math.PI*2); ctx.fillStyle='white'; ctx.fill();
+  ctx.fillStyle='#374151'; ctx.font=`bold ${fontPx}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(total.toFixed(2)+'h',cx,cy); // 通常+残業合計
   legend.innerHTML=Object.entries(catMap).sort((a,b)=>b[1]-a[1]).map(([k,v])=>{
     const pct=Math.round(v/total*100);
     return `<div class="ml-row"><div style="width:8px;height:8px;border-radius:2px;background:${CAT_COLOR[k]||'#9ca3af'};flex-shrink:0;"></div><span style="flex:1;">${CAT_LABEL[k]||k}</span><span style="font-weight:700;">${pct}%</span></div>`;
