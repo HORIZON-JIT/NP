@@ -68,12 +68,12 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 /* ─── SUBMIT CARD ────────────────────── */
 .submit-card{background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:14px;border:1px solid var(--g200);}
 /* ── 入力タブ 2カラム（テーブル＋ライブ円グラフ） ── */
-.input-layout{display:flex;gap:20px;align-items:flex-start;max-width:1160px;margin:0 auto;}
+.input-layout{display:flex;gap:20px;align-items:flex-start;max-width:1220px;margin:0 auto;}
 .input-layout .submit-card{flex:1;min-width:0;}
-.input-live-pie{position:sticky;top:70px;width:320px;flex-shrink:0;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--g200);padding:20px 18px;display:flex;flex-direction:column;align-items:center;gap:12px;}
+.input-live-pie{position:sticky;top:calc(var(--tabs-h,90px) + 16px);width:380px;flex-shrink:0;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--g200);padding:22px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;}
 .input-live-pie h3{font-size:14px;font-weight:700;color:var(--g700);margin:0;text-align:center;}
 .live-pie-canvas{display:block;}
-.live-pie-total{font-size:24px;font-weight:800;color:var(--primary);letter-spacing:-.02em;}
+.live-pie-total{font-size:28px;font-weight:800;color:var(--primary);letter-spacing:-.02em;}
 .live-pie-total-label{font-size:10px;color:var(--g400);margin-top:-2px;}
 .live-pie-legend{width:100%;display:flex;flex-direction:column;gap:5px;margin-top:2px;}
 .live-pie-legend .lpl-row{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--g600);padding:3px 4px;border-radius:6px;}
@@ -682,7 +682,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   <!-- ── ライブ円グラフ（入力内容をリアルタイム反映） ── -->
   <div class="input-live-pie no-print" id="input-live-pie">
     <h3>本日の内訳</h3>
-    <canvas class="live-pie-canvas" id="live-pie-cv" width="240" height="240"></canvas>
+    <canvas class="live-pie-canvas" id="live-pie-cv" width="300" height="300"></canvas>
     <div class="live-pie-total" id="live-pie-total">0.00h</div>
     <div class="live-pie-total-label">合計時間</div>
     <div class="live-pie-legend" id="live-pie-legend"></div>
@@ -3650,7 +3650,7 @@ function updateLivePie() {
 
 function _drawLivePie(canvas, data, total) {
   const dpr = window.devicePixelRatio || 1;
-  const S = 240;
+  const S = 300;
   if (canvas.width !== S * dpr) { canvas.width = S * dpr; canvas.height = S * dpr; canvas.style.width = S + 'px'; canvas.style.height = S + 'px'; }
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -3663,7 +3663,7 @@ function _drawLivePie(canvas, data, total) {
     ctx.beginPath(); ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#fff';
     ctx.fill();
-    ctx.fillStyle = CHT_FAINT; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = CHT_FAINT; ctx.font = 'bold 17px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('未入力', cx, cy);
     return;
   }
@@ -3683,7 +3683,7 @@ function _drawLivePie(canvas, data, total) {
   ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#fff';
   ctx.fill();
 
-  ctx.fillStyle = CHT_TEXT; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = CHT_TEXT; ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(total.toFixed(2) + 'h', cx, cy);
 }
 
