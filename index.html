@@ -31,9 +31,9 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:var(
 
 /* ─── HEADER ─────────────────────────── */
 header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(60,36,21,.35);}
-.hd-left{display:flex;align-items:center;gap:10px;}
-.hd-left h1{font-size:15px;font-weight:800;white-space:nowrap;letter-spacing:-.01em;}
-.hd-left .sub{font-size:10px;opacity:.8;font-weight:500;}
+.hd-left{display:flex;align-items:center;gap:12px;}
+.hd-left h1{font-size:17px;font-weight:800;white-space:nowrap;letter-spacing:.03em;}
+.hd-left .sub{font-size:10px;opacity:.55;font-weight:600;letter-spacing:.08em;text-transform:uppercase;}
 .hd-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .date-nav{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.12);border-radius:8px;padding:4px 10px;border:1px solid rgba(255,255,255,.2);}
 .date-sel{background:transparent;border:none;color:#fff;border-radius:5px;padding:3px 4px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;appearance:auto;-webkit-appearance:auto;text-align:center;min-width:54px;}
@@ -258,8 +258,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 
   /* ── ヘッダー ── */
   header{padding:8px 12px;gap:6px;}
-  .hd-left h1{font-size:13px;}
-  .hd-left .sub{font-size:9px;}
+  .hd-left h1{font-size:14px;}
+  .hd-left .sub{font-size:8px;}
   .hd-right{gap:4px;justify-content:flex-end;width:100%;}
   .date-nav{padding:3px 7px;gap:3px;}
   .date-sel{font-size:11px;min-width:42px;}
@@ -596,7 +596,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 <!-- HEADER -->
 <header>
   <div class="hd-left">
-    <div><h1>日報アプリ</h1><div class="sub">株式会社ホリゾン｜生産管理部</div></div>
+    <div><h1>日報アプリ</h1><div class="sub">HORIZON / 生産管理部</div></div>
   </div>
   <div class="hd-right">
     <div class="date-nav">
@@ -616,7 +616,6 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 <div class="tabs no-print">
   <button class="tab active" id="tab-input" onclick="showTab('input')">入力</button>
   <button class="tab" id="tab-dash"  onclick="showTab('dash')">ダッシュボード</button>
-  <a href="http://172.25.10.39:8501" target="_blank" class="tab-link no-print" title="業務分析(作成中)">業務分析(作成中)</a>
   <div style="flex:1;"></div>
   <a href="#" onclick="window.open('https://horizon-jit.github.io/NP-TASK/','kokuban','width=560,height=700,scrollbars=yes,resizable=yes');return false;" class="tab-link no-print" title="黒板">黒板</a>
   <a href="https://horizon-jit.github.io/JDS/" target="_blank" class="tab-link no-print" title="生産管理-資料検索システム">資料検索</a>
