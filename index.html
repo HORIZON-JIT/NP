@@ -236,7 +236,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .rank-item{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-bottom:1px solid var(--g100);}
 .rank-item:last-child{border-bottom:none;padding-bottom:0;}
 .rank-item:first-child{padding-top:0;}
-[id$="-rank-sub"],[id$="-rank-main"],[id$="-rank-person"]{padding:4px 4px;}
+[id$="-rank-sub"],[id$="-rank-main"],[id$="-avg-cat"]{padding:4px 4px;}
 .rank-top{display:flex;align-items:center;gap:10px;}
 .rank-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;background:var(--g100);color:var(--g500);}
 .rank-item:nth-child(1) .rank-num{background:linear-gradient(135deg,#C9A96E,#7B5B3A);color:#fff;}
@@ -742,11 +742,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </div>
       </div>
     </div>
-    <!-- ランキング3種（最下部） -->
+    <!-- ランキング＋日平均（最下部） -->
     <div class="rank-row">
       <div class="card rank-card">
-        <div class="card-hd"><h2>担当別 Top3</h2><span class="card-sub">総工数 上位</span></div>
-        <div class="card-body"><div id="daily-rank-person"></div></div>
+        <div class="card-hd"><h2>大分類別 1日平均</h2><span class="card-sub">全カテゴリ</span></div>
+        <div class="card-body"><div id="daily-avg-cat"></div></div>
       </div>
       <div class="card rank-card">
         <div class="card-hd"><h2>中分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
@@ -803,11 +803,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </div>
       </div>
     </div>
-    <!-- ランキング3種（最下部） -->
+    <!-- ランキング＋日平均（最下部） -->
     <div class="rank-row">
       <div class="card rank-card">
-        <div class="card-hd"><h2>担当別 Top3</h2><span class="card-sub">総工数 上位</span></div>
-        <div class="card-body"><div id="monthly-rank-person"></div></div>
+        <div class="card-hd"><h2>大分類別 1日平均</h2><span class="card-sub">全カテゴリ</span></div>
+        <div class="card-body"><div id="monthly-avg-cat"></div></div>
       </div>
       <div class="card rank-card">
         <div class="card-hd"><h2>中分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
@@ -879,11 +879,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </div>
       </div>
     </div>
-    <!-- ランキング3種（最下部） -->
+    <!-- ランキング＋日平均（最下部） -->
     <div class="rank-row">
       <div class="card rank-card">
-        <div class="card-hd"><h2>担当別 Top3</h2><span class="card-sub">総工数 上位</span></div>
-        <div class="card-body"><div id="yearly-rank-person"></div></div>
+        <div class="card-hd"><h2>大分類別 1日平均</h2><span class="card-sub">全カテゴリ</span></div>
+        <div class="card-body"><div id="yearly-avg-cat"></div></div>
       </div>
       <div class="card rank-card">
         <div class="card-hd"><h2>中分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
@@ -2731,7 +2731,7 @@ async function renderDash() {
     });
     renderPersonPies(filteredDaily,'daily-person-grid',leaveNormalD,leaveOTD);
     // ランキング
-    renderRankings(normalByAuthorD, filteredDaily, 'daily');
+    renderRankings(filteredDaily, 'daily', 1);
     // 棒グラフ（強化版）：ヘルプを除外
     const otData={};
     allAuthorsD.forEach(a=>{
@@ -2898,7 +2898,7 @@ async function renderMonthlyDash() {
     });
     renderPersonPies(filtered,'monthly-person-grid',leaveNormalM,leaveOTM);
     // ランキング
-    renderRankings(normalByAuthor, filtered, 'monthly');
+    renderRankings(filtered, 'monthly', days);
     // 全担当集計縦棒グラフ
     requestAnimationFrame(()=>renderCatBar(filtered,'monthly-cat-canvas','monthly-cat-empty'));
     // 残業棒グラフ（強化版）：ヘルプを除外
@@ -3023,7 +3023,7 @@ async function renderYearlyDash() {
     // 全担当 × 中分類 累積（10月〜翌9月順）
     const yearByAuthor = {};
     const monthOT = [];   // 表示順: 10,11,12,1,2,...,9
-    let totalN=0, totalOT=0, activeMonths=0;
+    let totalN=0, totalOT=0, activeMonths=0, yearTotalDays=0;
     const personSet = new Set();
 
     fiscalPeriods.forEach(({year,month}, idx) => {
@@ -3035,6 +3035,7 @@ async function renderYearlyDash() {
       if (!allAuthors.size) { monthOT.push({year,month, totalOT:0, persons:0}); return; }
 
       activeMonths++;
+      yearTotalDays += d._days||0;
       let mOT=0, mN=0;
       allAuthors.forEach(a=>{
         personSet.add(a);
@@ -3091,13 +3092,8 @@ async function renderYearlyDash() {
     const yearByAuthorFlat = {};
     Object.entries(yearByAuthor).forEach(([a,mo])=>{ yearByAuthorFlat[a]=Object.values(mo); });
 
-    // 担当別ランキング用 normalByAuthor を年次から計算
-    const yearNormalByAuthor={};
-    Object.entries(yearByAuthorFlat).forEach(([a,rows])=>{
-      yearNormalByAuthor[a]=rows.reduce((t,r)=>t+(r.hoursNormal||0),0);
-    });
     // ランキング
-    renderRankings(yearNormalByAuthor, yearByAuthorFlat, 'yearly');
+    renderRankings(yearByAuthorFlat, 'yearly', yearTotalDays||1);
 
     // ── 前年度データ集計（すでに並列取得済みの prevAllData を使う） ──
     let prevMonthOT = null;
@@ -3768,12 +3764,12 @@ function renderOTBar(byAuthor, canvasId, emptyId, avgOT=0) {
 //  ランキング描画
 // ═══════════════════════════════════════════
 /**
- * 3種ランキングを一括描画
- * @param {Object} normalByAuthor  {author: normalHours}
- * @param {Object} byAuthorRows    {author: [{cdSub,hoursNormal,...}]}  作業内訳
- * @param {string} prefix          'daily' | 'monthly' | 'yearly'
+ * ランキング＋大分類別日平均を描画
+ * @param {Object} byAuthorRows  {author: [{cdSub,hoursNormal,...}]}
+ * @param {string} prefix        'daily' | 'monthly' | 'yearly'
+ * @param {number} days          稼働日数（1日平均の分母）
  */
-function renderRankings(normalByAuthor, byAuthorRows, prefix) {
+function renderRankings(byAuthorRows, prefix, days) {
   const noData = '<p style="font-size:12px;color:var(--g400);text-align:center;padding:16px 0;">データなし</p>';
   function rankHTML(items, max) {
     return items.map((x,i) => `
@@ -3787,14 +3783,37 @@ function renderRankings(normalByAuthor, byAuthorRows, prefix) {
       </div>`).join('');
   }
 
-  // ─ 担当別負荷ランキング ─
-  const personRank = Object.entries(normalByAuthor)
-    .map(([name, h]) => ({label: name, h}))
-    .filter(x => x.h > 0)
-    .sort((a,b) => b.h - a.h)
-    .slice(0, 3);
-  const personEl = document.getElementById(prefix+'-rank-person');
-  if (personEl) personEl.innerHTML = personRank.length ? rankHTML(personRank, personRank[0].h) : noData;
+  // ─ 大分類別 1日平均（全カテゴリ） ─
+  const allMainTotals = {};
+  Object.values(byAuthorRows).forEach(rows => rows.forEach(r => {
+    const h = (r.hoursNormal||0) + (r.hoursOT||0);
+    if (h <= 0) return;
+    const s = SUB_MAP[r.cdSub] || {};
+    const k = s.mainCd || 'O';
+    if (!allMainTotals[k]) allMainTotals[k] = 0;
+    allMainTotals[k] += h;
+  }));
+  const d = Math.max(1, days||1);
+  const avgCatEl = document.getElementById(prefix+'-avg-cat');
+  if (avgCatEl) {
+    const items = CATS
+      .map(c => ({cd: c.cd, label: c.label||c.cd, color: c.color||CAT_COLOR[c.cd]||CHT_FAINT, total: allMainTotals[c.cd]||0, avg: (allMainTotals[c.cd]||0)/d}))
+      .filter(x => x.total > 0)
+      .sort((a,b) => b.avg - a.avg);
+    if (!items.length) { avgCatEl.innerHTML = noData; }
+    else {
+      const maxAvg = items[0].avg;
+      avgCatEl.innerHTML = items.map(x => `
+        <div class="rank-item">
+          <div class="rank-top">
+            <span style="width:10px;height:10px;border-radius:3px;background:${x.color};flex-shrink:0;"></span>
+            <span class="rank-name">${esc(x.label)}</span>
+            <span class="rank-val">${x.avg.toFixed(2)}h</span>
+          </div>
+          <div class="rank-bar-bg"><div class="rank-bar-fg" style="width:${Math.round(x.avg/maxAvg*100)}%;background:${x.color};"></div></div>
+        </div>`).join('');
+    }
+  }
 
   // ─ 中分類Top3 ─
   const subTotals = {};
