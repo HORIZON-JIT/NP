@@ -389,10 +389,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   #dash-monthly[style*="none"],
   #dash-yearly[style*="none"]{ display:none!important; }
 
-  /* ── ページ基本 ── */
+  /* ── ページ基本（テーマに依らず白基調を強制）── */
   *{ box-sizing:border-box; }
-  html,body{ width:100%; margin:0; padding:0; background:var(--surface); }
-  body{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  html,body{ width:100%; margin:0; padding:0; background:#fff!important; }
+  body{ -webkit-print-color-adjust:exact; print-color-adjust:exact; color:#241e19!important; }
+  .card,.d-stat,.person-card{ background:#fff!important; }
 
   /* ── コンテナ ── */
   .container{ max-width:100%; padding:0; margin:0; }
@@ -419,19 +420,24 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   .dash-col{ gap:4px!important; }
 
   /* ── canvas（日別・月次） ── */
-  canvas{ max-height:100px!important; width:100%!important; }
+  canvas{ max-height:120px!important; width:100%!important; }
 
   /* ── ランキング ── */
-  .rank-row{ grid-template-columns:1fr 1fr 1fr!important; gap:4px!important; margin-bottom:4px!important; }
-  .rank-item{ padding:3px 0!important; gap:3px!important; }
+  .rank-row{ grid-template-columns:1fr 1fr!important; gap:5px!important; margin-bottom:5px!important; break-inside:avoid; }
+  .rank-item{ padding:3px 0!important; gap:3px!important; break-inside:avoid; }
   .rank-num{ width:18px!important; height:18px!important; font-size:10px!important; }
-  .rank-bar-bg{ height:4px!important; }
-  .rank-name{ font-size:8px!important; }
-  .rank-val{ font-size:8px!important; }
+  .rank-bar-bg{ height:5px!important; }
+  .rank-name{ font-size:9px!important; }
+  .rank-val{ font-size:9px!important; }
 
   /* ── パーソングリッド ── */
-  .person-grid{ grid-template-columns:repeat(4,1fr)!important; gap:3px!important; }
-  .person-card{ padding:3px 4px!important; }
+  .person-grid{ grid-template-columns:repeat(4,1fr)!important; gap:5px!important; }
+  .person-card{ padding:6px 5px!important; break-inside:avoid; }
+  .person-card h3{ font-size:9px!important; margin-bottom:3px!important; }
+  .p-badges{ min-height:0!important; margin-bottom:4px!important; }
+  .b-work,.b-ot,.b-ok{ font-size:8px!important; padding:1px 5px!important; }
+  .person-card canvas{ max-height:130px!important; }
+  .mini-legend .ml-row{ font-size:8px!important; margin-bottom:1px!important; }
   .person-name{ font-size:8px!important; }
   .person-hours{ font-size:10px!important; }
 
@@ -691,9 +697,9 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 <!-- ═══ ダッシュボードタブ ═══ -->
 <!-- PDF印刷用タイトルバー（通常時は非表示） -->
 <div id="pdf-title-bar" style="display:none;align-items:center;justify-content:space-between;padding:4px 0 6px;border-bottom:2px solid #5D4037;margin-bottom:8px;">
-  <div style="display:flex;align-items:center;gap:8px;">
-    <span style="font-size:14px;font-weight:800;color:#5D4037;">日報アプリ　ダッシュボード</span>
-    <span style="font-size:10px;color:#6d6358;">株式会社ホリゾン｜生産管理部</span>
+  <div style="display:flex;align-items:baseline;gap:8px;">
+    <span style="font-size:14px;font-weight:800;color:#5D4037;letter-spacing:.02em;">日報ダッシュボード</span>
+    <span style="font-size:10px;color:#6d6358;letter-spacing:.06em;">HORIZON / 生産管理課</span>
   </div>
   <span id="pdf-range-label" style="font-size:10px;color:#3b322c;font-weight:700;"></span>
 </div>
@@ -2612,7 +2618,7 @@ function showDashTab(name) {
 //  DAILY DASHBOARD
 // ═══════════════════════════════════════════
 // ─── PDF出力 ─────────────────────────────────
-function exportPdf(tab) {
+async function exportPdf(tab) {
   const titles   = { daily:'日別', monthly:'月次', yearly:'年次' };
   const dateEl   = {
     daily:   document.getElementById('daily-range'),
@@ -2625,6 +2631,22 @@ function exportPdf(tab) {
 
   const original = document.title;
   document.title = `日報ダッシュボード_${titles[tab]}_${rangeText}`;
+
+  // ── ダークモード時は印刷用に一時的にライトテーマへ（canvas色を白基調で焼き直す）──
+  const savedTheme = getTheme();
+  const restoreTheme = savedTheme === 'dark';
+  async function renderActive() {
+    if (tab === 'daily') await renderDash();
+    else if (tab === 'yearly') await renderYearlyDash();
+    else await renderMonthlyDash();
+    // canvasのrequestAnimationFrame描画完了を待つ
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  }
+  if (restoreTheme) {
+    applyTheme('light');  // localStorageは変更しない（一時適用）
+    _renderCache.daily = _renderCache.monthly = _renderCache.yearly = null;
+    try { await renderActive(); } catch(_){}
+  }
 
   // ── 年次：残業推移2枚カードを横並びラッパーで包む ──
   let yearlyWrapper = null;
@@ -2656,6 +2678,13 @@ function exportPdf(tab) {
   }
 
   document.title = original;
+
+  // ── テーマ復元（ダークに戻して再描画）──
+  if (restoreTheme) {
+    applyTheme(savedTheme);
+    _renderCache.daily = _renderCache.monthly = _renderCache.yearly = null;
+    try { await renderActive(); } catch(_){}
+  }
 }
 
 async function renderDash() {
