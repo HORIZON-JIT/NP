@@ -168,7 +168,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .person-card{background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);padding:15px;text-align:center;border:1px solid var(--g100);transition:box-shadow .2s,transform .2s;display:flex;flex-direction:column;}
 .person-card:hover{box-shadow:var(--sh-md);transform:translateY(-2px);}
 .person-card h3{font-size:13px;font-weight:700;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--g700);}
-.p-badges{display:flex;justify-content:center;gap:5px;margin-bottom:9px;flex-wrap:wrap;}
+.p-badges{display:flex;justify-content:center;gap:5px;margin-bottom:9px;flex-wrap:wrap;min-height:22px;}
+.person-card canvas{flex-shrink:0;}
 .b-work{font-size:11px;background:var(--g100);color:var(--g600);padding:2px 8px;border-radius:10px;font-weight:600;}
 .b-ot{font-size:11px;background:#fff1f2;color:var(--danger);padding:2px 8px;border-radius:10px;font-weight:700;border:1px solid #fda4af;}
 .b-ok{font-size:11px;background:#ecfdf5;color:var(--success);padding:2px 8px;border-radius:10px;font-weight:700;border:1px solid #6ee7b7;}
@@ -3548,7 +3549,7 @@ function drawPie(uid,rows) {
   if(!canvas||!legend) return;
   const dpr=window.devicePixelRatio||1;
   const S=PIE_SIZE;
-  if(canvas.width!==S*dpr){canvas.width=S*dpr;canvas.height=S*dpr;canvas.style.width=S+'px';canvas.style.height=S+'px';}
+  canvas.width=S*dpr;canvas.height=S*dpr;canvas.style.width=S+'px';canvas.style.height=S+'px';
   const ctx=canvas.getContext('2d');
   ctx.setTransform(dpr,0,0,dpr,0,0);
   const cx=S/2, cy=S/2, rOuter=S*0.41, rInner=S*0.20;
