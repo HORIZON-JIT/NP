@@ -233,10 +233,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .card-sub{font-size:11px;color:var(--g400);}
 /* ランキング3カラム */
 .rank-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px;}
+.rank-row-2{grid-template-columns:repeat(2,1fr);}
 .rank-item{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-bottom:1px solid var(--g100);}
 .rank-item:last-child{border-bottom:none;padding-bottom:0;}
 .rank-item:first-child{padding-top:0;}
-[id$="-rank-sub"],[id$="-rank-main"],[id$="-avg-cat"]{padding:4px 4px;}
+[id$="-avg-cat"],[id$="-avg-sub"]{padding:4px 4px;}
 .rank-top{display:flex;align-items:center;gap:10px;}
 .rank-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;background:var(--g100);color:var(--g500);}
 .rank-item:nth-child(1) .rank-num{background:linear-gradient(135deg,#C9A96E,#7B5B3A);color:#fff;}
@@ -742,19 +743,15 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </div>
       </div>
     </div>
-    <!-- ランキング＋日平均（最下部） -->
-    <div class="rank-row">
+    <!-- 大分類別／中分類別 1日平均（最下部） -->
+    <div class="rank-row rank-row-2">
       <div class="card rank-card">
         <div class="card-hd"><h2>大分類別 1日平均</h2><span class="card-sub">全カテゴリ</span></div>
         <div class="card-body"><div id="daily-avg-cat"></div></div>
       </div>
       <div class="card rank-card">
-        <div class="card-hd"><h2>中分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
-        <div class="card-body"><div id="daily-rank-sub"></div></div>
-      </div>
-      <div class="card rank-card">
-        <div class="card-hd"><h2>大分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
-        <div class="card-body"><div id="daily-rank-main"></div></div>
+        <div class="card-hd"><h2>中分類別 1日平均</h2><span class="card-sub">上位10件</span></div>
+        <div class="card-body"><div id="daily-avg-sub"></div></div>
       </div>
     </div>
   </div><!-- /dash-daily -->
@@ -803,19 +800,15 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </div>
       </div>
     </div>
-    <!-- ランキング＋日平均（最下部） -->
-    <div class="rank-row">
+    <!-- 大分類別／中分類別 1日平均（最下部） -->
+    <div class="rank-row rank-row-2">
       <div class="card rank-card">
         <div class="card-hd"><h2>大分類別 1日平均</h2><span class="card-sub">全カテゴリ</span></div>
         <div class="card-body"><div id="monthly-avg-cat"></div></div>
       </div>
       <div class="card rank-card">
-        <div class="card-hd"><h2>中分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
-        <div class="card-body"><div id="monthly-rank-sub"></div></div>
-      </div>
-      <div class="card rank-card">
-        <div class="card-hd"><h2>大分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
-        <div class="card-body"><div id="monthly-rank-main"></div></div>
+        <div class="card-hd"><h2>中分類別 1日平均</h2><span class="card-sub">上位10件</span></div>
+        <div class="card-body"><div id="monthly-avg-sub"></div></div>
       </div>
     </div>
   </div><!-- /dash-monthly -->
@@ -879,19 +872,15 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </div>
       </div>
     </div>
-    <!-- ランキング＋日平均（最下部） -->
-    <div class="rank-row">
+    <!-- 大分類別／中分類別 1日平均（最下部） -->
+    <div class="rank-row rank-row-2">
       <div class="card rank-card">
         <div class="card-hd"><h2>大分類別 1日平均</h2><span class="card-sub">全カテゴリ</span></div>
         <div class="card-body"><div id="yearly-avg-cat"></div></div>
       </div>
       <div class="card rank-card">
-        <div class="card-hd"><h2>中分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
-        <div class="card-body"><div id="yearly-rank-sub"></div></div>
-      </div>
-      <div class="card rank-card">
-        <div class="card-hd"><h2>大分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
-        <div class="card-body"><div id="yearly-rank-main"></div></div>
+        <div class="card-hd"><h2>中分類別 1日平均</h2><span class="card-sub">上位10件</span></div>
+        <div class="card-body"><div id="yearly-avg-sub"></div></div>
       </div>
     </div>
   </div><!-- /dash-yearly -->
@@ -3764,24 +3753,13 @@ function renderOTBar(byAuthor, canvasId, emptyId, avgOT=0) {
 //  ランキング描画
 // ═══════════════════════════════════════════
 /**
- * ランキング＋大分類別日平均を描画
+ * 大分類別／中分類別 1日平均工数を描画
  * @param {Object} byAuthorRows  {author: [{cdSub,hoursNormal,...}]}
  * @param {string} prefix        'daily' | 'monthly' | 'yearly'
  * @param {number} days          稼働日数（1日平均の分母）
  */
 function renderRankings(byAuthorRows, prefix, days) {
   const noData = '<p style="font-size:12px;color:var(--g400);text-align:center;padding:16px 0;">データなし</p>';
-  function rankHTML(items, max) {
-    return items.map((x,i) => `
-      <div class="rank-item">
-        <div class="rank-top">
-          <span class="rank-num">${i+1}</span>
-          <span class="rank-name">${esc(x.label)}</span>
-          <span class="rank-val">${x.h.toFixed(2)}h</span>
-        </div>
-        <div class="rank-bar-bg"><div class="rank-bar-fg" style="width:${Math.round(x.h/max*100)}%"></div></div>
-      </div>`).join('');
-  }
 
   // ─ 大分類別 1日平均（全カテゴリ） ─
   const allMainTotals = {};
@@ -3815,43 +3793,33 @@ function renderRankings(byAuthorRows, prefix, days) {
     }
   }
 
-  // ─ 中分類Top3 ─
+  // ─ 中分類別 1日平均（上位10件） ─
   const subTotals = {};
   Object.values(byAuthorRows).forEach(rows => rows.forEach(r => {
     const h = (r.hoursNormal||0) + (r.hoursOT||0);
     if (h <= 0) return;
     const s = SUB_MAP[r.cdSub] || {};
-    subTotals[r.cdSub] = (subTotals[r.cdSub] || {label: s.label||r.cdSub, h:0});
+    if (!subTotals[r.cdSub]) subTotals[r.cdSub] = {label: s.label||r.cdSub, color: CAT_COLOR[s.mainCd]||CHT_FAINT, h:0};
     subTotals[r.cdSub].h += h;
   }));
-  const subRank = Object.values(subTotals).sort((a,b)=>b.h-a.h).slice(0,3);
-  const subEl = document.getElementById(prefix+'-rank-sub');
-  if (subEl) subEl.innerHTML = subRank.length ? rankHTML(subRank, subRank[0].h) : noData;
-
-  // ─ 大分類Top3 ─
-  const mainTotals = {};
-  Object.values(byAuthorRows).forEach(rows => rows.forEach(r => {
-    const h = (r.hoursNormal||0) + (r.hoursOT||0);
-    if (h <= 0) return;
-    const s = SUB_MAP[r.cdSub] || {};
-    const k = s.mainCd || 'O';
-    if (!mainTotals[k]) mainTotals[k] = {label: CAT_LABEL[k]||k, color: CAT_COLOR[k]||CHT_FAINT, h:0};
-    mainTotals[k].h += h;
-  }));
-  const mainRank = Object.values(mainTotals).sort((a,b)=>b.h-a.h).slice(0,3);
-  const mainEl = document.getElementById(prefix+'-rank-main');
-  if (mainEl) {
-    if (!mainRank.length) { mainEl.innerHTML = noData; }
+  const avgSubEl = document.getElementById(prefix+'-avg-sub');
+  if (avgSubEl) {
+    const subItems = Object.values(subTotals)
+      .map(x => ({label: x.label, color: x.color, avg: x.h/d}))
+      .filter(x => x.avg > 0)
+      .sort((a,b) => b.avg - a.avg)
+      .slice(0, 10);
+    if (!subItems.length) { avgSubEl.innerHTML = noData; }
     else {
-      mainEl.innerHTML = mainRank.map((x,i) => `
+      const maxAvg = subItems[0].avg;
+      avgSubEl.innerHTML = subItems.map(x => `
         <div class="rank-item">
           <div class="rank-top">
-            <span class="rank-num">${i+1}</span>
             <span style="width:10px;height:10px;border-radius:3px;background:${x.color};flex-shrink:0;"></span>
             <span class="rank-name">${esc(x.label)}</span>
-            <span class="rank-val">${x.h.toFixed(2)}h</span>
+            <span class="rank-val">${x.avg.toFixed(2)}h</span>
           </div>
-          <div class="rank-bar-bg"><div class="rank-bar-fg" style="width:${Math.round(x.h/mainRank[0].h*100)}%;background:linear-gradient(90deg,${x.color},${x.color}cc);"></div></div>
+          <div class="rank-bar-bg"><div class="rank-bar-fg" style="width:${Math.round(x.avg/maxAvg*100)}%;background:${x.color};"></div></div>
         </div>`).join('');
     }
   }
