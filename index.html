@@ -3805,7 +3805,7 @@ function renderRankings(byAuthorRows, prefix, days) {
   const avgSubEl = document.getElementById(prefix+'-avg-sub');
   if (avgSubEl) {
     const subItems = Object.values(subTotals)
-      .map(x => ({label: x.label, color: x.color, avg: x.h/d}))
+      .map(x => ({label: x.label, color: x.color, total: x.h, avg: x.h/d}))
       .filter(x => x.avg > 0)
       .sort((a,b) => b.avg - a.avg)
       .slice(0, 10);
