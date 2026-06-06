@@ -17,13 +17,17 @@
   /* ── ウォームグレースケール ── */
   --g50:#faf9f7;--g100:#f3f0ec;--g200:#e5e0d8;--g300:#cdc5ba;
   --g400:#a09589;--g500:#6d6358;--g600:#524840;--g700:#3b322c;--g800:#241e19;
+  /* ── サーフェス（カード等の地色） ── */
+  --surface:#fff;          /* カード・モーダル・タブ背景 */
+  --surface-2:var(--g50);  /* 微妙な地色 */
+  --page:linear-gradient(135deg,#F8F3EE 0%,#FAFAFA 60%,#F8F3EE 100%);
   /* ── シャドウ ── */
   --r:10px;
   --sh:0 1px 4px rgba(0,0,0,.04),0 4px 16px rgba(107,76,59,.06);
   --sh-md:0 4px 24px rgba(107,76,59,.10);
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:linear-gradient(135deg,#F8F3EE 0%,#FAFAFA 60%,#F8F3EE 100%);background-attachment:fixed;color:var(--g800);min-height:100vh;font-size:14px;}
+body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:var(--page);background-attachment:fixed;color:var(--g800);min-height:100vh;font-size:14px;}
 
 /* ─── HEADER ─────────────────────────── */
 header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(60,36,21,.35);}
@@ -43,7 +47,7 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 .btn-hd:hover{background:rgba(255,255,255,.28);}
 
 /* ─── TABS ───────────────────────────── */
-.tabs{display:flex;background:#fff;border-bottom:1px solid var(--g200);padding:0 18px;box-shadow:0 1px 0 var(--g100);position:sticky;top:var(--header-h,48px);z-index:99;}
+.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--g200);padding:0 18px;box-shadow:0 1px 0 var(--g100);position:sticky;top:var(--header-h,48px);z-index:99;}
 .tab{background:none;border:none;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;color:var(--g400);border-bottom:2.5px solid transparent;margin-bottom:-1px;font-family:inherit;transition:all .18s;letter-spacing:-.01em;}
 .tab.active{color:var(--primary);border-bottom-color:var(--primary);}
 .tab:hover:not(.active){color:var(--g600);}
@@ -53,7 +57,7 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 .tab-content.active{display:block;}
 
 /* ─── DASHBOARD SUB-TABS ─────────────── */
-.dash-subtabs{display:flex;gap:4px;padding:10px 18px 0;background:#fff;border-bottom:1px solid var(--g200);margin-bottom:16px;}
+.dash-subtabs{display:flex;gap:4px;padding:10px 18px 0;background:var(--surface);border-bottom:1px solid var(--g200);margin-bottom:16px;}
 .dash-stab{background:none;border:none;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;color:var(--g400);border-bottom:2.5px solid transparent;margin-bottom:-1px;font-family:inherit;transition:all .15s;white-space:nowrap;}
 .dash-stab.active{color:var(--primary);border-bottom-color:var(--primary);}
 .dash-stab:hover:not(.active){color:var(--g600);}
@@ -62,8 +66,8 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 .container{max-width:1800px;margin:0 auto;padding:16px 20px;}
 
 /* ─── SUBMIT CARD ────────────────────── */
-.submit-card{background:#fff;border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:14px;border:1px solid var(--g200);}
-.submit-header{padding:10px 16px;border-bottom:1px solid var(--g100);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(90deg,var(--g50),#fff);}
+.submit-card{background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:14px;border:1px solid var(--g200);}
+.submit-header{padding:10px 16px;border-bottom:1px solid var(--g100);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(90deg,var(--g50),var(--surface));}
 .submit-header h2{font-size:13px;font-weight:700;color:var(--g700);}
 .data-status{font-size:11px;color:var(--g400);}
 .data-status.loaded{color:var(--success);font-weight:700;}
@@ -94,7 +98,7 @@ table.entry-tbl tr:hover td{background:#FAF6F0;}
 .td-cd{color:var(--g400);font-size:12px;text-align:center;}
 .hours-wrap{display:flex;align-items:center;gap:4px;justify-content:center;}
 .hours-wrap input{width:62px;text-align:center;border:1.5px solid var(--g200);border-radius:7px;padding:4px;font-size:13px;font-family:inherit;background:var(--g50);transition:.15s;}
-.hours-wrap input:focus{outline:none;border-color:var(--primary);background:#fff;box-shadow:0 0 0 3px rgba(123,91,58,.12);}
+.hours-wrap input:focus{outline:none;border-color:var(--primary);background:var(--surface);box-shadow:0 0 0 3px rgba(123,91,58,.12);}
 .hours-wrap input.has-val{border-color:var(--primary);background:var(--primary-lt);font-weight:700;color:var(--primary-dk);}
 .hours-wrap input.at-max{border-color:#f59e0b!important;background:#fef3c7!important;color:#92400e!important;font-weight:700;}
 .hours-wrap input.has-ot{border-color:#f43f5e!important;background:#fff1f2!important;color:#be123c!important;font-weight:700;}
@@ -107,11 +111,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .btn-submit{background:linear-gradient(135deg,var(--primary),var(--primary-dk));color:#fff;border:none;border-radius:9px;padding:9px 28px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .18s;display:flex;align-items:center;gap:6px;box-shadow:0 4px 12px rgba(123,91,58,.35);}
 .btn-submit:hover{background:linear-gradient(135deg,var(--primary-dk),#3C2415);transform:translateY(-1px);box-shadow:0 6px 16px rgba(123,91,58,.4);}
 .btn-submit:active{transform:translateY(0);}
-.btn-clear{background:#fff;color:var(--g600);border:1.5px solid var(--g200);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit;transition:.15s;}
+.btn-clear{background:var(--surface);color:var(--g600);border:1.5px solid var(--g200);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit;transition:.15s;}
 .btn-clear:hover{background:var(--g50);border-color:var(--g300);}
-.leave-row{display:flex;align-items:center;gap:8px;padding:8px 16px;background:linear-gradient(90deg,var(--g50),#fff);border-top:1px solid var(--g100);}
+.leave-row{display:flex;align-items:center;gap:8px;padding:8px 16px;background:linear-gradient(90deg,var(--g50),var(--surface));border-top:1px solid var(--g100);}
 .leave-label{font-size:12px;font-weight:700;color:var(--g600);white-space:nowrap;}
-.leave-input{border:1.5px solid var(--g200);border-radius:7px;padding:4px 8px;font-size:13px;font-family:inherit;background:#fff;color:var(--g800);cursor:pointer;transition:.15s;}
+.leave-input{border:1.5px solid var(--g200);border-radius:7px;padding:4px 8px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--g800);cursor:pointer;transition:.15s;}
 .leave-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(123,91,58,.1);}
 .btn-stamp{background:linear-gradient(135deg,var(--accent),#B8964E);color:#fff;border:none;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .15s;box-shadow:0 2px 6px rgba(201,169,110,.3);}
 .btn-stamp:hover{background:linear-gradient(135deg,#B8964E,#9A7E3E);transform:translateY(-1px);box-shadow:0 4px 10px rgba(201,169,110,.4);}
@@ -125,7 +129,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 
 /* ─── DASHBOARD STATS ─────────────────── */
 .dash-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;}
-.d-stat{background:#fff;border-radius:var(--r);box-shadow:var(--sh);padding:12px 10px;text-align:center;border:1px solid var(--g100);position:relative;overflow:hidden;}
+.d-stat{background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);padding:12px 10px;text-align:center;border:1px solid var(--g100);position:relative;overflow:hidden;}
 .d-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--primary),var(--accent));}
 .d-stat .sv{font-size:19px;font-weight:800;color:var(--primary);letter-spacing:-.02em;}
 .d-stat .sv.ot{color:var(--danger);}
@@ -134,20 +138,20 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 
 /* ─── PERIOD NAVIGATION ───────────────── */
 .period-controls{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
-.period-nav{display:flex;align-items:center;gap:6px;background:#fff;border-radius:9px;padding:6px 12px;box-shadow:var(--sh);font-size:13px;font-weight:700;border:1px solid var(--g200);}
+.period-nav{display:flex;align-items:center;gap:6px;background:var(--surface);border-radius:9px;padding:6px 12px;box-shadow:var(--sh);font-size:13px;font-weight:700;border:1px solid var(--g200);}
 .period-nav button{background:none;border:none;cursor:pointer;font-size:16px;color:var(--g500);padding:0 4px;line-height:1;transition:.15s;}
 .period-nav button:hover{color:var(--primary);}
 #period-label{min-width:120px;text-align:center;color:var(--g800);}
-.period-sel{background:#fff;border:1.5px solid var(--g200);color:var(--g800);border-radius:7px;padding:3px 6px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;appearance:none;-webkit-appearance:none;text-align:center;min-width:90px;}
+.period-sel{background:var(--surface);border:1.5px solid var(--g200);color:var(--g800);border-radius:7px;padding:3px 6px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;appearance:none;-webkit-appearance:none;text-align:center;min-width:90px;}
 .period-sel:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(123,91,58,.1);}
-.period-sel option{background:#fff;color:var(--g800);}
-.period-range-label{font-size:11px;color:var(--g500);background:#fff;padding:5px 11px;border-radius:7px;box-shadow:var(--sh);border:1px solid var(--g200);}
-.btn-refresh{background:#fff;border:1.5px solid var(--g200);color:var(--g600);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer;font-family:inherit;margin-left:auto;transition:.15s;font-weight:600;}
+.period-sel option{background:var(--surface);color:var(--g800);}
+.period-range-label{font-size:11px;color:var(--g500);background:var(--surface);padding:5px 11px;border-radius:7px;box-shadow:var(--sh);border:1px solid var(--g200);}
+.btn-refresh{background:var(--surface);border:1.5px solid var(--g200);color:var(--g600);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer;font-family:inherit;margin-left:auto;transition:.15s;font-weight:600;}
 .btn-refresh:hover{background:var(--primary-lt);color:var(--primary);border-color:var(--primary);}
 
 /* ─── PERSON GRID & CHARTS ────────────── */
 .person-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;align-items:stretch;}
-.person-card{background:#fff;border-radius:var(--r);box-shadow:var(--sh);padding:15px;text-align:center;border:1px solid var(--g100);transition:box-shadow .2s,transform .2s;display:flex;flex-direction:column;}
+.person-card{background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);padding:15px;text-align:center;border:1px solid var(--g100);transition:box-shadow .2s,transform .2s;display:flex;flex-direction:column;}
 .person-card:hover{box-shadow:var(--sh-md);transform:translateY(-2px);}
 .person-card h3{font-size:13px;font-weight:700;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--g700);}
 .p-badges{display:flex;justify-content:center;gap:5px;margin-bottom:9px;flex-wrap:wrap;}
@@ -160,22 +164,22 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .no-data-msg{text-align:center;padding:30px;color:var(--g400);font-size:13px;grid-column:1/-1;}
 
 /* ─── CARD ───────────────────────────── */
-.card{background:#fff;border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;min-width:0;margin-bottom:14px;border:1px solid var(--g200);}
-.card-hd{padding:10px 16px;border-bottom:1px solid var(--g100);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px;background:linear-gradient(90deg,var(--g50),#fff);}
+.card{background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;min-width:0;margin-bottom:14px;border:1px solid var(--g200);}
+.card-hd{padding:10px 16px;border-bottom:1px solid var(--g100);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px;background:linear-gradient(90deg,var(--g50),var(--surface));}
 .card-hd h2{font-size:13px;font-weight:700;color:var(--g700);letter-spacing:-.01em;}
 .card-body{padding:14px;}
 
 /* ─── MODAL ──────────────────────────── */
 .backdrop{display:none;position:fixed;inset:0;background:rgba(36,30,25,.5);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
 .backdrop.open{display:flex;}
-.modal{background:#fff;border-radius:14px;padding:22px;width:90%;max-width:430px;box-shadow:0 24px 64px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto;border:1px solid var(--g200);}
+.modal{background:var(--surface);border-radius:14px;padding:22px;width:90%;max-width:430px;box-shadow:0 24px 64px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto;border:1px solid var(--g200);}
 .modal h3{font-size:14px;font-weight:800;margin-bottom:14px;color:var(--g800);letter-spacing:-.01em;}
 .modal-sec{border-top:1px solid var(--g100);padding-top:13px;margin-top:13px;}
 .modal-sec h4{font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:9px;}
 .fgrp{display:flex;flex-direction:column;gap:4px;margin-bottom:11px;}
 .fgrp label{font-size:11px;font-weight:700;color:var(--g600);}
 .fgrp input{border:1.5px solid var(--g200);border-radius:7px;padding:7px 9px;font-size:13px;font-family:inherit;background:var(--g50);transition:.15s;}
-.fgrp input:focus{outline:none;border-color:var(--primary);background:#fff;box-shadow:0 0 0 3px rgba(123,91,58,.1);}
+.fgrp input:focus{outline:none;border-color:var(--primary);background:var(--surface);box-shadow:0 0 0 3px rgba(123,91,58,.1);}
 .url-row{display:flex;gap:6px;}
 .url-row input{flex:1;font-size:11px;}
 .test-res{font-size:12px;margin-top:5px;padding:5px 9px;border-radius:6px;display:none;font-weight:600;}
@@ -192,10 +196,10 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .btn{border:none;border-radius:8px;padding:7px 15px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px;transition:.15s;}
 .btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary-dk));color:#fff;box-shadow:0 2px 8px rgba(123,91,58,.3);}
 .btn-primary:hover{background:linear-gradient(135deg,var(--primary-dk),#3C2415);box-shadow:0 4px 12px rgba(123,91,58,.4);}
-.btn-outline{background:#fff;color:var(--g600);border:1.5px solid var(--g200);}
+.btn-outline{background:var(--surface);color:var(--g600);border:1.5px solid var(--g200);}
 .btn-outline:hover{background:var(--g50);border-color:var(--g300);}
 .btn-sm{padding:4px 9px;font-size:12px;}
-.btn-danger{background:#fff;color:var(--danger);border:1.5px solid #fda4af;}
+.btn-danger{background:var(--surface);color:var(--danger);border:1.5px solid #fda4af;}
 .btn-danger:hover{background:#fff1f2;}
 
 /* ─── LOADING ────────────────────────── */
@@ -368,7 +372,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 
   /* ── ページ基本 ── */
   *{ box-sizing:border-box; }
-  html,body{ width:100%; margin:0; padding:0; background:#fff; }
+  html,body{ width:100%; margin:0; padding:0; background:var(--surface); }
   body{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 
   /* ── コンテナ ── */
@@ -456,7 +460,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   animation:fadeIn .25s ease;
 }
 #first-launch-box{
-  background:#fff;border-radius:14px;padding:28px 26px 22px;
+  background:var(--surface);border-radius:14px;padding:28px 26px 22px;
   max-width:360px;width:90%;box-shadow:0 24px 60px rgba(0,0,0,.25);
   text-align:center;
 }
@@ -477,23 +481,93 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   box-shadow:0 4px 12px rgba(123,91,58,.35);
 }
 #btn-fl-ok:hover{ background:linear-gradient(135deg,#3C2415,#5D4037);transform:translateY(-1px); }
+
+/* ─── テーマ切替（セグメントトグル） ─── */
+.theme-toggle{display:flex;gap:0;background:var(--g100);border:1px solid var(--g200);border-radius:9px;padding:3px;}
+.theme-opt{flex:1;background:none;border:none;border-radius:7px;padding:7px 10px;font-size:13px;font-weight:700;font-family:inherit;color:var(--g500);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:5px;}
+.theme-opt:hover{color:var(--g700);}
+.theme-opt.active{background:var(--surface);color:var(--primary);box-shadow:0 1px 4px rgba(0,0,0,.12);}
+
+/* ═══════════════════════════════════════════
+   ダークモード（プレミアム ウォームダーク）
+   ※ CSS変数の上書きで大半に反映。白サーフェスと
+     特殊要素のみ個別に上書きする。
+═══════════════════════════════════════════ */
+[data-theme="dark"]{
+  /* ブランド（白文字が乗っても読めるトーン） */
+  --primary:#B08D57;
+  --primary-dk:#9A7943;
+  --primary-lt:#2E2620;
+  --accent:#D4B87A;
+  --success:#34d399;
+  --danger:#f87171;
+  --warning:#e0b341;
+  /* ウォームグレースケールを反転（g50=最暗 … g800=最明） */
+  --g50:#1c1814;--g100:#241f1a;--g200:#332c25;--g300:#4a4136;
+  --g400:#8c8175;--g500:#b0a596;--g600:#cabfb0;--g700:#e3dccf;--g800:#f4efe6;
+  /* サーフェス */
+  --surface:#262019;
+  --surface-2:#1f1a15;
+  --page:linear-gradient(135deg,#161210 0%,#1c1814 60%,#161210 100%);
+  /* シャドウ（暗背景用に濃く） */
+  --sh:0 1px 4px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.35);
+  --sh-md:0 6px 28px rgba(0,0,0,.5);
+}
+/* ── ヘッダー：ダークでも上質なブラウングラデを維持 ── */
+[data-theme="dark"] header{background:linear-gradient(90deg,#1f140c 0%,#3a2a1e 55%,#4a3826 100%);box-shadow:0 2px 16px rgba(0,0,0,.5);}
+/* ── 入力テーブル：ヘッダ/フッタを暗いウォームに ── */
+[data-theme="dark"] table.entry-tbl thead th{background:#332c25;color:var(--g800);}
+[data-theme="dark"] tfoot td{background:linear-gradient(90deg,#2a231c,#332c25)!important;color:var(--g800);}
+[data-theme="dark"] table.entry-tbl tr:hover td{background:#2e2820;}
+/* ── 大分類セルの淡色背景を暗トーンに ── */
+[data-theme="dark"] .cat-K,[data-theme="dark"] .cat-T,[data-theme="dark"] .cat-J,
+[data-theme="dark"] .cat-B,[data-theme="dark"] .cat-S,[data-theme="dark"] .cat-Z,
+[data-theme="dark"] .cat-O,[data-theme="dark"] .cat-A{background:#2b251e;}
+/* ── 入力欄の状態色（淡色背景）を暗トーンに ── */
+[data-theme="dark"] .hours-wrap input{color:var(--g800);}
+[data-theme="dark"] .hours-wrap input.has-val{background:#33291c;}
+[data-theme="dark"] .hours-wrap input.at-max{background:#3a2f17!important;color:#f0c869!important;}
+[data-theme="dark"] .hours-wrap input.has-ot{background:#3a1f1f!important;color:#f8a5a5!important;}
+/* ── バッジ/メッセージ等の淡色背景 ── */
+[data-theme="dark"] .b-work{background:#332c25;color:var(--g600);}
+[data-theme="dark"] .b-ot{background:#3a1f1f;color:#f8a5a5;border-color:#7a3b3b;}
+[data-theme="dark"] .b-ok{background:#1f3329;color:#7ee0b0;border-color:#356b52;}
+[data-theme="dark"] #save-msg.ok,[data-theme="dark"] .test-res.ok{background:#15281f;border-color:#356b52;color:#7ee0b0;}
+[data-theme="dark"] #save-msg.err,[data-theme="dark"] .test-res.ng{background:#2e1a1a;border-color:#7a3b3b;color:#f8a5a5;}
+[data-theme="dark"] .test-res.auth{background:#2e2614;border-color:#6b5a2a;color:#e0c468;}
+/* ── スピナー/プログレス等 ── */
+[data-theme="dark"] #loading{background:rgba(22,18,16,.82);}
+[data-theme="dark"] #preload-progress > div[style*="background:#e5e0d8"]{background:#332c25!important;}
+/* ── 初回起動ポップアップ ── */
+[data-theme="dark"] #first-launch-box h2{color:var(--accent);}
+[data-theme="dark"] #first-launch-box p{color:var(--g700);}
+[data-theme="dark"] #first-launch-box .fl-note{color:var(--g600);background:var(--g100);border-color:var(--g200);}
+/* ── 退勤時刻ボタン（緑系プレビュー）は変数で対応済み ── */
 </style>
 </head>
 <body>
+<script>
+  /* テーマを描画前に適用してチラつきを防ぐ */
+  (function(){
+    try{
+      var t = localStorage.getItem('theme') || 'light';
+      if (t === 'dark') document.documentElement.setAttribute('data-theme','dark');
+    }catch(_){}
+  })();
+</script>
 <!-- 初回起動ポップアップ（初回のみ表示） -->
 <div id="first-launch-overlay" style="display:none;">
   <div id="first-launch-box">
-    <div class="fl-icon">🚀</div>
     <h2>はじめにご確認ください</h2>
     <p>初回起動時は以下の手順で初期設定をお願いします。</p>
     <p>
-      <strong>① 右上の「⚙ 設定」を開く</strong><br>
+      <strong>① 右上の「設定」を開く</strong><br>
       　担当者名を選択してください。<br>
       <strong>② 「過去データを一括取得」を実行</strong><br>
       　ダッシュボードが高速に動作するようになります。
     </p>
     <div class="fl-note">
-      ⏱ <strong>取得には10〜15分程度</strong>かかる場合があります。
+      <strong>取得には10〜15分程度</strong>かかる場合があります。
     </div>
     <button id="btn-fl-ok" onclick="closeFirstLaunch()">確認しました</button>
   </div>
@@ -504,7 +578,6 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 <!-- HEADER -->
 <header>
   <div class="hd-left">
-    <span style="font-size:20px;">📋</span>
     <div><h1>日報アプリ</h1><div class="sub">株式会社ホリゾン｜生産管理部</div></div>
   </div>
   <div class="hd-right">
@@ -515,20 +588,20 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <button onclick="goToday()" class="btn-today" title="今日">今日</button>
     </div>
     <div class="author-chip" onclick="openSettings()">
-      👤 <span id="author-chip-label">未設定</span>
+      <span id="author-chip-label">未設定</span>
     </div>
-    <button class="btn-hd no-print" onclick="openSettings()">⚙ 設定</button>
+    <button class="btn-hd no-print" onclick="openSettings()">設定</button>
   </div>
 </header>
 
 <!-- MAIN TABS -->
 <div class="tabs no-print">
-  <button class="tab active" id="tab-input" onclick="showTab('input')">✏️ 入力</button>
-  <button class="tab" id="tab-dash"  onclick="showTab('dash')">📊 ダッシュボード</button>
-  <a href="http://172.25.10.39:8501" target="_blank" class="tab-link no-print" title="業務分析(作成中)">🔬 業務分析(作成中)</a>
+  <button class="tab active" id="tab-input" onclick="showTab('input')">入力</button>
+  <button class="tab" id="tab-dash"  onclick="showTab('dash')">ダッシュボード</button>
+  <a href="http://172.25.10.39:8501" target="_blank" class="tab-link no-print" title="業務分析(作成中)">業務分析(作成中)</a>
   <div style="flex:1;"></div>
-  <a href="#" onclick="window.open('https://horizon-jit.github.io/NP-TASK/','kokuban','width=560,height=700,scrollbars=yes,resizable=yes');return false;" class="tab-link no-print" title="黒板">📋 黒板</a>
-  <a href="https://horizon-jit.github.io/JDS/" target="_blank" class="tab-link no-print" title="生産管理-資料検索システム">🔍 資料検索</a>
+  <a href="#" onclick="window.open('https://horizon-jit.github.io/NP-TASK/','kokuban','width=560,height=700,scrollbars=yes,resizable=yes');return false;" class="tab-link no-print" title="黒板">黒板</a>
+  <a href="https://horizon-jit.github.io/JDS/" target="_blank" class="tab-link no-print" title="生産管理-資料検索システム">資料検索</a>
   <div style="display:flex;align-items:center;padding:0 14px;">
     <img src="data:image/jpeg;base64,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" alt="Horizon" style="height:22px;opacity:0.7;"/>
   </div>
@@ -567,18 +640,18 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <div class="submit-footer">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <button class="btn-submit" onclick="submitDay()">＋ 保存</button>
-        <button class="btn-clear no-print" onclick="clearInputs()">🗑 クリア</button>
+        <button class="btn-clear no-print" onclick="clearInputs()">クリア</button>
         <span id="save-msg"></span>
       </div>
       <div class="leave-row no-print">
-        <label class="leave-label" for="input-leave">🕐 退勤時刻</label>
+        <label class="leave-label" for="input-leave">退勤時刻</label>
         <input type="time" id="input-leave" class="leave-input" placeholder="--:--" step="60"
                oninput="onLeaveChangeDebounced()" />
-        <button class="btn-stamp no-print" onclick="stampNow()" title="現在時刻を入力">⏱ 現在時刻を反映</button>
+        <button class="btn-stamp no-print" onclick="stampNow()" title="現在時刻を入力">現在時刻を反映</button>
         <span id="leave-ot-preview" class="leave-ot-preview"></span>
       </div>
       <div id="hours-safety-warn" style="display:none;margin:4px 0 2px;padding:5px 10px;background:#fff7ed;border:1px solid #fb923c;border-radius:7px;font-size:12px;font-weight:700;color:#ea580c;">
-        ⚠ 入力合計時間が退勤時刻から計算した実勤務時間を超えています（上限: <span id="safety-limit">0.0</span>h、入力: <span id="safety-input">0.0</span>h）
+        入力合計時間が退勤時刻から計算した実勤務時間を超えています（上限: <span id="safety-limit">0.0</span>h、入力: <span id="safety-input">0.0</span>h）
       </div>
       <div class="submit-hint no-print">同じ日に再度押すと上書き保存されます</div>
     </div>
@@ -592,7 +665,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 <!-- PDF印刷用タイトルバー（通常時は非表示） -->
 <div id="pdf-title-bar" style="display:none;align-items:center;justify-content:space-between;padding:4px 0 6px;border-bottom:2px solid #5D4037;margin-bottom:8px;">
   <div style="display:flex;align-items:center;gap:8px;">
-    <span style="font-size:14px;font-weight:800;color:#5D4037;">📋 日報アプリ　ダッシュボード</span>
+    <span style="font-size:14px;font-weight:800;color:#5D4037;">日報アプリ　ダッシュボード</span>
     <span style="font-size:10px;color:#6d6358;">株式会社ホリゾン｜生産管理部</span>
   </div>
   <span id="pdf-range-label" style="font-size:10px;color:#3b322c;font-weight:700;"></span>
@@ -601,9 +674,9 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 
   <!-- ダッシュボード サブタブ -->
   <div class="dash-subtabs no-print">
-    <button class="dash-stab active" id="stab-monthly" onclick="showDashTab('monthly')">📆 月次（15日締め）</button>
-    <button class="dash-stab"        id="stab-yearly"  onclick="showDashTab('yearly')">📈 年次</button>
-    <button class="dash-stab"        id="stab-daily"   onclick="showDashTab('daily')">📅 日別</button>
+    <button class="dash-stab active" id="stab-monthly" onclick="showDashTab('monthly')">月次（15日締め）</button>
+    <button class="dash-stab"        id="stab-yearly"  onclick="showDashTab('yearly')">年次</button>
+    <button class="dash-stab"        id="stab-daily"   onclick="showDashTab('daily')">日別</button>
   </div>
 
   <!-- ─── 日別ビュー ─── -->
@@ -617,40 +690,40 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <select id="dash-sel-day"   class="period-sel" onchange="onDashDaySelChange()" style="min-width:55px;"></select>
         <button onclick="changeDay(1)"  title="翌日">▶</button>
       </div>
-      <button class="btn-refresh no-print" onclick="goToday();renderDash();" style="background:#e0f2fe;color:#0284c7;border:1px solid #bae6fd;font-size:12px;padding:4px 12px;border-radius:7px;cursor:pointer;font-weight:700;" id="daily-range">📅 今日に戻る</button>
-      <button class="btn-refresh no-print" onclick="forceRefreshDaily()">🔄 再読込</button>
-      <button class="btn-pdf no-print" onclick="exportPdf('daily')">📄 PDF出力</button>
+      <button class="btn-refresh no-print" onclick="goToday();renderDash();" style="background:var(--primary-lt);color:var(--primary);border:1px solid var(--g200);font-size:12px;padding:4px 12px;border-radius:7px;cursor:pointer;font-weight:700;" id="daily-range">今日に戻る</button>
+      <button class="btn-refresh no-print" onclick="forceRefreshDaily()">再読込</button>
+      <button class="btn-pdf no-print" onclick="exportPdf('daily')">PDF出力</button>
     </div>
     <!-- 統計カード -->
     <div class="dash-stats">
-      <div class="d-stat"><div class="sv"    id="ds-persons">—</div><div class="sl">👥 記録者数</div></div>
-      <div class="d-stat"><div class="sv"    id="ds-normal">—</div><div class="sl">⏱ 通常時間計</div></div>
-      <div class="d-stat"><div class="sv ot" id="ds-ot">—</div><div class="sl">🔴 残業時間計</div></div>
-      <div class="d-stat"><div class="sv avg" id="ds-ot-avg">—</div><div class="sl">📊 残業平均/人</div></div>
-      <div class="d-stat"><div class="sv"    id="ds-entries">—</div><div class="sl">📌 記録行数</div></div>
+      <div class="d-stat"><div class="sv"    id="ds-persons">—</div><div class="sl">記録者数</div></div>
+      <div class="d-stat"><div class="sv"    id="ds-normal">—</div><div class="sl">通常時間計</div></div>
+      <div class="d-stat"><div class="sv ot" id="ds-ot">—</div><div class="sl">残業時間計</div></div>
+      <div class="d-stat"><div class="sv avg" id="ds-ot-avg">—</div><div class="sl">残業平均/人</div></div>
+      <div class="d-stat"><div class="sv"    id="ds-entries">—</div><div class="sl">記録行数</div></div>
     </div>
     <!-- メイングラフ2カラム -->
     <div class="dash-layout">
       <div class="card" style="display:flex;flex-direction:column;">
-        <div class="card-hd"><h2>🥧 担当別 作業内訳</h2><span class="card-sub">作業時間合計（定時＋残業）</span></div>
+        <div class="card-hd"><h2>担当別 作業内訳</h2><span class="card-sub">作業時間合計（定時＋残業）</span></div>
         <div class="card-body" style="flex:1;overflow-y:auto;"><div class="person-grid" id="daily-person-grid"></div></div>
       </div>
       <div class="card">
-        <div class="card-hd"><h2>📊 残業時間集計</h2><span class="card-sub">17:30以降を残業カウント</span></div>
+        <div class="card-hd"><h2>残業時間集計</h2><span class="card-sub">17:30以降を残業カウント</span></div>
         <div class="card-body" style="position:relative;">
           <canvas id="daily-ot-canvas"></canvas>
-          <div class="ot-empty" id="daily-ot-empty" style="display:none;">✅ 本日の残業者はいません</div>
+          <div class="ot-empty" id="daily-ot-empty" style="display:none;">本日の残業者はいません</div>
         </div>
       </div>
     </div>
     <!-- ランキング2種（最下部） -->
     <div class="rank-row rank-row-2">
       <div class="card rank-card">
-        <div class="card-hd"><h2>📋 中分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
+        <div class="card-hd"><h2>中分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
         <div class="card-body"><div id="daily-rank-sub"></div></div>
       </div>
       <div class="card rank-card">
-        <div class="card-hd"><h2>📂 大分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
+        <div class="card-hd"><h2>大分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
         <div class="card-body"><div id="daily-rank-main"></div></div>
       </div>
     </div>
@@ -666,36 +739,36 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <button onclick="changePeriod(1)"  title="次月期">▶</button>
       </div>
       <span class="period-range-label" id="period-range">—</span>
-      <button class="btn-refresh no-print" onclick="refreshMonthly()">🔄 再読込</button>
-      <button class="btn-pdf no-print" onclick="exportPdf('monthly')">📄 PDF出力</button>
+      <button class="btn-refresh no-print" onclick="refreshMonthly()">再読込</button>
+      <button class="btn-pdf no-print" onclick="exportPdf('monthly')">PDF出力</button>
     </div>
     <!-- 統計カード（5枚） -->
     <div class="dash-stats">
-      <div class="d-stat"><div class="sv"    id="ms-persons">—</div><div class="sl">👥 記録者数</div></div>
-      <div class="d-stat"><div class="sv"    id="ms-normal">—</div><div class="sl">⏱ 通常時間計</div></div>
-      <div class="d-stat"><div class="sv ot" id="ms-ot">—</div><div class="sl">🔴 残業時間計</div></div>
-      <div class="d-stat"><div class="sv avg" id="ms-ot-avg-person">—</div><div class="sl">📊 残業平均/人</div></div>
-      <div class="d-stat"><div class="sv"    id="ms-days">—</div><div class="sl">📅 集計日数</div></div>
+      <div class="d-stat"><div class="sv"    id="ms-persons">—</div><div class="sl">記録者数</div></div>
+      <div class="d-stat"><div class="sv"    id="ms-normal">—</div><div class="sl">通常時間計</div></div>
+      <div class="d-stat"><div class="sv ot" id="ms-ot">—</div><div class="sl">残業時間計</div></div>
+      <div class="d-stat"><div class="sv avg" id="ms-ot-avg-person">—</div><div class="sl">残業平均/人</div></div>
+      <div class="d-stat"><div class="sv"    id="ms-days">—</div><div class="sl">集計日数</div></div>
     </div>
     <!-- メイングラフ2カラム -->
     <div class="dash-layout">
       <div class="card" style="display:flex;flex-direction:column;">
-        <div class="card-hd"><h2>🥧 担当別 作業内訳</h2><span class="card-sub" id="monthly-period-sub">作業時間合計（定時＋残業）</span></div>
+        <div class="card-hd"><h2>担当別 作業内訳</h2><span class="card-sub" id="monthly-period-sub">作業時間合計（定時＋残業）</span></div>
         <div class="card-body" style="flex:1;overflow-y:auto;"><div class="person-grid" id="monthly-person-grid"></div></div>
       </div>
       <div class="dash-col">
         <div class="card">
-          <div class="card-hd"><h2>📊 全担当 作業内訳（大分類別）</h2><span class="card-sub" id="monthly-cat-sub">作業時間合計（定時＋残業）</span></div>
+          <div class="card-hd"><h2>全担当 作業内訳（大分類別）</h2><span class="card-sub" id="monthly-cat-sub">作業時間合計（定時＋残業）</span></div>
           <div class="card-body" style="position:relative;">
             <canvas id="monthly-cat-canvas"></canvas>
             <div class="ot-empty" id="monthly-cat-empty" style="display:none;">この期間のデータがありません</div>
           </div>
         </div>
         <div class="card">
-          <div class="card-hd"><h2>📊 残業時間集計</h2><span class="card-sub" id="monthly-ot-sub">破線=全員平均</span></div>
+          <div class="card-hd"><h2>残業時間集計</h2><span class="card-sub" id="monthly-ot-sub">破線=全員平均</span></div>
           <div class="card-body" style="position:relative;">
             <canvas id="monthly-ot-canvas"></canvas>
-            <div class="ot-empty" id="monthly-ot-empty" style="display:none;">✅ この期間に残業はありません</div>
+            <div class="ot-empty" id="monthly-ot-empty" style="display:none;">この期間に残業はありません</div>
           </div>
         </div>
       </div>
@@ -703,11 +776,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <!-- ランキング2種（最下部） -->
     <div class="rank-row rank-row-2">
       <div class="card rank-card">
-        <div class="card-hd"><h2>📋 中分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
+        <div class="card-hd"><h2>中分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
         <div class="card-body"><div id="monthly-rank-sub"></div></div>
       </div>
       <div class="card rank-card">
-        <div class="card-hd"><h2>📂 大分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
+        <div class="card-hd"><h2>大分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
         <div class="card-body"><div id="monthly-rank-main"></div></div>
       </div>
     </div>
@@ -722,28 +795,28 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <button onclick="changeYear(1)"  title="翌年">▶</button>
       </div>
       <span class="period-range-label" id="yearly-range">—</span>
-      <button class="btn-refresh no-print" onclick="refreshYearly()">🔄 再読込</button>
-      <button class="btn-pdf no-print" onclick="exportPdf('yearly')">📄 PDF出力</button>
+      <button class="btn-refresh no-print" onclick="refreshYearly()">再読込</button>
+      <button class="btn-pdf no-print" onclick="exportPdf('yearly')">PDF出力</button>
     </div>
     <!-- 統計カード（7枚） -->
     <div class="dash-stats dash-stats-7">
-      <div class="d-stat"><div class="sv"    id="ys-persons">—</div><div class="sl">👥 記録者数</div></div>
-      <div class="d-stat"><div class="sv"    id="ys-normal">—</div><div class="sl">⏱ 通常時間計</div></div>
-      <div class="d-stat"><div class="sv ot" id="ys-ot">—</div><div class="sl">🔴 残業時間計</div></div>
-      <div class="d-stat"><div class="sv avg" id="ys-ot-avg-person">—</div><div class="sl">📊 残業月平均（個人）</div></div>
-      <div class="d-stat"><div class="sv avg" id="ys-ot-avg-total">—</div><div class="sl">📊 残業月平均（全員）</div></div>
-      <div class="d-stat"><div class="sv"    id="ys-months">—</div><div class="sl">📅 集計月数</div></div>
+      <div class="d-stat"><div class="sv"    id="ys-persons">—</div><div class="sl">記録者数</div></div>
+      <div class="d-stat"><div class="sv"    id="ys-normal">—</div><div class="sl">通常時間計</div></div>
+      <div class="d-stat"><div class="sv ot" id="ys-ot">—</div><div class="sl">残業時間計</div></div>
+      <div class="d-stat"><div class="sv avg" id="ys-ot-avg-person">—</div><div class="sl">残業月平均（個人）</div></div>
+      <div class="d-stat"><div class="sv avg" id="ys-ot-avg-total">—</div><div class="sl">残業月平均（全員）</div></div>
+      <div class="d-stat"><div class="sv"    id="ys-months">—</div><div class="sl">集計月数</div></div>
     </div>
     <!-- 上段：残業推移グラフ（全幅）2枚縦並び -->
     <div class="card" style="margin-bottom:14px;">
-      <div class="card-hd"><h2>📈 残業時間推移 ／ 全担当合計</h2><span class="card-sub" id="yearly-ot-sub">全担当合計 ｜ 棒=残業 ｜ 破線=月平均 ｜ 折線=累計平均 ｜ グレー=前年</span></div>
+      <div class="card-hd"><h2>残業時間推移 ／ 全担当合計</h2><span class="card-sub" id="yearly-ot-sub">全担当合計 ｜ 棒=残業 ｜ 破線=月平均 ｜ 折線=累計平均 ｜ グレー=前年</span></div>
       <div class="card-body" style="position:relative;">
         <canvas id="yearly-ot-canvas"></canvas>
         <div class="ot-empty" id="yearly-ot-empty" style="display:none;">この年のデータがありません</div>
       </div>
     </div>
     <div class="card" style="margin-bottom:14px;">
-      <div class="card-hd"><h2>📈 残業時間推移 ／ 個人月平均</h2><span class="card-sub" id="yearly-ot-person-sub">個人月平均 ｜ 棒=残業 ｜ 破線=月平均 ｜ 折線=累計平均 ｜ グレー=前年</span></div>
+      <div class="card-hd"><h2>残業時間推移 ／ 個人月平均</h2><span class="card-sub" id="yearly-ot-person-sub">個人月平均 ｜ 棒=残業 ｜ 破線=月平均 ｜ 折線=累計平均 ｜ グレー=前年</span></div>
       <div class="card-body" style="position:relative;">
         <canvas id="yearly-ot-person-canvas"></canvas>
         <div class="ot-empty" id="yearly-ot-person-empty" style="display:none;">この年のデータがありません</div>
@@ -752,19 +825,19 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <!-- 下段：2カラム -->
     <div class="dash-layout">
       <div class="card" style="display:flex;flex-direction:column;">
-        <div class="card-hd"><h2>🥧 担当別 作業内訳</h2><span class="card-sub" id="yearly-person-sub">作業時間合計（定時＋残業）</span></div>
+        <div class="card-hd"><h2>担当別 作業内訳</h2><span class="card-sub" id="yearly-person-sub">作業時間合計（定時＋残業）</span></div>
         <div class="card-body" style="flex:1;overflow-y:auto;"><div class="person-grid" id="yearly-person-grid"></div></div>
       </div>
       <div class="card" style="display:flex;flex-direction:column;gap:14px;">
         <div>
-          <div class="card-hd"><h2>📊 全担当 作業内訳（大分類別）</h2><span class="card-sub" id="yearly-cat-sub">作業時間合計（定時＋残業）</span></div>
+          <div class="card-hd"><h2>全担当 作業内訳（大分類別）</h2><span class="card-sub" id="yearly-cat-sub">作業時間合計（定時＋残業）</span></div>
           <div class="card-body" style="position:relative;">
             <canvas id="yearly-cat-canvas"></canvas>
             <div class="ot-empty" id="yearly-cat-empty" style="display:none;">この年のデータがありません</div>
           </div>
         </div>
         <div>
-          <div class="card-hd"><h2>📊 担当別 作業時間比率</h2><span class="card-sub" id="yearly-stack-sub">大分類100%積み上げ（定時＋残業）</span></div>
+          <div class="card-hd"><h2>担当別 作業時間比率</h2><span class="card-sub" id="yearly-stack-sub">大分類100%積み上げ（定時＋残業）</span></div>
           <div class="card-body" style="position:relative;">
             <canvas id="yearly-stack-canvas"></canvas>
             <div class="ot-empty" id="yearly-stack-empty" style="display:none;">この年のデータがありません</div>
@@ -775,11 +848,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <!-- ランキング2種（最下部） -->
     <div class="rank-row rank-row-2">
       <div class="card rank-card">
-        <div class="card-hd"><h2>📋 中分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
+        <div class="card-hd"><h2>中分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
         <div class="card-body"><div id="yearly-rank-sub"></div></div>
       </div>
       <div class="card rank-card">
-        <div class="card-hd"><h2>📂 大分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
+        <div class="card-hd"><h2>大分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
         <div class="card-body"><div id="yearly-rank-main"></div></div>
       </div>
     </div>
@@ -792,10 +865,17 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 <!-- SETTINGS MODAL -->
 <div class="backdrop" id="settings-modal">
   <div class="modal">
-    <h3>⚙ 設定</h3>
+    <h3>設定</h3>
     <div style="background:var(--g50);border:1px solid var(--g200);border-radius:8px;padding:7px 12px;margin-bottom:13px;display:flex;align-items:center;justify-content:space-between;">
       <span style="font-size:11px;color:var(--g400);font-weight:700;letter-spacing:.04em;">バージョン情報</span>
       <span style="font-size:12px;color:var(--g700);font-weight:800;font-family:monospace;">Daily work log v2 104</span>
+    </div>
+    <div class="fgrp">
+      <label>テーマ</label>
+      <div class="theme-toggle" id="theme-toggle" role="group" aria-label="テーマ切替">
+        <button type="button" class="theme-opt" data-theme-val="light" onclick="setTheme('light')">ライト</button>
+        <button type="button" class="theme-opt" data-theme-val="dark" onclick="setTheme('dark')">ダーク</button>
+      </div>
     </div>
     <div class="fgrp">
       <label>担当者名 *（必須）</label>
@@ -805,13 +885,13 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <button class="btn btn-outline btn-sm" onclick="toggleNewAuthor()" id="btn-new-author" title="新規担当者を追加">＋ 新規</button>
       </div>
       <div id="new-author-row" style="display:none;margin-top:6px;display:none;gap:6px;align-items:center;">
-        <input type="text" id="s-author-new" placeholder="新しい担当者名を入力" style="flex:1;border:1.5px solid var(--primary);border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;background:#fff;"/>
+        <input type="text" id="s-author-new" placeholder="新しい担当者名を入力" style="flex:1;border:1.5px solid var(--primary);border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--g800);"/>
         <button class="btn btn-sm btn-primary" onclick="addNewAuthor()">追加</button>
-        <button class="btn btn-sm btn-outline" onclick="cancelNewAuthor()">✕</button>
+        <button class="btn btn-sm btn-outline" onclick="cancelNewAuthor()">×</button>
       </div>
     </div>
     <div class="modal-sec">
-      <h4>🔗 Google Apps Script URL</h4>
+      <h4>Google Apps Script URL</h4>
       <div class="url-row">
         <input type="text" id="s-gasurl" placeholder="https://script.google.com/a/macros/.../exec" style="font-size:11px;border:1.5px solid var(--g200);border-radius:6px;padding:5px 7px;font-family:inherit;background:var(--g50);"/>
         <button class="btn btn-outline btn-sm" onclick="testConn()">接続テスト</button>
@@ -819,23 +899,22 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <div id="test-res" class="test-res"></div>
     </div>
     <div class="modal-sec">
-      <h4>🗄 マスターデータ保存先</h4>
+      <h4>マスターデータ保存先</h4>
       <a href="https://docs.google.com/spreadsheets/d/1LlQVpi8O7RMmugpVkOlXckiNGrSzE2isS73drWsgxYk/edit" target="_blank"
          style="display:flex;align-items:center;gap:7px;padding:8px 10px;background:var(--g50);border:1px solid var(--g200);border-radius:8px;text-decoration:none;color:var(--g700);font-size:12px;font-weight:600;transition:.15s;"
-         onmouseover="this.style.background='#f0fdf4';this.style.borderColor='#86efac'"
+         onmouseover="this.style.background='var(--primary-lt)';this.style.borderColor='var(--accent)'"
          onmouseout="this.style.background='var(--g50)';this.style.borderColor='var(--g200)'">
-        <span style="font-size:16px;">📊</span>
         <div>
           <div>日報データ</div>
           <div style="font-size:10px;color:var(--g400);font-weight:400;margin-top:1px;">Google スプレッドシート</div>
         </div>
-        <span style="margin-left:auto;font-size:11px;color:var(--g400);">↗</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--g400);">開く</span>
       </a>
     </div>
     <div class="modal-sec" id="preload-section" style="display:none;">
-      <h4>📦 過去データ プリロード</h4>
-      <div style="font-size:12px;color:var(--g600);margin-bottom:10px;">月次・年次（過去24ヶ月）と日別（過去30日）をまとめて取得してキャッシュします。<br>実行後はダッシュボードが高速に動作します。<br><span style="color:var(--primary);font-weight:700;">💡 月1回程度を目安に更新してください。</span></div>
-      <button class="btn btn-outline btn-sm" onclick="preloadAllCache()" id="btn-preload" style="width:100%;">⬇ 過去データを一括取得</button>
+      <h4>過去データ プリロード</h4>
+      <div style="font-size:12px;color:var(--g600);margin-bottom:10px;">月次・年次（過去24ヶ月）と日別（過去30日）をまとめて取得してキャッシュします。<br>実行後はダッシュボードが高速に動作します。<br><span style="color:var(--primary);font-weight:700;">月1回程度を目安に更新してください。</span></div>
+      <button class="btn btn-outline btn-sm" onclick="preloadAllCache()" id="btn-preload" style="width:100%;">過去データを一括取得</button>
       <div id="preload-progress" style="margin-top:8px;display:none;">
         <div id="preload-status" style="font-size:12px;color:var(--g600);margin-bottom:5px;font-weight:600;"></div>
         <div style="background:#e5e0d8;border-radius:99px;height:8px;overflow:hidden;">
@@ -845,16 +924,16 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       </div>
     </div>
     <div class="modal-sec" id="cats-update-section" style="display:none;">
-      <h4>📋 入力項目定義</h4>
+      <h4>入力項目定義</h4>
       <div style="font-size:12px;color:var(--g600);margin-bottom:10px;">スプレッドシートの「項目定義」シートから大分類・中分類を取得します。</div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <button class="btn btn-outline btn-sm" onclick="updateCatsFromGas()" id="btn-cats-update" style="flex:1;">📥 項目定義を更新</button>
+        <button class="btn btn-outline btn-sm" onclick="updateCatsFromGas()" id="btn-cats-update" style="flex:1;">項目定義を更新</button>
         <div id="cats-update-res" style="font-size:11px;color:var(--g500);"></div>
       </div>
     </div>
     <div class="modal-btns">
       <button class="btn btn-outline" onclick="closeModal('settings-modal')">キャンセル</button>
-      <button class="btn btn-primary" onclick="saveSettings()">💾 保存</button>
+      <button class="btn btn-primary" onclick="saveSettings()">保存</button>
     </div>
   </div>
 </div>
@@ -896,18 +975,18 @@ async function updateCatsFromGas() {
   const btn = document.getElementById('btn-cats-update');
   const res = document.getElementById('cats-update-res');
   btn.disabled = true;
-  res.textContent = '🔄 取得中...';
+  res.textContent = '取得中...';
   try {
     const ok = await fetchCatsFromGas(true);
     if (ok) {
-      res.textContent = '✅ 更新完了';
+      res.textContent = '更新完了';
       res.style.color = 'var(--success, #22c55e)';
     } else {
-      res.textContent = '⚠ 取得失敗';
+      res.textContent = '取得失敗';
       res.style.color = 'var(--danger, #ef4444)';
     }
   } catch(e) {
-    res.textContent = '⚠ エラー';
+    res.textContent = 'エラー';
     res.style.color = 'var(--danger, #ef4444)';
   }
   btn.disabled = false;
@@ -1032,6 +1111,35 @@ function cacheInvalidate(date) {
   // 入力モードキャッシュも削除（既知のキーパターンで直接削除）
   const author = getAuthor();
   if (author) localStorage.removeItem(CACHE_PREFIX + `input_${date}_${author}`);
+}
+
+// ═══════════════════════════════════════════
+//  THEME（ライト/ダーク）
+// ═══════════════════════════════════════════
+function getTheme(){ return localStorage.getItem('theme') || 'light'; }
+function applyTheme(theme){
+  const dark = theme === 'dark';
+  if (dark) document.documentElement.setAttribute('data-theme','dark');
+  else      document.documentElement.removeAttribute('data-theme');
+  applyChartTheme(dark);
+  // トグルUIのactive状態を更新
+  document.querySelectorAll('.theme-opt').forEach(b=>{
+    b.classList.toggle('active', b.dataset.themeVal === theme);
+  });
+}
+function setTheme(theme){
+  localStorage.setItem('theme', theme);
+  applyTheme(theme);
+  // Canvasチャートはテーマ色をJSで描くため、描画キャッシュをクリアして再描画させる。
+  // （他タブに戻った際の再描画スキップによる旧色残りを防ぐ）
+  try {
+    _renderCache.daily = _renderCache.monthly = _renderCache.yearly = null;
+    if (_currentTab === 'dash') {
+      if (_dashTab === 'daily') renderDash();
+      else if (_dashTab === 'yearly') renderYearlyDash();
+      else renderMonthlyDash();
+    }
+  } catch(_){}
 }
 
 // ═══════════════════════════════════════════
@@ -1163,7 +1271,7 @@ async function preloadAllCache() {
     statusEl.textContent = msg;
   }
 
-  setProgress(5, '⏳ データ準備中...');
+  setProgress(5, 'データ準備中...');
 
   // ── 対象期間を構築（当年度・前年度・前々年度、当月期除外） ──
   const cp  = getCurrentPeriodMonth();
@@ -1202,7 +1310,7 @@ async function preloadAllCache() {
 
   // ── 全部キャッシュ済みなら即完了 ──
   if (fetchTargets.length === 0 && dailyFetchNeeded.length === 0) {
-    stopTimer(`✅ 全てキャッシュ済み（月次スキップ${skipped}件 ／ 日別スキップ${dSkipped}件）`);
+    stopTimer(`全てキャッシュ済み（月次スキップ${skipped}件 ／ 日別スキップ${dSkipped}件）`);
     btn.disabled = false;
     return;
   }
@@ -1214,7 +1322,7 @@ async function preloadAllCache() {
   let done = 0, failed = 0;
   for (const t of fetchTargets) {
     const pct = 10 + Math.round((done + failed) / Math.max(fetchTargets.length, 1) * 55);
-    setProgress(pct, `📅 月次取得中... (${done + failed + 1}/${fetchTargets.length})`);
+    setProgress(pct, `月次取得中... (${done + failed + 1}/${fetchTargets.length})`);
     try { await _fetchRangeFromGas(t.startDate, t.endDate, t.ck, -1); done++; }
     catch(e) { failed++; }
     await new Promise(r => setTimeout(r, 300));
@@ -1224,7 +1332,7 @@ async function preloadAllCache() {
   for (const ds of dailyFetchNeeded) {
     const ck = `daily_${ds}`;
     const pct2 = 65 + Math.round(dDone / Math.max(dailyFetchNeeded.length, 1) * 30);
-    setProgress(pct2, `📋 日別取得中 ${ds}... (${dDone + 1}/${dailyFetchNeeded.length})`);
+    setProgress(pct2, `日別取得中 ${ds}... (${dDone + 1}/${dailyFetchNeeded.length})`);
     try {
       await _fetchDailyFromGas(ds, ck);
       const cached = cacheGet(ck);
@@ -1235,8 +1343,8 @@ async function preloadAllCache() {
   }
 
   stopTimer(
-    `✅ 完了！ 月次: 取得${done}件 スキップ${skipped}件${failed>0?` ⚠失敗${failed}件`:''}` +
-    ` ／ 日別: 取得${dDone}件 スキップ${dSkipped}件${dFailed>0?` ⚠失敗${dFailed}件`:''}`
+    `完了！ 月次: 取得${done}件 スキップ${skipped}件${failed>0?` 失敗${failed}件`:''}` +
+    ` ／ 日別: 取得${dDone}件 スキップ${dSkipped}件${dFailed>0?` 失敗${dFailed}件`:''}`
   );
   btn.disabled = false;
 }
@@ -1265,7 +1373,7 @@ async function testConn() {
   el.className = 'test-res'; el.style.display = 'block';
 
   // ── Stage 2: GET fetch（POST no-cors はテストでは常にopaqueで無意味なのでスキップ）──
-  el.textContent = '🔄 GET接続を試行中...';
+  el.textContent = 'GET接続を試行中...';
   let authIssue = false;
   try {
     const qs  = new URLSearchParams({ action: 'test' }).toString();
@@ -1277,7 +1385,7 @@ async function testConn() {
     if (text && !text.trim().startsWith('<!')) {
       const clean = text.trim().replace(/^[^(]+\(/, '').replace(/\)\s*;?\s*$/, '');
       const d = JSON.parse(clean);
-      el.textContent = d.ok ? '✅ 接続成功！' : `❌ ${d.error||'不明'}`;
+      el.textContent = d.ok ? '接続成功！' : `${d.error||'不明'}`;
       el.className   = d.ok ? 'test-res ok' : 'test-res ng';
       return;
     }
@@ -1287,7 +1395,7 @@ async function testConn() {
 
   // ── Stage 3: JSONP（認証失敗が確定していなければ試行）──
   if (!authIssue) {
-    el.textContent = '🔄 JSONP接続を試行中...';
+    el.textContent = 'JSONP接続を試行中...';
     try {
       const d = await new Promise((resolve, reject) => {
         const cb = '_g_' + Date.now() + '_' + Math.random().toString(36).slice(2);
@@ -1298,7 +1406,7 @@ async function testConn() {
         sc.src = url + '?action=test&callback=' + cb;
         document.head.appendChild(sc);
       });
-      el.textContent = d.ok ? '✅ 接続成功！' : `❌ ${d.error||'不明'}`;
+      el.textContent = d.ok ? '接続成功！' : `${d.error||'不明'}`;
       el.className   = d.ok ? 'test-res ok' : 'test-res ng';
       return;
     } catch(_) {}
@@ -1313,7 +1421,7 @@ function _showAuthGuidance(el, authIssue) {
   if (authIssue || isMobile) {
     el.className = 'test-res auth';
     el.innerHTML =
-      '<strong>⚠ Google Workspaceへの認証が必要です</strong><br>' +
+      '<strong>Google Workspaceへの認証が必要です</strong><br>' +
       '<span style="font-size:11px;">スマートフォンではサードパーティCookieの制限により、' +
       'GAS URLを直接開いてログインする必要があります。</span>' +
       '<div class="auth-actions">' +
@@ -1324,7 +1432,7 @@ function _showAuthGuidance(el, authIssue) {
   } else {
     el.className = 'test-res ng';
     el.innerHTML =
-      '❌ 接続できませんでした<br>' +
+      '接続できませんでした<br>' +
       '<span style="font-size:11px;">GAS URLが正しいか確認してください。' +
       'horizon.co.jpのGoogle Workspaceにログイン済みである必要があります。</span>' +
       '<div class="auth-actions">' +
@@ -2300,7 +2408,7 @@ function checkHoursSafety(normal, ot) {
       ? 'display:block;margin:4px 0 2px;padding:5px 10px;border-radius:7px;font-size:12px;font-weight:700;background:#fff7ed;border:1px solid #fb923c;color:#ea580c;'
       : 'display:block;margin:4px 0 2px;padding:5px 10px;border-radius:7px;font-size:12px;font-weight:700;background:#eff6ff;border:1px solid #60a5fa;color:#1d4ed8;';
     warnEl.innerHTML = isOver
-      ? `⚠ 入力合計時間が退勤時刻から計算した実勤務時間を<strong>超えています</strong>（上限: <span id="safety-limit">${limit.toFixed(2)}</span>h、入力: <span id="safety-input">${total.toFixed(2)}</span>h）`
+      ? `入力合計時間が退勤時刻から計算した実勤務時間を<strong>超えています</strong>（上限: <span id="safety-limit">${limit.toFixed(2)}</span>h、入力: <span id="safety-input">${total.toFixed(2)}</span>h）`
       : `ℹ 入力合計時間が退勤時刻から計算した実勤務時間より<strong>少ない</strong>です（上限: <span id="safety-limit">${limit.toFixed(2)}</span>h、入力: <span id="safety-input">${total.toFixed(2)}</span>h）`;
   }
 }
@@ -2327,7 +2435,7 @@ async function loadDay_and_render() {
     let dayData;
     try { dayData=await loadDay(currentDate,author); }
     catch(e) {
-      st.innerHTML=`⚠ 読込失敗 <a href="#" onclick="loadDay_and_render();return false;" style="color:var(--primary);text-decoration:underline;margin-left:4px;">🔄 再試行</a>`;
+      st.innerHTML=`読込失敗 <a href="#" onclick="loadDay_and_render();return false;" style="color:var(--primary);text-decoration:underline;margin-left:4px;">再試行</a>`;
       st.className='data-status'; return;
     }
     const rows2 = dayData.rows||dayData; // 後方互換
@@ -2382,14 +2490,14 @@ async function submitDay() {
     ]);
     cacheInvalidate(currentDate); // キャッシュクリア
     const msg=document.getElementById('save-msg');
-    msg.textContent=rows.length>0?`✅ ${currentDate} を保存しました（${rows.length}行）`:'✅ データをクリアしました';
+    msg.textContent=rows.length>0?`${currentDate} を保存しました（${rows.length}行）`:'データをクリアしました';
     msg.className='ok'; msg.style.display='inline-block';
     setTimeout(()=>{ msg.style.display='none'; msg.className=''; },3000);
     document.getElementById('data-status').textContent=`${currentDate} のデータを保存済み`;
     document.getElementById('data-status').className='data-status loaded';
   } catch(e) {
     const msg=document.getElementById('save-msg');
-    msg.textContent=`❌ 保存失敗: ${e.message}`; msg.className='err'; msg.style.display='inline-block';
+    msg.textContent=`保存失敗: ${e.message}`; msg.className='err'; msg.style.display='inline-block';
   } finally {
     setLoading(false);
     // 連続タップ防止: 保存完了後1秒はボタン無効のまま
@@ -2529,7 +2637,7 @@ async function renderDash() {
     try { byAuthor=await loadDashData(currentDate); }
     catch(e) {
       document.getElementById('daily-person-grid').innerHTML=
-        `<p class="no-data-msg">⚠ データ読込失敗 — <a href="#" onclick="renderDash();return false;" style="color:var(--primary);">🔄 再試行</a></p>`;
+        `<p class="no-data-msg">データ読込失敗 — <a href="#" onclick="renderDash();return false;" style="color:var(--primary);">再試行</a></p>`;
       return;
     }
     const leaves   = byAuthor._leaves||{};
@@ -2679,7 +2787,7 @@ async function renderMonthlyDash() {
     catch(e) {
       _renderCache.monthly = null;
       document.getElementById('monthly-person-grid').innerHTML=
-        `<p class="no-data-msg">⚠ データ読込失敗 — <a href="#" onclick="renderMonthlyDash();return false;" style="color:var(--primary);">🔄 再試行</a></p>`;
+        `<p class="no-data-msg">データ読込失敗 — <a href="#" onclick="renderMonthlyDash();return false;" style="color:var(--primary);">再試行</a></p>`;
       return;
     }
     const days      = byAuthor._days||countDays(startDate,endDate);
@@ -2867,7 +2975,7 @@ async function renderYearlyDash() {
     } catch(e) {
       _renderCache.yearly = null;
       document.getElementById('yearly-person-grid').innerHTML=
-        `<p class="no-data-msg">⚠ データ読込失敗 — <a href="#" onclick="renderYearlyDash();return false;" style="color:var(--primary);">🔄 再試行</a></p>`;
+        `<p class="no-data-msg">データ読込失敗 — <a href="#" onclick="renderYearlyDash();return false;" style="color:var(--primary);">再試行</a></p>`;
       return;
     }
 
@@ -3043,13 +3151,13 @@ function renderYearlyOTLine(monthOT, canvasId, emptyId, avgOT=0, prevMonthOT=nul
   const barW = Math.max(10, cW/n*0.45);
 
   // グリッド
-  ctx.strokeStyle='#e5e0d8'; ctx.lineWidth=1;
+  ctx.strokeStyle=CHT_GRID; ctx.lineWidth=1;
   const gridMax=Math.ceil(maxOT/gridStep)*gridStep;
   for(let v=0;v<=gridMax;v+=gridStep){
     const y=PT+cH*(1-v/maxOT);
     if(y<PT-2||y>PT+cH+2) continue;
     ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(PL+cW,y); ctx.stroke();
-    ctx.fillStyle='#a09589'; ctx.font='9px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
+    ctx.fillStyle=CHT_AXIS; ctx.font='9px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
     ctx.fillText(v+'h',PL-4,y);
   }
 
@@ -3060,7 +3168,7 @@ function renderYearlyOTLine(monthOT, canvasId, emptyId, avgOT=0, prevMonthOT=nul
       if (!prev || !prev.totalOT) return;
       const x = PL+cW*(i+0.5)/n;
       const bH = (prev.totalOT/maxOT)*cH;
-      ctx.fillStyle='#e5e0d8';
+      ctx.fillStyle=CHT_GRID;
       ctx.fillRect(x-barW*0.9, PT+cH-bH, barW*0.9, bH);
     });
   }
@@ -3079,13 +3187,13 @@ function renderYearlyOTLine(monthOT, canvasId, emptyId, avgOT=0, prevMonthOT=nul
       ctx.fillText(d.totalOT.toFixed(2)+'h', x, PT+cH-bH-2);
     }
     // 月ラベル
-    ctx.fillStyle='#3b322c'; ctx.font='10px sans-serif';
+    ctx.fillStyle=CHT_TEXT; ctx.font='10px sans-serif';
     ctx.textAlign='center'; ctx.textBaseline='top';
     ctx.fillText(d.month+'月', x, PT+cH+5);
     // 前年比ラベル
     if(prevMonthOT && prevMonthOT[i]?.totalOT>0 && d.totalOT>0){
       const ratio=Math.round(d.totalOT/prevMonthOT[i].totalOT*100);
-      const col=ratio>100?'#f43f5e':ratio<100?'#10b981':'#6d6358';
+      const col=ratio>100?'#f43f5e':ratio<100?'#10b981':CHT_MUTED;
       ctx.fillStyle=col; ctx.font='bold 8px sans-serif';
       ctx.fillText(ratio+'%', x, PT+cH+17);
     }
@@ -3148,7 +3256,7 @@ function renderYearlyOTLine(monthOT, canvasId, emptyId, avgOT=0, prevMonthOT=nul
   // 凡例
   const legend=[
     {col:'#f43f5e', label:'当期残業'},
-    {col:'#e5e0d8', label:'前年'},
+    {col:CHT_GRID, label:'前年'},
     {col:'#06b6d4', label:'累計平均'},
     {col:'#f59e0b', label:'月平均', dash:true},
   ];
@@ -3162,7 +3270,7 @@ function renderYearlyOTLine(monthOT, canvasId, emptyId, avgOT=0, prevMonthOT=nul
     } else {
       ctx.fillRect(lx,7,10,10);
     }
-    ctx.fillStyle='#6d6358'; ctx.font='9px sans-serif';
+    ctx.fillStyle=CHT_MUTED; ctx.font='9px sans-serif';
     ctx.textAlign='left'; ctx.textBaseline='middle';
     ctx.fillText(l.label, lx+18, 12);
     lx+=70;
@@ -3210,11 +3318,11 @@ function renderStackBar(byAuthor, canvasId, emptyId) {
   const barH = Math.max(14, Math.min(36, cH / barCount - 6));
   const gap = (cH - barH * barCount) / (barCount + 1);
 
-  ctx.strokeStyle = '#e5e0d8'; ctx.lineWidth = 1;
+  ctx.strokeStyle = CHT_GRID; ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
     const x = PL + cW * i / 4;
     ctx.beginPath(); ctx.moveTo(x, PT); ctx.lineTo(x, PT + cH); ctx.stroke();
-    ctx.fillStyle = '#b0a598'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillStyle = CHT_FAINT; ctx.font = '9px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText((i * 25) + '%', x, PT + cH + 4);
   }
 
@@ -3226,7 +3334,7 @@ function renderStackBar(byAuthor, canvasId, emptyId) {
       if (!d.seg[k] || !d.total) return;
       const pct = d.seg[k] / d.total;
       const bW = pct * cW;
-      ctx.fillStyle = CAT_COLOR[k] || '#b0a598';
+      ctx.fillStyle = CAT_COLOR[k] || CHT_FAINT;
       ctx.fillRect(xCur, y, bW, barH);
       // 5%以上のセグメントにのみ%ラベルを描画
       if (pct >= 0.05) {
@@ -3237,11 +3345,11 @@ function renderStackBar(byAuthor, canvasId, emptyId) {
       xCur += bW;
     });
     // 担当者名（左）
-    ctx.fillStyle = '#3b322c'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = CHT_TEXT; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
     ctx.fillText(d.name.length > 4 ? d.name.slice(0,4)+'\u2026' : d.name, PL - 4, y + barH / 2);
     // 合計時間（右端）
     if (d.total > 0) {
-      ctx.fillStyle = '#3b322c'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = CHT_TEXT; ctx.font = '10px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
       ctx.fillText(d.total.toFixed(2) + 'h', cW + PL + 4, y + barH / 2);
     }
   });
@@ -3249,9 +3357,9 @@ function renderStackBar(byAuthor, canvasId, emptyId) {
   const visibleCds = mainCds.filter(k => data.some(d => d.seg[k] > 0));
   let lx = PL; const ly = H - PB + 22;
   visibleCds.forEach(k => {
-    ctx.fillStyle = CAT_COLOR[k] || '#b0a598';
+    ctx.fillStyle = CAT_COLOR[k] || CHT_FAINT;
     ctx.fillRect(lx, ly, 10, 10);
-    ctx.fillStyle = '#6d6358'; ctx.font = '9px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = CHT_MUTED; ctx.font = '9px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillText(CAT_LABEL[k] || k, lx + 13, ly + 5);
     lx += ctx.measureText(CAT_LABEL[k] || k).width + 26;
     if (lx > W - 60) lx = PL;
@@ -3291,11 +3399,11 @@ function renderCatBar(byAuthor, canvasId, emptyId) {
   const maxVal=cats[0].total*1.1||1;
 
   // グリッド線
-  ctx.strokeStyle='#e5e0d8'; ctx.lineWidth=1;
+  ctx.strokeStyle=CHT_GRID; ctx.lineWidth=1;
   for(let i=0;i<=4;i++){
     const y=PT+cH*(1-i/4);
     ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(PL+cW,y); ctx.stroke();
-    ctx.fillStyle='#b0a598'; ctx.font='9px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
+    ctx.fillStyle=CHT_FAINT; ctx.font='9px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
     ctx.fillText((maxVal*i/4).toFixed(2)+'h',PL-4,y);
   }
 
@@ -3303,21 +3411,21 @@ function renderCatBar(byAuthor, canvasId, emptyId) {
   cats.forEach((c,i)=>{
     const x = PL + cW*(i+0.5)/barCount;
     const bH = (c.total/maxVal)*cH;
-    const col = CAT_COLOR[c.mainCd]||'#b0a598';
+    const col = CAT_COLOR[c.mainCd]||CHT_FAINT;
     // バー描画（グラデーション）
     const grd=ctx.createLinearGradient(0,PT+cH-bH,0,PT+cH);
     grd.addColorStop(0,col+'cc'); grd.addColorStop(1,col);
     ctx.fillStyle=grd;
     ctx.fillRect(x-barW/2, PT+cH-bH, barW, bH);
     // 値ラベル（バー上部）
-    ctx.fillStyle='#3b322c'; ctx.font='bold 9px sans-serif';
+    ctx.fillStyle=CHT_TEXT; ctx.font='bold 9px sans-serif';
     ctx.textAlign='center'; ctx.textBaseline='bottom';
     ctx.fillText(c.total.toFixed(2)+'h', x, PT+cH-bH-2);
     // X軸ラベル（斜め表示）
     ctx.save();
     ctx.translate(x, PT+cH+6);
     ctx.rotate(-Math.PI/4);
-    ctx.fillStyle='#3b322c'; ctx.font='10px sans-serif';
+    ctx.fillStyle=CHT_TEXT; ctx.font='10px sans-serif';
     ctx.textAlign='right'; ctx.textBaseline='middle';
     ctx.fillText(c.label.length>8?c.label.slice(0,8)+'…':c.label, 0, 0);
     ctx.restore();
@@ -3328,10 +3436,10 @@ function renderCatBar(byAuthor, canvasId, emptyId) {
   const legX=PL, legY=H-16;
   let lx=legX;
   usedMain.forEach(cd=>{
-    const col=CAT_COLOR[cd]||'#b0a598';
+    const col=CAT_COLOR[cd]||CHT_FAINT;
     const lbl=CAT_LABEL[cd]||cd;
     ctx.fillStyle=col; ctx.fillRect(lx,legY-6,10,10);
-    ctx.fillStyle='#3b322c'; ctx.font='10px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillStyle=CHT_TEXT; ctx.font='10px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
     ctx.fillText(lbl,lx+13,legY);
     lx+=ctx.measureText(lbl).width+28;
   });
@@ -3368,10 +3476,10 @@ function renderPersonPies(byAuthor, gridId, leaveNormal=null, leaveOT=null) {
     const uid='pc_'+gridId+'_'+author.replace(/[^a-zA-Z0-9]/g,'_')+'_'+Math.random().toString(36).slice(2,5);
     const card=document.createElement('div'); card.className='person-card';
     card.innerHTML=`
-      <h3>👤 ${esc(author)}</h3>
+      <h3>${esc(author)}</h3>
       <div class="p-badges">
         <span class="b-work">通常 ${totalN.toFixed(2)}h</span>
-        ${totalOT>0?`<span class="b-ot">残業 ${totalOT.toFixed(2)}h</span>`:`<span class="b-ok">✅ 定時内</span>`}
+        ${totalOT>0?`<span class="b-ot">残業 ${totalOT.toFixed(2)}h</span>`:`<span class="b-ok">定時内</span>`}
       </div>
       <canvas id="${uid}" width="${PIE_SIZE}" height="${PIE_SIZE}" style="display:block;margin:0 auto;max-width:100%;"></canvas>
       <div class="mini-legend" id="leg_${uid}"></div>`;
@@ -3383,6 +3491,18 @@ function renderPersonPies(byAuthor, gridId, leaveNormal=null, leaveOT=null) {
 const CAT_COLOR={'K':'#3b82f6','T':'#22c55e','J':'#ef4444','B':'#a855f7','S':'#eab308','Z':'#06b6d4','O':'#6b7280','A':'#ec4899'};
 const CAT_LABEL={'K':'計画','T':'手配','J':'受注','B':'BOM','S':'打合せ','Z':'改善','O':'その他','A':'アフター'};
 const PIE_SIZE=150; // 個人円グラフの描画サイズ(px)
+
+// ── Canvasチャート用テーマカラー（ライト/ダークで切替。applyTheme()で更新）──
+let CHT_GRID='#e5e0d8', CHT_AXIS='#a09589', CHT_TEXT='#3b322c',
+    CHT_MUTED='#6d6358', CHT_FAINT='#b0a598', CHT_FILL='#f3f0ec';
+function applyChartTheme(dark){
+  CHT_GRID = dark ? '#3a332c' : '#e5e0d8';
+  CHT_AXIS = dark ? '#8a7f72' : '#a09589';
+  CHT_TEXT = dark ? '#e8e1d6' : '#3b322c';
+  CHT_MUTED= dark ? '#b3a89a' : '#6d6358';
+  CHT_FAINT= dark ? '#8a7f72' : '#b0a598';
+  CHT_FILL = dark ? '#2e2820' : '#f3f0ec';
+}
 
 function drawPie(uid,rows) {
   const canvas=document.getElementById(uid), legend=document.getElementById('leg_'+uid);
@@ -3400,21 +3520,21 @@ function drawPie(uid,rows) {
   const total=Object.values(catMap).reduce((a,b)=>a+b,0);
   ctx.clearRect(0,0,S,S);
   if(!total){
-    ctx.fillStyle='#e5e0d8'; ctx.beginPath(); ctx.arc(cx,cy,rOuter,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=CHT_GRID; ctx.beginPath(); ctx.arc(cx,cy,rOuter,0,Math.PI*2); ctx.fill();
     legend.innerHTML='<p style="font-size:11px;color:#9ca3af;text-align:center;">時間未入力</p>'; return;
   }
   let ang=-Math.PI/2;
   Object.entries(catMap).forEach(([k,v])=>{
     const s=(v/total)*Math.PI*2;
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,rOuter,ang,ang+s); ctx.closePath();
-    ctx.fillStyle=CAT_COLOR[k]||'#b0a598'; ctx.fill(); ang+=s;
+    ctx.fillStyle=CAT_COLOR[k]||CHT_FAINT; ctx.fill(); ang+=s;
   });
   ctx.beginPath(); ctx.arc(cx,cy,rInner,0,Math.PI*2); ctx.fillStyle='white'; ctx.fill();
-  ctx.fillStyle='#3b322c'; ctx.font=`bold ${fontPx}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle=CHT_TEXT; ctx.font=`bold ${fontPx}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(total.toFixed(2)+'h',cx,cy); // 通常+残業合計
   legend.innerHTML=Object.entries(catMap).sort((a,b)=>b[1]-a[1]).map(([k,v])=>{
     const pct=Math.round(v/total*100);
-    return `<div class="ml-row"><div style="width:8px;height:8px;border-radius:2px;background:${CAT_COLOR[k]||'#b0a598'};flex-shrink:0;"></div><span style="flex:1;">${CAT_LABEL[k]||k}</span><span style="font-weight:700;">${pct}%</span></div>`;
+    return `<div class="ml-row"><div style="width:8px;height:8px;border-radius:2px;background:${CAT_COLOR[k]||CHT_FAINT};flex-shrink:0;"></div><span style="flex:1;">${CAT_LABEL[k]||k}</span><span style="font-weight:700;">${pct}%</span></div>`;
   }).join('');
 }
 
@@ -3445,7 +3565,7 @@ function renderOTBar(byAuthor, canvasId, emptyId, avgOT=0) {
   // グリッド線
   const steps=[];
   for(let h=0;h<=Math.ceil(maxOT*1.2);h+=1) steps.push(h);
-  ctx.strokeStyle='#e5e0d8'; ctx.lineWidth=1;
+  ctx.strokeStyle=CHT_GRID; ctx.lineWidth=1;
   steps.forEach(h=>{
     const x=PL+(h/maxOT)*cW;
     if(x>PL&&x<PL+cW+1){ ctx.beginPath(); ctx.moveTo(x,PT-3); ctx.lineTo(x,H-PB+3); ctx.stroke(); }
@@ -3454,14 +3574,14 @@ function renderOTBar(byAuthor, canvasId, emptyId, avgOT=0) {
   data.forEach((d,i)=>{
     const y=PT+i*(BH+GAP);
     const bW=(d.ot/maxOT)*cW;
-    ctx.fillStyle='#f3f0ec'; ctx.fillRect(PL,y,cW,BH);
+    ctx.fillStyle=CHT_FILL; ctx.fillRect(PL,y,cW,BH);
     if(d.ot>0){
       const grd=ctx.createLinearGradient(PL,0,PL+bW,0);
       grd.addColorStop(0,'#fca5a5'); grd.addColorStop(1,'#dc2626');
       ctx.fillStyle=grd; ctx.fillRect(PL,y+4,Math.max(bW,3),BH-8);
     }
     // 名前
-    ctx.fillStyle='#3b322c'; ctx.font='bold 12px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
+    ctx.fillStyle=CHT_TEXT; ctx.font='bold 12px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
     ctx.fillText(d.name.length>5?d.name.slice(0,5)+'…':d.name,PL-6,y+BH/2);
     // 残業値
     if(d.ot>0){ ctx.fillStyle='#dc2626'; ctx.font='bold 12px sans-serif'; ctx.textAlign='left'; ctx.fillText(`+${d.ot.toFixed(2)}h`,PL+bW+5,y+BH/2); }
@@ -3478,7 +3598,7 @@ function renderOTBar(byAuthor, canvasId, emptyId, avgOT=0) {
     ctx.fillText(`平均 ${avgOT.toFixed(2)}h`,avgX,PT-12);
   }
   // X軸ラベル
-  ctx.fillStyle='#b0a598'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+  ctx.fillStyle=CHT_FAINT; ctx.font='10px sans-serif'; ctx.textAlign='center';
   steps.forEach(h=>{
     const x=PL+(h/maxOT)*cW;
     if(x>=PL&&x<=PL+cW) ctx.fillText(h===0?'0h':`${h}h`,x,H-PB+12);
@@ -3488,7 +3608,7 @@ function renderOTBar(byAuthor, canvasId, emptyId, avgOT=0) {
 // ═══════════════════════════════════════════
 //  ランキング描画
 // ═══════════════════════════════════════════
-const MEDALS = ['🥇','🥈','🥉'];
+const MEDALS = ['1','2','3'];
 
 /**
  * 3種ランキングを一括描画
@@ -3629,7 +3749,7 @@ function renderOTBarEnhanced(byAuthor, canvasId, emptyId, avgPerPerson=0, avgTot
   // グリッド
   const steps = [];
   for(let h=0; h<=Math.ceil(maxOT); h++) steps.push(h);
-  ctx.strokeStyle='#e5e0d8'; ctx.lineWidth=1;
+  ctx.strokeStyle=CHT_GRID; ctx.lineWidth=1;
   steps.forEach(h=>{
     const x=PL+(h/maxOT)*cW;
     if(x>=PL&&x<=PL+cW+1){ ctx.beginPath(); ctx.moveTo(x,PT-3); ctx.lineTo(x,H-PB+3); ctx.stroke(); }
@@ -3640,7 +3760,7 @@ function renderOTBarEnhanced(byAuthor, canvasId, emptyId, avgPerPerson=0, avgTot
     const y = PT + i*(BH+GAP);
     const bW = (d.ot/maxOT)*cW;
     // 背景
-    ctx.fillStyle='#f3f0ec'; ctx.fillRect(PL,y,cW,hasPrev?BH/2-2:BH);
+    ctx.fillStyle=CHT_FILL; ctx.fillRect(PL,y,cW,hasPrev?BH/2-2:BH);
     // 当期バー
     if(d.ot>0){
       const grd=ctx.createLinearGradient(PL,0,PL+bW,0);
@@ -3651,14 +3771,14 @@ function renderOTBarEnhanced(byAuthor, canvasId, emptyId, avgPerPerson=0, avgTot
     // 前期バー（薄い）
     if(hasPrev && d.prevOT!==null){
       const pW=(d.prevOT/maxOT)*cW;
-      ctx.fillStyle='#e5e0d8'; ctx.fillRect(PL,y+BH/2+1,cW,BH/2-3);
+      ctx.fillStyle=CHT_GRID; ctx.fillRect(PL,y+BH/2+1,cW,BH/2-3);
       if(d.prevOT>0){
-        ctx.fillStyle='#a09589';
+        ctx.fillStyle=CHT_AXIS;
         ctx.fillRect(PL,y+BH/2+1,Math.max(pW,3),BH/2-3);
       }
     }
     // 担当者名
-    ctx.fillStyle='#3b322c'; ctx.font='bold 12px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
+    ctx.fillStyle=CHT_TEXT; ctx.font='bold 12px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
     ctx.fillText(d.name.length>5?d.name.slice(0,5)+'…':d.name, PL-6, y+BH*0.5);
     // 残業値ラベル（当期）
     if(d.ot>0){
@@ -3671,12 +3791,12 @@ function renderOTBarEnhanced(byAuthor, canvasId, emptyId, avgPerPerson=0, avgTot
     // 前期ラベル
     if(hasPrev && d.prevOT!==null && d.prevOT>0){
       const pW=(d.prevOT/maxOT)*cW;
-      ctx.fillStyle='#6d6358'; ctx.font='10px sans-serif'; ctx.textAlign='left';
+      ctx.fillStyle=CHT_MUTED; ctx.font='10px sans-serif'; ctx.textAlign='left';
       ctx.fillText(`前${d.prevOT.toFixed(2)}h`, PL+pW+5, y+BH*0.76);
       // 前年比
       if(d.prevOT>0){
         const ratio = Math.round(d.ot/d.prevOT*100);
-        const col = ratio>100?'#f43f5e':ratio<100?'#10b981':'#6d6358';
+        const col = ratio>100?'#f43f5e':ratio<100?'#10b981':CHT_MUTED;
         ctx.fillStyle=col; ctx.font='bold 10px sans-serif';
         ctx.fillText(`${ratio}%`, PL+cW+4, y+BH*0.76);
       }
@@ -3698,7 +3818,7 @@ function renderOTBarEnhanced(byAuthor, canvasId, emptyId, avgPerPerson=0, avgTot
 
   // X軸ラベル（適切な間隔で表示）
   const tickStep = maxOT<=10?1:maxOT<=30?5:maxOT<=60?10:maxOT<=120?20:30;
-  ctx.fillStyle='#a09589'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+  ctx.fillStyle=CHT_AXIS; ctx.font='10px sans-serif'; ctx.textAlign='center';
   for(let h=0;h<=Math.ceil(maxOT);h+=tickStep){
     const x=PL+(h/maxOT)*cW;
     if(x>=PL&&x<=PL+cW+1) ctx.fillText(h===0?'0h':`${h}h`,x,H-PB+12);
@@ -3800,6 +3920,7 @@ function updateStickyOffsets() {
 }
 
 (async function init(){
+  applyTheme(getTheme());   // ダーク/ライトのチャート色・トグル状態を初期化
   buildTable();
   updateDateLabel();
 
