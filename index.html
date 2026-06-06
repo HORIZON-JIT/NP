@@ -233,22 +233,19 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .card-sub{font-size:11px;color:var(--g400);}
 /* ランキング3カラム */
 .rank-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px;}
-.rank-row-2{grid-template-columns:repeat(2,1fr);}
-.rank-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--g100);}
+.rank-item{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-bottom:1px solid var(--g100);}
 .rank-item:last-child{border-bottom:none;padding-bottom:0;}
-[id$="-rank-sub"],[id$="-rank-main"],[id$="-rank-person"]{
-  display:flex;flex-direction:column;align-items:center;padding:8px 12px;}
-[id$="-rank-sub"] .rank-item,
-[id$="-rank-main"] .rank-item,
-[id$="-rank-person"] .rank-item{width:100%;max-width:280px;}
-.rank-medal{font-size:20px;width:26px;text-align:center;flex-shrink:0;}
-.rank-info{flex:1;min-width:0;}
-.rank-name{font-size:12px;font-weight:700;color:var(--g800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.rank-sub{font-size:10px;color:var(--g400);margin-top:1px;}
-.rank-bar-wrap{width:80px;flex-shrink:0;}
-.rank-bar-bg{height:5px;background:var(--g100);border-radius:3px;overflow:hidden;margin-top:4px;}
-.rank-bar-fg{height:5px;background:linear-gradient(90deg,var(--primary),var(--accent));border-radius:3px;}
-.rank-val{font-size:11px;font-weight:700;color:var(--primary);text-align:right;margin-top:2px;}
+.rank-item:first-child{padding-top:0;}
+[id$="-rank-sub"],[id$="-rank-main"],[id$="-rank-person"]{padding:4px 4px;}
+.rank-top{display:flex;align-items:center;gap:10px;}
+.rank-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0;background:var(--g100);color:var(--g500);}
+.rank-item:nth-child(1) .rank-num{background:linear-gradient(135deg,#C9A96E,#7B5B3A);color:#fff;}
+.rank-item:nth-child(2) .rank-num{background:var(--g300);color:#fff;}
+.rank-item:nth-child(3) .rank-num{background:var(--g200);color:var(--g500);}
+.rank-name{font-size:13px;font-weight:700;color:var(--g800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;}
+.rank-val{font-size:13px;font-weight:800;color:var(--primary);flex-shrink:0;letter-spacing:-.02em;}
+.rank-bar-bg{height:7px;background:var(--g100);border-radius:4px;overflow:hidden;}
+.rank-bar-fg{height:7px;background:linear-gradient(90deg,var(--primary),var(--accent));border-radius:4px;transition:width .4s ease;}
 
 /* ─── PRINT / RESPONSIVE ─────────────── */
 
@@ -329,7 +326,6 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 
   /* ── ランキング ── */
   .rank-row{grid-template-columns:1fr;gap:8px;}
-  .rank-row-2{grid-template-columns:1fr;}
 
   /* ── パーソングリッド ── */
   .person-grid{grid-template-columns:repeat(2,1fr);gap:8px;}
@@ -424,12 +420,12 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   canvas{ max-height:100px!important; width:100%!important; }
 
   /* ── ランキング ── */
-  .rank-row{ grid-template-columns:1fr 1fr!important; gap:4px!important; margin-bottom:4px!important; }
-  .rank-item{ padding:3px 5px!important; }
-  .rank-bar-wrap{ height:4px!important; margin:2px 0!important; }
-  .rank-lbl{ font-size:8px!important; }
+  .rank-row{ grid-template-columns:1fr 1fr 1fr!important; gap:4px!important; margin-bottom:4px!important; }
+  .rank-item{ padding:3px 0!important; gap:3px!important; }
+  .rank-num{ width:18px!important; height:18px!important; font-size:10px!important; }
+  .rank-bar-bg{ height:4px!important; }
+  .rank-name{ font-size:8px!important; }
   .rank-val{ font-size:8px!important; }
-  .rank-medal{ font-size:12px!important; }
 
   /* ── パーソングリッド ── */
   .person-grid{ grid-template-columns:repeat(4,1fr)!important; gap:3px!important; }
@@ -746,8 +742,12 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </div>
       </div>
     </div>
-    <!-- ランキング2種（最下部） -->
-    <div class="rank-row rank-row-2">
+    <!-- ランキング3種（最下部） -->
+    <div class="rank-row">
+      <div class="card rank-card">
+        <div class="card-hd"><h2>担当別 Top3</h2><span class="card-sub">総工数 上位</span></div>
+        <div class="card-body"><div id="daily-rank-person"></div></div>
+      </div>
       <div class="card rank-card">
         <div class="card-hd"><h2>中分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
         <div class="card-body"><div id="daily-rank-sub"></div></div>
@@ -803,8 +803,12 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </div>
       </div>
     </div>
-    <!-- ランキング2種（最下部） -->
-    <div class="rank-row rank-row-2">
+    <!-- ランキング3種（最下部） -->
+    <div class="rank-row">
+      <div class="card rank-card">
+        <div class="card-hd"><h2>担当別 Top3</h2><span class="card-sub">総工数 上位</span></div>
+        <div class="card-body"><div id="monthly-rank-person"></div></div>
+      </div>
       <div class="card rank-card">
         <div class="card-hd"><h2>中分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
         <div class="card-body"><div id="monthly-rank-sub"></div></div>
@@ -875,8 +879,12 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </div>
       </div>
     </div>
-    <!-- ランキング2種（最下部） -->
-    <div class="rank-row rank-row-2">
+    <!-- ランキング3種（最下部） -->
+    <div class="rank-row">
+      <div class="card rank-card">
+        <div class="card-hd"><h2>担当別 Top3</h2><span class="card-sub">総工数 上位</span></div>
+        <div class="card-body"><div id="yearly-rank-person"></div></div>
+      </div>
       <div class="card rank-card">
         <div class="card-hd"><h2>中分類 Top3</h2><span class="card-sub">作業時間 上位</span></div>
         <div class="card-body"><div id="yearly-rank-sub"></div></div>
@@ -3514,7 +3522,7 @@ function renderPersonPies(byAuthor, gridId, leaveNormal=null, leaveOT=null) {
         <span class="b-work">通常 ${totalN.toFixed(2)}h</span>
         ${totalOT>0?`<span class="b-ot">残業 ${totalOT.toFixed(2)}h</span>`:`<span class="b-ok">定時内</span>`}
       </div>
-      <canvas id="${uid}" width="${PIE_SIZE}" height="${PIE_SIZE}" style="display:block;margin:0 auto;max-width:100%;"></canvas>
+      <canvas id="${uid}" width="${PIE_SIZE}" height="${PIE_SIZE}" style="display:block;margin:0 auto;"></canvas>
       <div class="mini-legend" id="leg_${uid}"></div>`;
     grid.appendChild(card);
     requestAnimationFrame(()=>drawPie(uid,rows));
@@ -3523,7 +3531,7 @@ function renderPersonPies(byAuthor, gridId, leaveNormal=null, leaveOT=null) {
 
 const CAT_COLOR={'K':'#3b82f6','T':'#22c55e','J':'#ef4444','B':'#a855f7','S':'#eab308','Z':'#06b6d4','O':'#6b7280','A':'#ec4899'};
 const CAT_LABEL={'K':'計画','T':'手配','J':'受注','B':'BOM','S':'打合せ','Z':'改善','O':'その他','A':'アフター'};
-const PIE_SIZE=150; // 個人円グラフの描画サイズ(px)
+const PIE_SIZE=180; // 個人円グラフの描画サイズ(px)
 
 // ── Canvasチャート用テーマカラー（ライト/ダークで切替。applyTheme()で更新）──
 let CHT_GRID='#e5e0d8', CHT_AXIS='#a09589', CHT_TEXT='#3b322c',
@@ -3540,9 +3548,11 @@ function applyChartTheme(dark){
 function drawPie(uid,rows) {
   const canvas=document.getElementById(uid), legend=document.getElementById('leg_'+uid);
   if(!canvas||!legend) return;
+  const dpr=window.devicePixelRatio||1;
+  const S=PIE_SIZE;
+  if(canvas.width!==S*dpr){canvas.width=S*dpr;canvas.height=S*dpr;canvas.style.width=S+'px';canvas.style.height=S+'px';}
   const ctx=canvas.getContext('2d');
-  // canvasサイズ基準でジオメトリを算出（現状比率を維持: 110px時 中心55/外45/内22/文字9px）
-  const S=canvas.width||110;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
   const cx=S/2, cy=S/2, rOuter=S*0.41, rInner=S*0.20;
   const fontPx=Math.max(9,Math.round(S*0.085));
   const catMap={};
@@ -3564,7 +3574,7 @@ function drawPie(uid,rows) {
   });
   ctx.beginPath(); ctx.arc(cx,cy,rInner,0,Math.PI*2); ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--surface').trim()||'#fff'; ctx.fill();
   ctx.fillStyle=CHT_TEXT; ctx.font=`bold ${fontPx}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(total.toFixed(2)+'h',cx,cy); // 通常+残業合計
+  ctx.fillText(total.toFixed(2)+'h',cx,cy);
   legend.innerHTML=Object.entries(catMap).sort((a,b)=>b[1]-a[1]).map(([k,v])=>{
     const pct=Math.round(v/total*100);
     return `<div class="ml-row"><div style="width:8px;height:8px;border-radius:2px;background:${CAT_COLOR[k]||CHT_FAINT};flex-shrink:0;"></div><span style="flex:1;">${CAT_LABEL[k]||k}</span><span style="font-weight:700;">${pct}%</span></div>`;
@@ -3757,8 +3767,6 @@ function renderOTBar(byAuthor, canvasId, emptyId, avgOT=0) {
 // ═══════════════════════════════════════════
 //  ランキング描画
 // ═══════════════════════════════════════════
-const MEDALS = ['1','2','3'];
-
 /**
  * 3種ランキングを一括描画
  * @param {Object} normalByAuthor  {author: normalHours}
@@ -3766,30 +3774,27 @@ const MEDALS = ['1','2','3'];
  * @param {string} prefix          'daily' | 'monthly' | 'yearly'
  */
 function renderRankings(normalByAuthor, byAuthorRows, prefix) {
+  const noData = '<p style="font-size:12px;color:var(--g400);text-align:center;padding:16px 0;">データなし</p>';
+  function rankHTML(items, max) {
+    return items.map((x,i) => `
+      <div class="rank-item">
+        <div class="rank-top">
+          <span class="rank-num">${i+1}</span>
+          <span class="rank-name">${esc(x.label)}</span>
+          <span class="rank-val">${x.h.toFixed(2)}h</span>
+        </div>
+        <div class="rank-bar-bg"><div class="rank-bar-fg" style="width:${Math.round(x.h/max*100)}%"></div></div>
+      </div>`).join('');
+  }
+
   // ─ 担当別負荷ランキング ─
   const personRank = Object.entries(normalByAuthor)
-    .map(([name, h]) => ({name, h}))
+    .map(([name, h]) => ({label: name, h}))
     .filter(x => x.h > 0)
     .sort((a,b) => b.h - a.h)
     .slice(0, 3);
-  const maxPerson = personRank[0]?.h || 1;
   const personEl = document.getElementById(prefix+'-rank-person');
-  if (personEl) {
-    if (!personRank.length) { personEl.innerHTML = '<p style="font-size:12px;color:var(--g400);text-align:center;padding:16px 0;">データなし</p>'; }
-    else {
-      personEl.innerHTML = personRank.map((x,i) => `
-        <div class="rank-item">
-          <span class="rank-medal">${MEDALS[i]}</span>
-          <div class="rank-info">
-            <div class="rank-name">${esc(x.name)}</div>
-            <div class="rank-bar-wrap">
-              <div class="rank-bar-bg"><div class="rank-bar-fg" style="width:${Math.round(x.h/maxPerson*100)}%"></div></div>
-              <div class="rank-val">${x.h.toFixed(2)}h</div>
-            </div>
-          </div>
-        </div>`).join('');
-    }
-  }
+  if (personEl) personEl.innerHTML = personRank.length ? rankHTML(personRank, personRank[0].h) : noData;
 
   // ─ 中分類Top3 ─
   const subTotals = {};
@@ -3801,24 +3806,8 @@ function renderRankings(normalByAuthor, byAuthorRows, prefix) {
     subTotals[r.cdSub].h += h;
   }));
   const subRank = Object.values(subTotals).sort((a,b)=>b.h-a.h).slice(0,3);
-  const maxSub = subRank[0]?.h || 1;
   const subEl = document.getElementById(prefix+'-rank-sub');
-  if (subEl) {
-    if (!subRank.length) { subEl.innerHTML = '<p style="font-size:12px;color:var(--g400);text-align:center;padding:16px 0;">データなし</p>'; }
-    else {
-      subEl.innerHTML = subRank.map((x,i) => `
-        <div class="rank-item">
-          <span class="rank-medal">${MEDALS[i]}</span>
-          <div class="rank-info">
-            <div class="rank-name">${esc(x.label)}</div>
-            <div class="rank-bar-wrap">
-              <div class="rank-bar-bg"><div class="rank-bar-fg" style="width:${Math.round(x.h/maxSub*100)}%"></div></div>
-              <div class="rank-val">${x.h.toFixed(2)}h</div>
-            </div>
-          </div>
-        </div>`).join('');
-    }
-  }
+  if (subEl) subEl.innerHTML = subRank.length ? rankHTML(subRank, subRank[0].h) : noData;
 
   // ─ 大分類Top3 ─
   const mainTotals = {};
@@ -3827,25 +3816,23 @@ function renderRankings(normalByAuthor, byAuthorRows, prefix) {
     if (h <= 0) return;
     const s = SUB_MAP[r.cdSub] || {};
     const k = s.mainCd || 'O';
-    if (!mainTotals[k]) mainTotals[k] = {label: CAT_LABEL[k]||k, h:0};
+    if (!mainTotals[k]) mainTotals[k] = {label: CAT_LABEL[k]||k, color: CAT_COLOR[k]||CHT_FAINT, h:0};
     mainTotals[k].h += h;
   }));
   const mainRank = Object.values(mainTotals).sort((a,b)=>b.h-a.h).slice(0,3);
-  const maxMain = mainRank[0]?.h || 1;
   const mainEl = document.getElementById(prefix+'-rank-main');
   if (mainEl) {
-    if (!mainRank.length) { mainEl.innerHTML = '<p style="font-size:12px;color:var(--g400);text-align:center;padding:16px 0;">データなし</p>'; }
+    if (!mainRank.length) { mainEl.innerHTML = noData; }
     else {
       mainEl.innerHTML = mainRank.map((x,i) => `
         <div class="rank-item">
-          <span class="rank-medal">${MEDALS[i]}</span>
-          <div class="rank-info">
-            <div class="rank-name">${esc(x.label)}</div>
-            <div class="rank-bar-wrap">
-              <div class="rank-bar-bg"><div class="rank-bar-fg" style="width:${Math.round(x.h/maxMain*100)}%"></div></div>
-              <div class="rank-val">${x.h.toFixed(2)}h</div>
-            </div>
+          <div class="rank-top">
+            <span class="rank-num">${i+1}</span>
+            <span style="width:10px;height:10px;border-radius:3px;background:${x.color};flex-shrink:0;"></span>
+            <span class="rank-name">${esc(x.label)}</span>
+            <span class="rank-val">${x.h.toFixed(2)}h</span>
           </div>
+          <div class="rank-bar-bg"><div class="rank-bar-fg" style="width:${Math.round(x.h/mainRank[0].h*100)}%;background:linear-gradient(90deg,${x.color},${x.color}cc);"></div></div>
         </div>`).join('');
     }
   }
