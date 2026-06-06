@@ -3805,7 +3805,7 @@ function renderRankings(byAuthorRows, prefix, days) {
   const avgSubEl = document.getElementById(prefix+'-avg-sub');
   if (avgSubEl) {
     const subItems = Object.values(subTotals)
-      .map(x => ({label: x.label, color: x.color, avg: x.h/d}))
+      .map(x => ({label: x.label, color: x.color, total: x.h, avg: x.h/d}))
       .filter(x => x.avg > 0)
       .sort((a,b) => b.avg - a.avg)
       .slice(0, 10);
@@ -3817,7 +3817,7 @@ function renderRankings(byAuthorRows, prefix, days) {
           <div class="rank-top">
             <span style="width:10px;height:10px;border-radius:3px;background:${x.color};flex-shrink:0;"></span>
             <span class="rank-name">${esc(x.label)}</span>
-            <span class="rank-val">${x.avg.toFixed(2)}h</span>
+            <span class="rank-val">${x.avg.toFixed(2)}h<span style="font-size:11px;font-weight:500;color:var(--g400);margin-left:6px;">計 ${x.total.toFixed(2)}h</span></span>
           </div>
           <div class="rank-bar-bg"><div class="rank-bar-fg" style="width:${Math.round(x.avg/maxAvg*100)}%;background:${x.color};"></div></div>
         </div>`).join('');
