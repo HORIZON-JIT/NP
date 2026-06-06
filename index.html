@@ -746,11 +746,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <!-- 大分類別／中分類別 1日平均（最下部） -->
     <div class="rank-row rank-row-2">
       <div class="card rank-card">
-        <div class="card-hd"><h2>大分類別 1日平均</h2><span class="card-sub">全カテゴリ</span></div>
+        <div class="card-hd"><h2>大分類別 1日の総工数</h2><span class="card-sub">全カテゴリ</span></div>
         <div class="card-body"><div id="daily-avg-cat"></div></div>
       </div>
       <div class="card rank-card">
-        <div class="card-hd"><h2>中分類別 1日平均</h2><span class="card-sub">上位10件</span></div>
+        <div class="card-hd"><h2>中分類別 1日の総工数</h2><span class="card-sub">上位10件</span></div>
         <div class="card-body"><div id="daily-avg-sub"></div></div>
       </div>
     </div>
@@ -803,11 +803,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <!-- 大分類別／中分類別 1日平均（最下部） -->
     <div class="rank-row rank-row-2">
       <div class="card rank-card">
-        <div class="card-hd"><h2>大分類別 1日平均</h2><span class="card-sub">全カテゴリ</span></div>
+        <div class="card-hd"><h2>大分類別 1日の総工数</h2><span class="card-sub">全カテゴリ</span></div>
         <div class="card-body"><div id="monthly-avg-cat"></div></div>
       </div>
       <div class="card rank-card">
-        <div class="card-hd"><h2>中分類別 1日平均</h2><span class="card-sub">上位10件</span></div>
+        <div class="card-hd"><h2>中分類別 1日の総工数</h2><span class="card-sub">上位10件</span></div>
         <div class="card-body"><div id="monthly-avg-sub"></div></div>
       </div>
     </div>
@@ -875,11 +875,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <!-- 大分類別／中分類別 1日平均（最下部） -->
     <div class="rank-row rank-row-2">
       <div class="card rank-card">
-        <div class="card-hd"><h2>大分類別 1日平均</h2><span class="card-sub">全カテゴリ</span></div>
+        <div class="card-hd"><h2>大分類別 1日の総工数</h2><span class="card-sub">全カテゴリ</span></div>
         <div class="card-body"><div id="yearly-avg-cat"></div></div>
       </div>
       <div class="card rank-card">
-        <div class="card-hd"><h2>中分類別 1日平均</h2><span class="card-sub">上位10件</span></div>
+        <div class="card-hd"><h2>中分類別 1日の総工数</h2><span class="card-sub">上位10件</span></div>
         <div class="card-body"><div id="yearly-avg-sub"></div></div>
       </div>
     </div>
@@ -3753,7 +3753,7 @@ function renderOTBar(byAuthor, canvasId, emptyId, avgOT=0) {
 //  ランキング描画
 // ═══════════════════════════════════════════
 /**
- * 大分類別／中分類別 1日平均工数を描画
+ * 大分類別／中分類別 1日の総工数（全員合算÷稼働日数）を描画
  * @param {Object} byAuthorRows  {author: [{cdSub,hoursNormal,...}]}
  * @param {string} prefix        'daily' | 'monthly' | 'yearly'
  * @param {number} days          稼働日数（1日平均の分母）
