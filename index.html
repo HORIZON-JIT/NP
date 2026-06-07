@@ -70,7 +70,7 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 /* ── 入力タブ 2カラム（テーブル＋ライブ円グラフ） ── */
 .input-layout{display:flex;gap:20px;align-items:flex-start;max-width:1280px;margin:0 auto;}
 .input-layout .submit-card{flex:1;min-width:0;}
-.input-live-pie{position:sticky;top:calc(var(--tabs-h,90px) + 16px);width:430px;flex-shrink:0;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--g200);padding:22px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;}
+.input-live-pie{position:sticky;top:calc(var(--tabs-h,90px) + 16px);width:460px;flex-shrink:0;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--g200);padding:22px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;}
 .input-live-pie h3{font-size:14px;font-weight:700;color:var(--g700);margin:0;text-align:center;}
 /* ── 操作欄を「本日の内訳」カード上部へ移設した際の縦積みスタイル ── */
 .input-live-pie .submit-footer{width:100%;flex-direction:column;align-items:stretch;padding:0;margin:0;gap:0;justify-content:flex-start;}
@@ -91,9 +91,13 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 .side-leave .leave-input{padding:3px 6px;font-size:12px;}
 .side-leave .btn-stamp{padding:3px 8px;font-size:11px;}
 .side-divider{width:100%;height:1px;background:var(--g100);margin:2px 0;}
-.live-pie-canvas{display:block;}
+.live-pie-canvas{display:block;max-width:100%;}
 .live-pie-total{font-size:28px;font-weight:800;color:var(--primary);letter-spacing:-.02em;}
 .live-pie-total-label{font-size:10px;color:var(--g400);margin-top:-2px;}
+.lp-toggle{width:100%;background:var(--g50);border:1px solid var(--g200);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;color:var(--g600);cursor:pointer;font-family:inherit;transition:.15s;display:flex;align-items:center;justify-content:center;gap:6px;}
+.lp-toggle:hover{background:var(--g100);border-color:var(--g300);}
+.lp-toggle .lp-arrow{transition:transform .2s;font-size:10px;}
+.lp-toggle.open .lp-arrow{transform:rotate(180deg);}
 .live-pie-legend{width:100%;display:flex;flex-direction:column;gap:5px;margin-top:2px;}
 .live-pie-legend .lpl-row{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--g600);padding:3px 4px;border-radius:6px;}
 .live-pie-legend .lpl-row:nth-child(odd){background:var(--g50);}
@@ -331,8 +335,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   .input-layout .submit-card{max-width:none;}
   .input-live-pie{width:100%;position:static;flex-direction:column;align-items:center;box-sizing:border-box;}
   .input-live-pie h3{width:100%;}
-  /* ライブ円グラフは画面幅に合わせて正方形を維持（固定300pxのはみ出し防止）*/
-  #live-pie-cv{width:62vw!important;height:62vw!important;max-width:240px!important;max-height:240px!important;}
+  /* ライブ円グラフは画面幅に合わせて縮小（ラベル付きの横長比率を維持）*/
+  #live-pie-cv{width:94vw!important;height:auto!important;max-width:380px!important;max-height:none!important;aspect-ratio:400/310;}
   .live-pie-legend{width:100%;max-width:300px;}
 
   /* ── ダッシュボード サブタブ ── */
@@ -717,10 +721,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     </div>
     <div class="side-divider"></div>
     <h3>本日の内訳</h3>
-    <canvas class="live-pie-canvas" id="live-pie-cv" width="300" height="300"></canvas>
+    <canvas class="live-pie-canvas" id="live-pie-cv" width="400" height="310"></canvas>
     <div class="live-pie-total" id="live-pie-total">0.00h</div>
     <div class="live-pie-total-label">合計時間</div>
-    <div class="live-pie-legend" id="live-pie-legend"></div>
+    <button type="button" class="lp-toggle" id="lp-toggle" onclick="toggleLiveLegend()" aria-expanded="false">詳細を表示 <span class="lp-arrow">▾</span></button>
+    <div class="live-pie-legend" id="live-pie-legend" style="display:none;"></div>
   </div>
 </div><!-- /input-layout -->
 </div><!-- /view-input -->
@@ -3722,43 +3727,96 @@ function updateLivePie() {
     }).join('');
 }
 
+function toggleLiveLegend() {
+  const btn = document.getElementById('lp-toggle');
+  const legend = document.getElementById('live-pie-legend');
+  if (!btn || !legend) return;
+  const open = legend.style.display === 'none';
+  legend.style.display = open ? 'flex' : 'none';
+  btn.classList.toggle('open', open);
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  btn.childNodes[0].nodeValue = open ? '詳細を隠す ' : '詳細を表示 ';
+}
+
 function _drawLivePie(canvas, data, total) {
   const dpr = window.devicePixelRatio || 1;
-  const S = 300;
-  if (canvas.width !== S * dpr) { canvas.width = S * dpr; canvas.height = S * dpr; canvas.style.width = S + 'px'; canvas.style.height = S + 'px'; }
+  const W = 400, H = 310;
+  if (canvas.width !== W * dpr) { canvas.width = W * dpr; canvas.height = H * dpr; canvas.style.width = W + 'px'; canvas.style.height = H + 'px'; }
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, S, S);
-  const cx = S / 2, cy = S / 2, rOuter = S * 0.44, rInner = S * 0.26;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2, rOuter = H * 0.375, rInner = H * 0.225;
+  const surface = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#fff';
 
   if (total <= 0) {
     ctx.beginPath(); ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
     ctx.fillStyle = CHT_GRID; ctx.fill();
     ctx.beginPath(); ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#fff';
-    ctx.fill();
+    ctx.fillStyle = surface; ctx.fill();
     ctx.fillStyle = CHT_FAINT; ctx.font = 'bold 17px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('未入力', cx, cy);
     return;
   }
 
-  let ang = -Math.PI / 2;
-  const catColorMap = {};
-  CATS.forEach(c => { catColorMap[c.cd] = c.color; });
+  const catColorMap = {}, catLabelMap = {};
+  CATS.forEach(c => { catColorMap[c.cd] = c.color; catLabelMap[c.cd] = c.label; });
   const keys = Object.keys(data).filter(k => data[k] > 0).sort((a, b) => data[b] - data[a]);
+
+  // ── ドーナツ各セクターを描画しつつ中央角を記録 ──
+  let ang = -Math.PI / 2;
+  const slices = [];
   keys.forEach(k => {
     const s = (data[k] / total) * Math.PI * 2;
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, rOuter, ang, ang + s); ctx.closePath();
     ctx.fillStyle = catColorMap[k] || CHT_FAINT; ctx.fill();
+    slices.push({ k, mid: ang + s / 2, frac: data[k] / total });
     ang += s;
   });
 
+  // 中央の穴＋合計
   ctx.beginPath(); ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
-  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#fff';
-  ctx.fill();
-
-  ctx.fillStyle = CHT_TEXT; ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = surface; ctx.fill();
+  ctx.fillStyle = CHT_TEXT; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(total.toFixed(2) + 'h', cx, cy);
+
+  // ── 分類名ラベル（リーダー線付き・左右に振り分けて重なり回避）──
+  const rLabel = rOuter + 16;
+  const right = [], left = [];
+  slices.forEach(sl => {
+    const y = cy + Math.sin(sl.mid) * rLabel;
+    (Math.cos(sl.mid) >= 0 ? right : left).push({ ...sl, y });
+  });
+  const minGap = 16;
+  [right, left].forEach(side => {
+    side.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < side.length; i++) {
+      if (side[i].y - side[i - 1].y < minGap) side[i].y = side[i - 1].y + minGap;
+    }
+    // 下端からはみ出す場合は上方向へ押し戻す
+    for (let i = side.length - 1; i > 0; i--) {
+      if (side[i].y > H - 8) side[i].y = H - 8 - (side.length - 1 - i) * minGap;
+      if (side[i].y - side[i - 1].y < minGap) side[i - 1].y = side[i].y - minGap;
+    }
+  });
+
+  ctx.font = '12px sans-serif'; ctx.textBaseline = 'middle';
+  [[right, 1], [left, -1]].forEach(([side, dir]) => {
+    ctx.textAlign = dir > 0 ? 'left' : 'right';
+    side.forEach(it => {
+      const col = catColorMap[it.k] || CHT_FAINT;
+      const sx = cx + Math.cos(it.mid) * rOuter, sy = cy + Math.sin(it.mid) * rOuter;
+      const elbowX = cx + dir * (rOuter + 12);
+      const textX = cx + dir * (rOuter + 20);
+      // リーダー線
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(elbowX, it.y); ctx.lineTo(textX - dir * 4, it.y);
+      ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.stroke();
+      // 色ドット
+      ctx.beginPath(); ctx.arc(textX - dir * 4, it.y, 2.5, 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill();
+      // 分類名
+      ctx.fillStyle = CHT_TEXT;
+      ctx.fillText(catLabelMap[it.k] || it.k, textX, it.y);
+    });
+  });
 }
 
 // ═══════════════════════════════════════════
