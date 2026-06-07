@@ -51,8 +51,8 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 .tab{background:none;border:none;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;color:var(--g400);border-bottom:2.5px solid transparent;margin-bottom:-1px;font-family:inherit;transition:all .18s;letter-spacing:-.01em;}
 .tab.active{color:var(--primary);border-bottom-color:var(--primary);}
 .tab:hover:not(.active){color:var(--g600);}
-.tab-link{font-size:14px;font-weight:700;color:var(--g500);text-decoration:none;padding:6px 10px;border-radius:7px;background:var(--g50);border:1px solid var(--g200);white-space:nowrap;transition:all .15s;display:flex;align-items:center;gap:3px;}
-.tab-link:hover{background:var(--primary-lt);color:var(--primary);border-color:var(--primary);}
+.tab-link{font-size:12px;font-weight:600;color:var(--g400);text-decoration:none;padding:5px 12px;white-space:nowrap;transition:all .15s;display:flex;align-items:center;gap:3px;border-bottom:2.5px solid transparent;margin-bottom:-1px;}
+.tab-link:hover{color:var(--primary);border-bottom-color:var(--primary);}
 .tab-content{display:none;}
 .tab-content.active{display:block;}
 
@@ -113,10 +113,16 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 .live-pie-legend .lpl-dot{width:11px;height:11px;border-radius:3px;flex-shrink:0;}
 .live-pie-legend .lpl-val{margin-left:auto;font-weight:700;color:var(--g700);}
 .live-pie-empty{font-size:12px;color:var(--g400);text-align:center;padding:4px 0;}
-.submit-header{padding:10px 16px;border-bottom:1px solid var(--g100);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(90deg,var(--g50),var(--surface));}
+.submit-header{padding:10px 16px;border-bottom:1px solid var(--g100);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(90deg,var(--g50),var(--surface));flex-wrap:wrap;gap:6px;}
 .submit-header h2{font-size:13px;font-weight:700;color:var(--g700);}
 .data-status{font-size:11px;color:var(--g400);}
 .data-status.loaded{color:var(--success);font-weight:700;}
+.step-row{display:flex;align-items:center;gap:4px;width:100%;}
+.step-label{font-size:10px;color:var(--g400);font-weight:600;white-space:nowrap;}
+.step-pills{display:flex;gap:2px;}
+.step-pill{border:none;background:var(--g100);color:var(--g500);font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;cursor:pointer;font-family:inherit;transition:.15s;line-height:1.2;}
+.step-pill:hover{background:var(--g200);color:var(--g700);}
+.step-pill.active{background:var(--primary);color:#fff;}
 
 /* ─── ENTRY TABLE ────────────────────── */
 .table-wrap{overflow-x:auto;}
@@ -317,6 +323,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   .tabs::-webkit-scrollbar{display:none;}
   .tab{font-size:12px;padding:8px 11px;flex-shrink:0;white-space:nowrap;}
   .tab-link{font-size:11px;padding:4px 7px;flex-shrink:0;white-space:nowrap;}
+  .step-row{gap:3px;}.step-pill{font-size:9px;padding:2px 6px;}
   .tabs-logo{display:none!important;}
 
   /* ── コンテナ ── */
@@ -689,8 +696,19 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 <div class="input-layout">
   <div class="submit-card">
     <div class="submit-header">
-      <h2>作業時間入力 <small style="font-weight:400;color:var(--g500);font-size:11px;">中分類名をクリックで +0.25h</small></h2>
+      <h2>作業時間入力</h2>
       <span class="data-status" id="data-status">未入力</span>
+      <div class="step-row">
+        <span class="step-label">クリック加算:</span>
+        <div class="step-pills" id="step-pills">
+          <button class="step-pill active" data-step="0.25">0.25</button>
+          <button class="step-pill" data-step="0.5">0.50</button>
+          <button class="step-pill" data-step="1">1.00</button>
+          <button class="step-pill" data-step="2">2.00</button>
+          <button class="step-pill" data-step="4">4.00</button>
+        </div>
+        <span class="step-label" style="color:var(--g300);">h</span>
+      </div>
     </div>
     <div class="table-wrap">
       <table class="entry-tbl">
@@ -698,7 +716,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
           <tr>
             <th class="th-main">大分類</th>
             <th class="th-cd">コード</th>
-            <th class="th-name">中分類（クリックで +0.25h）</th>
+            <th class="th-name">中分類（クリックで加算）</th>
             <th class="th-hours">通常時間 (h)</th>
             <th class="th-hours">残業時間 (h)</th>
           </tr>
@@ -2337,14 +2355,35 @@ function buildTable() {
       }
       const tdCd=document.createElement('td'); tdCd.className='td-cd'; tdCd.textContent=sub.cd; tr.appendChild(tdCd);
       const tdName=document.createElement('td'); tdName.className='td-name'; tdName.textContent=sub.label;
-      tdName.setAttribute('data-cd', sub.cd); tdName.title=`クリックで ${sub.label} の通常時間 +0.25h`; tdName.onclick=()=>addQuarter(sub.cd); tr.appendChild(tdName);
+      tdName.setAttribute('data-cd', sub.cd); tdName.onclick=()=>addQuarter(sub.cd); tr.appendChild(tdName);
       tr.appendChild(makeHoursCell(`h_${sub.cd}`,  sub.cd, false));
       tr.appendChild(makeHoursCell(`ot_${sub.cd}`, sub.cd, true));
       tbody.appendChild(tr);
     });
   });
   _buildInputCache(); // DOM構築後にキャッシュ更新
+  refreshStepHints();
 }
+let _clickStep = 0.25;
+function setClickStep(step) {
+  _clickStep = step;
+  document.querySelectorAll('.step-pill').forEach(b => b.classList.toggle('active', parseFloat(b.dataset.step) === step));
+  refreshStepHints();
+}
+function refreshStepHints() {
+  const label = _clickStep === Math.floor(_clickStep) ? _clickStep.toFixed(1) : _clickStep.toFixed(2);
+  document.querySelectorAll('td[data-cd]').forEach(td => {
+    const cd = td.getAttribute('data-cd');
+    const sub = SUB_MAP[cd];
+    if (sub) td.title = `クリックで ${sub.label} の通常時間 +${label}h`;
+  });
+}
+(function(){
+  document.addEventListener('click', function(e) {
+    const pill = e.target.closest('.step-pill');
+    if (pill) setClickStep(parseFloat(pill.dataset.step));
+  });
+})();
 function makeHoursCell(id, cdSub, isOT) {
   const td=document.createElement('td'); td.style.textAlign='center';
   const wrap=document.createElement('div'); wrap.className='hours-wrap';
@@ -2360,33 +2399,30 @@ function makeHoursCell(id, cdSub, isOT) {
   wrap.appendChild(inp); td.appendChild(wrap); return td;
 }
 function addQuarter(cdSub) {
-  // 通常合計が8h未満なら通常に加算、8h以上なら残業に加算
+  const step = _clickStep;
   const normalTotal = getTotalNormal();
-  const remaining = Math.max(0, REGULAR_H - normalTotal); // 通常に入れられる残り
+  const remaining = Math.max(0, REGULAR_H - normalTotal);
   if (remaining > 0) {
-    // 通常列に加算（残り枠内に収まるよう制限）
     const inp = document.getElementById(`h_${cdSub}`);
     const v = parseFloat(inp.value) || 0;
-    const add = Math.min(0.25, remaining); // 余裕がなければ端数だけ
+    const add = Math.min(step, remaining);
     inp.value = (Math.round((v + add) * 100) / 100).toFixed(2);
     refreshCellStyle(inp);
     inp.style.transition = 'background .2s'; inp.style.background = '#bfdbfe';
     setTimeout(() => { inp.style.background = ''; }, 300);
-    // 0.25h加算で8hを超えた残り分を残業へ
-    if (add < 0.25) {
+    if (add < step) {
       const otInp = document.getElementById(`ot_${cdSub}`);
       const ov = parseFloat(otInp.value) || 0;
-      const otAdd = Math.round((0.25 - add) * 100) / 100;
+      const otAdd = Math.round((step - add) * 100) / 100;
       otInp.value = (Math.round((ov + otAdd) * 100) / 100).toFixed(2);
       refreshCellStyle(otInp);
       otInp.style.transition = 'background .2s'; otInp.style.background = '#fecdd3';
       setTimeout(() => { otInp.style.background = ''; }, 300);
     }
   } else {
-    // 通常が満杯 → 残業に加算
     const otInp = document.getElementById(`ot_${cdSub}`);
     const ov = parseFloat(otInp.value) || 0;
-    otInp.value = (Math.round((ov + 0.25) * 100) / 100).toFixed(2);
+    otInp.value = (Math.round((ov + step) * 100) / 100).toFixed(2);
     refreshCellStyle(otInp);
     otInp.style.transition = 'background .2s'; otInp.style.background = '#fecdd3';
     setTimeout(() => { otInp.style.background = ''; }, 300);
@@ -2450,7 +2486,8 @@ function updateTotals() {
   normal = Math.round(normal * 100) / 100;
   ot     = Math.round(ot * 100) / 100;
   const atMax = normal >= REGULAR_H;
-  const hint  = atMax ? '残業時間 +0.25h' : '通常時間 +0.25h';
+  const stepLabel = _clickStep === Math.floor(_clickStep) ? _clickStep.toFixed(1) : _clickStep.toFixed(2);
+  const hint  = atMax ? `残業時間 +${stepLabel}h` : `通常時間 +${stepLabel}h`;
 
   // 合計表示（変化があるときだけ書き換えでリフロー抑制）
   const tnEl = document.getElementById('total-normal');
