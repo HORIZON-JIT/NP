@@ -117,12 +117,16 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 .submit-header h2{font-size:13px;font-weight:700;color:var(--g700);}
 .data-status{font-size:11px;color:var(--g400);}
 .data-status.loaded{color:var(--success);font-weight:700;}
-.step-row{display:flex;align-items:center;gap:4px;width:100%;}
+.step-row{display:flex;align-items:center;gap:4px;width:100%;flex-wrap:wrap;}
 .step-label{font-size:10px;color:var(--g400);font-weight:600;white-space:nowrap;}
 .step-pills{display:flex;gap:2px;}
 .step-pill{border:none;background:var(--g100);color:var(--g500);font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;cursor:pointer;font-family:inherit;transition:.15s;line-height:1.2;}
 .step-pill:hover{background:var(--g200);color:var(--g700);}
 .step-pill.active{background:var(--primary);color:#fff;}
+.unit-toggle{display:flex;gap:0;background:var(--g100);border:1px solid var(--g200);border-radius:6px;padding:2px;}
+.unit-opt{border:none;background:none;color:var(--g500);font-size:10px;font-weight:700;padding:3px 10px;border-radius:4px;cursor:pointer;font-family:inherit;transition:.15s;line-height:1.2;}
+.unit-opt:hover{color:var(--g700);}
+.unit-opt.active{background:var(--primary);color:#fff;}
 
 /* ─── ENTRY TABLE ────────────────────── */
 .table-wrap{overflow-x:auto;}
@@ -699,7 +703,12 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <h2>作業時間入力</h2>
       <span class="data-status" id="data-status">未入力</span>
       <div class="step-row">
-        <span class="step-label">クリック加算:</span>
+        <span class="step-label">入力単位:</span>
+        <div class="unit-toggle" id="unit-toggle" role="group" aria-label="入力単位切替">
+          <button type="button" class="unit-opt active" data-unit="h">時間</button>
+          <button type="button" class="unit-opt" data-unit="min">分</button>
+        </div>
+        <span class="step-label" style="margin-left:8px;">クリック加算:</span>
         <div class="step-pills" id="step-pills">
           <button class="step-pill active" data-step="0.25">0.25</button>
           <button class="step-pill" data-step="0.5">0.50</button>
@@ -707,7 +716,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
           <button class="step-pill" data-step="2">2.00</button>
           <button class="step-pill" data-step="4">4.00</button>
         </div>
-        <span class="step-label" style="color:var(--g300);">h</span>
+        <span class="step-label" id="step-unit-label" style="color:var(--g300);">h</span>
       </div>
     </div>
     <div class="table-wrap">
@@ -2364,6 +2373,22 @@ function buildTable() {
   _buildInputCache(); // DOM構築後にキャッシュ更新
   refreshStepHints();
 }
+// ── 入力単位（時間h / 分）。内部は常に時間(h)、入力セルの value だけ単位に応じて表示 ──
+let _unit = localStorage.getItem('inputUnit') || 'h';     // 'h' | 'min'
+const _U = () => _unit === 'min' ? 60 : 1;                // value = hours * _U
+function getH(inp){ return inp ? (parseFloat(inp.value)||0) / _U() : 0; }   // value → 時間(h)
+function setHV(inp, hours){                                // 時間(h) → 現単位の表示値
+  if (!inp) return;
+  inp.value = _unit === 'min'
+    ? String(Math.round(hours * 60))                       // 分（整数）
+    : (Math.round(hours * 100) / 100).toFixed(2);          // h（従来形式）
+}
+function applyStepAttr(inp){ if(inp){ inp.step = _unit==='min' ? 15 : 0.25; inp.min = 0; } }
+// クリック加算量は常に時間(h)で保持。分モードでは表示ラベルのみ分に変換
+function stepLabelStr(stepH){
+  return _unit==='min' ? `${Math.round(stepH*60)}分`
+       : `${(stepH===Math.floor(stepH)?stepH.toFixed(1):stepH.toFixed(2))}h`;
+}
 let _clickStep = 0.25;
 function setClickStep(step) {
   _clickStep = step;
@@ -2371,24 +2396,50 @@ function setClickStep(step) {
   refreshStepHints();
 }
 function refreshStepHints() {
-  const label = _clickStep === Math.floor(_clickStep) ? _clickStep.toFixed(1) : _clickStep.toFixed(2);
+  const label = stepLabelStr(_clickStep);
   document.querySelectorAll('td[data-cd]').forEach(td => {
     const cd = td.getAttribute('data-cd');
     const sub = SUB_MAP[cd];
-    if (sub) td.title = `クリックで ${sub.label} の通常時間 +${label}h`;
+    if (sub) td.title = `クリックで ${sub.label} の通常時間 +${label}`;
   });
+}
+// 単位UI（トグルactive・ステップピルのラベル・単位ラベル）を現単位に同期
+function renderUnitUI(){
+  document.querySelectorAll('.unit-opt').forEach(b => b.classList.toggle('active', b.dataset.unit === _unit));
+  document.querySelectorAll('.step-pill').forEach(b => {
+    const sH = parseFloat(b.dataset.step);
+    b.textContent = _unit==='min' ? String(Math.round(sH*60)) : sH.toFixed(2);
+  });
+  const ul = document.getElementById('step-unit-label');
+  if (ul) ul.textContent = _unit==='min' ? '分' : 'h';
+  refreshStepHints();
+}
+function setUnit(unit){
+  if (unit !== 'h' && unit !== 'min') return;
+  // 切替前に各セルの時間(h)を退避（getH は _unit に依存するため先に取得）
+  const snap = {};
+  for (const cd in _INP_CACHE){ snap['h_'+cd]=getH(_INP_CACHE[cd].h); snap['o_'+cd]=getH(_INP_CACHE[cd].ot); }
+  _unit = unit; localStorage.setItem('inputUnit', unit);
+  for (const cd in _INP_CACHE){
+    applyStepAttr(_INP_CACHE[cd].h); applyStepAttr(_INP_CACHE[cd].ot);
+    setHV(_INP_CACHE[cd].h, snap['h_'+cd]); setHV(_INP_CACHE[cd].ot, snap['o_'+cd]);
+  }
+  renderUnitUI();
+  updateTotals(); updateLivePie();
 }
 (function(){
   document.addEventListener('click', function(e) {
     const pill = e.target.closest('.step-pill');
-    if (pill) setClickStep(parseFloat(pill.dataset.step));
+    if (pill) { setClickStep(parseFloat(pill.dataset.step)); return; }
+    const uopt = e.target.closest('.unit-opt');
+    if (uopt) setUnit(uopt.dataset.unit);
   });
 })();
 function makeHoursCell(id, cdSub, isOT) {
   const td=document.createElement('td'); td.style.textAlign='center';
   const wrap=document.createElement('div'); wrap.className='hours-wrap';
   const inp=document.createElement('input');
-  inp.type='number'; inp.id=id; inp.min=0; inp.step=0.25; inp.value='0';
+  inp.type='number'; inp.id=id; inp.value='0'; applyStepAttr(inp);
   if (isOT) {
     // 残業列：通常が8h未満のときは読み取り専用表示（入力は可）
     inp.oninput=()=>{ refreshCellStyle(inp); scheduleUpdateTotals(); };
@@ -2399,30 +2450,30 @@ function makeHoursCell(id, cdSub, isOT) {
   wrap.appendChild(inp); td.appendChild(wrap); return td;
 }
 function addQuarter(cdSub) {
-  const step = _clickStep;
+  const step = _clickStep;                    // 加算量は常に時間(h)
   const normalTotal = getTotalNormal();
   const remaining = Math.max(0, REGULAR_H - normalTotal);
   if (remaining > 0) {
     const inp = document.getElementById(`h_${cdSub}`);
-    const v = parseFloat(inp.value) || 0;
+    const v = getH(inp);
     const add = Math.min(step, remaining);
-    inp.value = (Math.round((v + add) * 100) / 100).toFixed(2);
+    setHV(inp, Math.round((v + add) * 100) / 100);
     refreshCellStyle(inp);
     inp.style.transition = 'background .2s'; inp.style.background = '#bfdbfe';
     setTimeout(() => { inp.style.background = ''; }, 300);
     if (add < step) {
       const otInp = document.getElementById(`ot_${cdSub}`);
-      const ov = parseFloat(otInp.value) || 0;
+      const ov = getH(otInp);
       const otAdd = Math.round((step - add) * 100) / 100;
-      otInp.value = (Math.round((ov + otAdd) * 100) / 100).toFixed(2);
+      setHV(otInp, Math.round((ov + otAdd) * 100) / 100);
       refreshCellStyle(otInp);
       otInp.style.transition = 'background .2s'; otInp.style.background = '#fecdd3';
       setTimeout(() => { otInp.style.background = ''; }, 300);
     }
   } else {
     const otInp = document.getElementById(`ot_${cdSub}`);
-    const ov = parseFloat(otInp.value) || 0;
-    otInp.value = (Math.round((ov + step) * 100) / 100).toFixed(2);
+    const ov = getH(otInp);
+    setHV(otInp, Math.round((ov + step) * 100) / 100);
     refreshCellStyle(otInp);
     otInp.style.transition = 'background .2s'; otInp.style.background = '#fecdd3';
     setTimeout(() => { otInp.style.background = ''; }, 300);
@@ -2448,23 +2499,23 @@ function clampNormal(cdSub) {
   const otInp = cache.ot || document.getElementById(`ot_${cdSub}`);
   if (!inp || !otInp) return;
 
-  const v = parseFloat(inp.value) || 0;
-  if (v < 0) { inp.value = '0'; return; }
+  const v = getH(inp);                        // 時間(h)
+  if (v < 0) { setHV(inp, 0); return; }
 
-  // 他行の通常合計をDOMキャッシュから計算（DOM検索なし）
+  // 他行の通常合計をDOMキャッシュから計算（DOM検索なし、時間h）
   let otherNormal = 0;
   for (const cd in _INP_CACHE) {
     if (cd === cdSub) continue;
-    otherNormal += parseFloat(_INP_CACHE[cd].h?.value) || 0;
+    otherNormal += getH(_INP_CACHE[cd].h);
   }
   otherNormal = Math.round(otherNormal * 100) / 100;
 
   const cap = Math.max(0, Math.round((REGULAR_H - otherNormal) * 100) / 100);
   if (v > cap) {
     const excess = Math.round((v - cap) * 100) / 100;
-    inp.value = cap.toFixed(2);
-    const ov = parseFloat(otInp.value) || 0;
-    otInp.value = (Math.round((ov + excess) * 100) / 100).toFixed(2);
+    setHV(inp, cap);
+    const ov = getH(otInp);
+    setHV(otInp, Math.round((ov + excess) * 100) / 100);
     refreshCellStyle(otInp);
   }
   refreshCellStyle(inp);
@@ -2472,22 +2523,21 @@ function clampNormal(cdSub) {
 
 function getTotalNormal() {
   let n = 0;
-  for (const cd in _INP_CACHE) { n += parseFloat(_INP_CACHE[cd].h?.value) || 0; }
+  for (const cd in _INP_CACHE) { n += getH(_INP_CACHE[cd].h); }
   return Math.round(n * 100) / 100;
 }
 function refreshCellStyle(inp){ inp.classList.toggle('has-val', parseFloat(inp.value)>0); }
 function updateTotals() {
-  // DOMキャッシュを使って1ループで合計計算・スタイル・ヒントを一括処理
+  // DOMキャッシュを使って1ループで合計計算・スタイル・ヒントを一括処理（内部は時間h）
   let normal = 0, ot = 0;
   for (const cd in _INP_CACHE) {
-    normal += parseFloat(_INP_CACHE[cd].h?.value)  || 0;
-    ot     += parseFloat(_INP_CACHE[cd].ot?.value) || 0;
+    normal += getH(_INP_CACHE[cd].h);
+    ot     += getH(_INP_CACHE[cd].ot);
   }
   normal = Math.round(normal * 100) / 100;
   ot     = Math.round(ot * 100) / 100;
   const atMax = normal >= REGULAR_H;
-  const stepLabel = _clickStep === Math.floor(_clickStep) ? _clickStep.toFixed(1) : _clickStep.toFixed(2);
-  const hint  = atMax ? `残業時間 +${stepLabel}h` : `通常時間 +${stepLabel}h`;
+  const hint  = atMax ? `残業時間 +${stepLabelStr(_clickStep)}` : `通常時間 +${stepLabelStr(_clickStep)}`;
 
   // 合計表示（変化があるときだけ書き換えでリフロー抑制）
   const tnEl = document.getElementById('total-normal');
@@ -2612,8 +2662,8 @@ async function loadDay_and_render() {
     if (rows2.length>0) {
       rows2.forEach(r=>{
         const cache=_INP_CACHE[r.cdSub]||{}; const h=cache.h||document.getElementById(`h_${r.cdSub}`), ot=cache.ot||document.getElementById(`ot_${r.cdSub}`);
-        if(h&&r.hoursNormal>0){ h.value=r.hoursNormal.toFixed(2); refreshCellStyle(h); }
-        if(ot&&r.hoursOT>0)   { ot.value=r.hoursOT.toFixed(2);   refreshCellStyle(ot); }
+        if(h&&r.hoursNormal>0){ setHV(h, r.hoursNormal); refreshCellStyle(h); }
+        if(ot&&r.hoursOT>0)   { setHV(ot, r.hoursOT);    refreshCellStyle(ot); }
       });
       updateTotals();
       document.getElementById('data-status').textContent=`${currentDate} のデータを読み込み済み`;
@@ -2646,8 +2696,8 @@ async function submitDay() {
   if (!author){ alert('設定から担当者名を入力してください'); openSettings(); return; }
   const rows=[];
   for (const cd in _INP_CACHE) {
-    const h=parseFloat(_INP_CACHE[cd].h?.value)||0;
-    const ot=parseFloat(_INP_CACHE[cd].ot?.value)||0;
+    const h=getH(_INP_CACHE[cd].h);     // 保存は常に時間(h)
+    const ot=getH(_INP_CACHE[cd].ot);
     if(h>0||ot>0) rows.push({cdSub:cd,hoursNormal:h,hoursOT:ot});
   }
   const leaveTime=(document.getElementById('input-leave')?.value)||'';
@@ -3764,8 +3814,8 @@ function updateLivePie() {
   const byMain = {};
   let grand = 0;
   for (const cd in _INP_CACHE) {
-    const h  = parseFloat(_INP_CACHE[cd].h?.value)  || 0;
-    const ot = parseFloat(_INP_CACHE[cd].ot?.value) || 0;
+    const h  = getH(_INP_CACHE[cd].h);
+    const ot = getH(_INP_CACHE[cd].ot);
     const sum = h + ot;
     if (sum <= 0) continue;
     const mainCd = SUB_MAP[cd]?.mainCd || '?';
@@ -4279,6 +4329,7 @@ function updateStickyOffsets() {
 (async function init(){
   applyTheme(getTheme());   // ダーク/ライトのチャート色・トグル状態を初期化
   buildTable();
+  renderUnitUI();           // 保存済みの入力単位（時間/分）をUIに反映
   updateLivePie();
   updateDateLabel();
 
