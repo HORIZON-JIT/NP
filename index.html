@@ -73,9 +73,24 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 .input-live-pie{position:sticky;top:calc(var(--tabs-h,90px) + 16px);width:430px;flex-shrink:0;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--g200);padding:22px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;}
 .input-live-pie h3{font-size:14px;font-weight:700;color:var(--g700);margin:0;text-align:center;}
 /* ── 操作欄を「本日の内訳」カード上部へ移設した際の縦積みスタイル ── */
-.input-live-pie .submit-footer{width:100%;flex-direction:column;align-items:stretch;padding:0 0 14px;margin:0 0 4px;gap:8px;border-bottom:1px solid var(--g100);justify-content:flex-start;}
+.input-live-pie .submit-footer{width:100%;flex-direction:column;align-items:stretch;padding:0;margin:0;gap:0;justify-content:flex-start;}
 .input-live-pie .leave-row{border-top:none;background:transparent;padding:0;flex-wrap:wrap;}
-.input-live-pie .btn-submit{flex:1;}
+/* ── 右パネル合計ストリップ ── */
+.side-totals{display:flex;gap:0;width:100%;border-radius:10px;overflow:hidden;border:1px solid var(--g200);}
+.side-totals .st-cell{flex:1;text-align:center;padding:10px 6px 8px;display:flex;flex-direction:column;gap:2px;}
+.side-totals .st-cell:first-child{border-right:1px solid var(--g200);}
+.side-totals .st-lbl{font-size:10px;font-weight:600;color:var(--g400);letter-spacing:.04em;text-transform:uppercase;}
+.side-totals .st-val{font-size:22px;font-weight:800;color:var(--primary);letter-spacing:-.02em;line-height:1;}
+.side-totals .st-val.ot{color:var(--danger);}
+/* ── 右パネル操作行 ── */
+.side-actions{display:flex;gap:8px;width:100%;align-items:center;}
+.side-actions .btn-submit{padding:7px 18px;font-size:13px;border-radius:8px;gap:4px;box-shadow:0 2px 8px rgba(123,91,58,.25);}
+.side-actions .btn-clear{padding:6px 12px;font-size:12px;border-radius:7px;}
+.side-leave{display:flex;align-items:center;gap:6px;width:100%;flex-wrap:wrap;}
+.side-leave .leave-label{font-size:11px;}
+.side-leave .leave-input{padding:3px 6px;font-size:12px;}
+.side-leave .btn-stamp{padding:3px 8px;font-size:11px;}
+.side-divider{width:100%;height:1px;background:var(--g100);margin:2px 0;}
 .live-pie-canvas{display:block;}
 .live-pie-total{font-size:28px;font-weight:800;color:var(--primary);letter-spacing:-.02em;}
 .live-pie-total-label{font-size:10px;color:var(--g400);margin-top:-2px;}
@@ -678,13 +693,17 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 
   <!-- ── ライブ円グラフ（入力内容をリアルタイム反映） ── -->
   <div class="input-live-pie no-print" id="input-live-pie">
+    <div class="side-totals">
+      <div class="st-cell"><span class="st-lbl">通常</span><span class="st-val" id="side-normal">0.00</span></div>
+      <div class="st-cell"><span class="st-lbl">残業</span><span class="st-val ot" id="side-ot">0.00</span></div>
+    </div>
     <div class="submit-footer">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <button class="btn-submit" onclick="submitDay()">＋ 保存</button>
+      <div class="side-actions">
+        <button class="btn-submit" onclick="submitDay()">保存</button>
         <button class="btn-clear no-print" onclick="clearInputs()">クリア</button>
         <span id="save-msg"></span>
       </div>
-      <div class="leave-row no-print">
+      <div class="side-leave no-print">
         <label class="leave-label" for="input-leave">退勤時刻</label>
         <input type="time" id="input-leave" class="leave-input" placeholder="--:--" step="60"
                oninput="onLeaveChangeDebounced()" />
@@ -696,6 +715,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       </div>
       <div class="submit-hint no-print">同じ日に再度押すと上書き保存されます</div>
     </div>
+    <div class="side-divider"></div>
     <h3>本日の内訳</h3>
     <canvas class="live-pie-canvas" id="live-pie-cv" width="300" height="300"></canvas>
     <div class="live-pie-total" id="live-pie-total">0.00h</div>
@@ -2410,6 +2430,10 @@ function updateTotals() {
   if (toEl.textContent !== oStr) toEl.textContent = oStr;
   tnEl.classList.toggle('at-max', atMax);
   toEl.classList.toggle('has-ot', ot > 0);
+  const snEl = document.getElementById('side-normal');
+  const soEl = document.getElementById('side-ot');
+  if (snEl && snEl.textContent !== nStr) snEl.textContent = nStr;
+  if (soEl && soEl.textContent !== oStr) soEl.textContent = oStr;
 
   // スタイル＋ヒントを1ループで（querySelectorAll不要）
   const hintChanged = (updateTotals._lastHint !== hint);
