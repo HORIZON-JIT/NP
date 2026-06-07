@@ -91,13 +91,14 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 }
 .st-bar-fill.complete{background:linear-gradient(90deg,#D4AF37,#F2D86F);animation:barGlowPulse 1.3s ease-in-out infinite;}
 /* ── 右パネル操作行 ── */
-.side-actions{display:flex;gap:8px;width:100%;align-items:center;}
-.side-actions .btn-submit{padding:7px 18px;font-size:13px;border-radius:8px;gap:4px;box-shadow:0 2px 8px rgba(123,91,58,.25);}
-.side-actions .btn-clear{padding:6px 12px;font-size:12px;border-radius:7px;}
-.side-leave{display:flex;align-items:center;gap:6px;width:100%;flex-wrap:wrap;}
-.side-leave .leave-label{font-size:11px;}
-.side-leave .leave-input{padding:3px 6px;font-size:12px;}
-.side-leave .btn-stamp{padding:3px 8px;font-size:11px;}
+.side-actions{display:flex;gap:10px;flex-wrap:wrap;width:100%;align-items:center;}
+.side-actions .btn-submit{flex:1.6;justify-content:center;padding:11px 0;font-size:15px;border-radius:9px;gap:4px;box-shadow:0 2px 8px rgba(123,91,58,.25);}
+.side-actions .btn-clear{flex:1;padding:10px 0;font-size:14px;border-radius:9px;text-align:center;}
+#save-msg{flex-basis:100%;}
+.side-leave{display:flex;align-items:center;gap:8px;width:100%;flex-wrap:wrap;}
+.side-leave .leave-label{font-size:13px;}
+.side-leave .leave-input{flex:1;padding:8px 10px;font-size:14px;}
+.side-leave .btn-stamp{padding:8px 14px;font-size:13px;border-radius:8px;}
 .side-divider{width:100%;height:1px;background:var(--g100);margin:2px 0;}
 .live-pie-canvas{display:block;max-width:100%;}
 .live-pie-total{font-size:28px;font-weight:800;color:var(--primary);letter-spacing:-.02em;}
@@ -3838,24 +3839,23 @@ function _drawLivePie(canvas, data, total) {
   ctx.fillStyle = CHT_TEXT; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(total.toFixed(2) + 'h', cx, cy);
 
-  // ── 分類名ラベル（リーダー線付き・左右に振り分けて重なり回避）──
+  // ── 分類名ラベル（リーダー線付き・左右で均等間隔に整列）──
   const rLabel = rOuter + 16;
   const right = [], left = [];
   slices.forEach(sl => {
     const y = cy + Math.sin(sl.mid) * rLabel;
     (Math.cos(sl.mid) >= 0 ? right : left).push({ ...sl, y });
   });
-  const minGap = 16;
+  const pad = 22;
   [right, left].forEach(side => {
-    side.sort((a, b) => a.y - b.y);
-    for (let i = 1; i < side.length; i++) {
-      if (side[i].y - side[i - 1].y < minGap) side[i].y = side[i - 1].y + minGap;
-    }
-    // 下端からはみ出す場合は上方向へ押し戻す
-    for (let i = side.length - 1; i > 0; i--) {
-      if (side[i].y > H - 8) side[i].y = H - 8 - (side.length - 1 - i) * minGap;
-      if (side[i].y - side[i - 1].y < minGap) side[i - 1].y = side[i].y - minGap;
-    }
+    side.sort((a, b) => a.y - b.y);            // 角度順（上→下）を保持
+    const n = side.length;
+    if (!n) return;
+    const gap = Math.min(26, (H - 2 * pad) / Math.max(1, n - 1));
+    const span = gap * (n - 1);
+    let startY = cy - span / 2;                // 中央寄せ
+    startY = Math.max(pad, Math.min(startY, H - pad - span));  // 画面内クランプ
+    side.forEach((it, i) => { it.y = startY + i * gap; });
   });
 
   ctx.font = '12px sans-serif'; ctx.textBaseline = 'middle';
