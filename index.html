@@ -3803,7 +3803,8 @@ function toggleLiveLegend() {
 function _drawLivePie(canvas, data, total) {
   const dpr = window.devicePixelRatio || 1;
   const W = 400, H = 310;
-  if (canvas.width !== W * dpr) { canvas.width = W * dpr; canvas.height = H * dpr; canvas.style.width = W + 'px'; canvas.style.height = H + 'px'; }
+  const bw = Math.round(W * dpr), bh = Math.round(H * dpr);
+  if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; canvas.style.width = W + 'px'; canvas.style.height = H + 'px'; }
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
@@ -3841,23 +3842,20 @@ function _drawLivePie(canvas, data, total) {
   ctx.fillStyle = CHT_TEXT; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(total.toFixed(2) + 'h', cx, cy);
 
-  // ── 分類名ラベル（リーダー線付き・左右で均等間隔に整列）──
+  // ── 分類名ラベル（リーダー線付き・角度ベース配置＋重なり解消）──
   const rLabel = rOuter + 16;
   const right = [], left = [];
   slices.forEach(sl => {
     const y = cy + Math.sin(sl.mid) * rLabel;
     (Math.cos(sl.mid) >= 0 ? right : left).push({ ...sl, y });
   });
-  const pad = 22;
+  const minGap = 16, pad = 10;
   [right, left].forEach(side => {
-    side.sort((a, b) => a.y - b.y);            // 角度順（上→下）を保持
-    const n = side.length;
-    if (!n) return;
-    const gap = Math.min(26, (H - 2 * pad) / Math.max(1, n - 1));
-    const span = gap * (n - 1);
-    let startY = cy - span / 2;                // 中央寄せ
-    startY = Math.max(pad, Math.min(startY, H - pad - span));  // 画面内クランプ
-    side.forEach((it, i) => { it.y = startY + i * gap; });
+    side.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < side.length; i++) {
+      if (side[i].y - side[i - 1].y < minGap) side[i].y = side[i - 1].y + minGap;
+    }
+    side.forEach(it => { it.y = Math.max(pad, Math.min(it.y, H - pad)); });
   });
 
   ctx.font = '12px sans-serif'; ctx.textBaseline = 'middle';
