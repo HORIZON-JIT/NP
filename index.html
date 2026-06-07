@@ -148,6 +148,20 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .btn-submit{background:linear-gradient(135deg,var(--primary),var(--primary-dk));color:#fff;border:none;border-radius:9px;padding:9px 28px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .18s;display:flex;align-items:center;gap:6px;box-shadow:0 4px 12px rgba(123,91,58,.35);}
 .btn-submit:hover{background:linear-gradient(135deg,var(--primary-dk),#3C2415);transform:translateY(-1px);box-shadow:0 6px 16px rgba(123,91,58,.4);}
 .btn-submit:active{transform:translateY(0);}
+/* ── 入力合計が退勤時刻の実働時間と一致したとき：保存ボタンが金色に輝く ── */
+@keyframes saveGlowPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(212,175,55,.50),0 4px 14px rgba(201,162,75,.45);}
+  50%{box-shadow:0 0 16px 5px rgba(232,199,90,.85),0 4px 18px rgba(201,162,75,.6);}
+}
+.btn-submit.save-glow{
+  background:linear-gradient(135deg,#F2D86F,#D4AF37,#B8860B);
+  color:#4A3500;text-shadow:0 1px 0 rgba(255,255,255,.35);
+  animation:saveGlowPulse 1.3s ease-in-out infinite;
+}
+.btn-submit.save-glow::before{content:'✨';font-size:14px;line-height:1;}
+.btn-submit.save-glow:hover{
+  background:linear-gradient(135deg,#F7E085,#E0BC44,#A9780B);transform:translateY(-1px);
+}
 .btn-clear{background:var(--surface);color:var(--g600);border:1.5px solid var(--g200);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit;transition:.15s;}
 .btn-clear:hover{background:var(--g50);border-color:var(--g300);}
 .leave-row{display:flex;align-items:center;gap:8px;padding:8px 16px;background:linear-gradient(90deg,var(--g50),var(--surface));border-top:1px solid var(--g100);}
@@ -2457,15 +2471,18 @@ function updateTotals() {
   updateLivePie();
 }
 
+function setSaveGlow(on) {
+  document.querySelectorAll('.btn-submit').forEach(b => b.classList.toggle('save-glow', !!on));
+}
 function checkHoursSafety(normal, ot) {
   const warnEl  = document.getElementById('hours-safety-warn');
   if (!warnEl) return;
 
   const leaveTime = document.getElementById('input-leave')?.value || '';
-  if (!leaveTime) { if (warnEl.style.display !== 'none') warnEl.style.display = 'none'; checkHoursSafety._lastKey = ''; return; }
+  if (!leaveTime) { if (warnEl.style.display !== 'none') warnEl.style.display = 'none'; setSaveGlow(false); checkHoursSafety._lastKey = ''; return; }
 
   const calc = calcFromLeave(leaveTime);
-  if (!calc) { if (warnEl.style.display !== 'none') warnEl.style.display = 'none'; checkHoursSafety._lastKey = ''; return; }
+  if (!calc) { if (warnEl.style.display !== 'none') warnEl.style.display = 'none'; setSaveGlow(false); checkHoursSafety._lastKey = ''; return; }
 
   // 実勤務時間上限 = 通常 + 残業（0.25刻みに切り捨て）
   const limitRaw = (calc.normal + calc.ot);
@@ -2476,6 +2493,9 @@ function checkHoursSafety(normal, ot) {
   const key = `${state}_${limit}_${total}`;
   if (checkHoursSafety._lastKey === key) return;
   checkHoursSafety._lastKey = key;
+
+  // 入力合計＝実働時間が一致したら保存ボタンを金色に光らせる（入力ありのときのみ）
+  setSaveGlow(state === 'match' && total > 0);
 
   if (state === 'match') {
     warnEl.style.display = 'none';
