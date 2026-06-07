@@ -43,8 +43,8 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
 .hd-left h1{font-size:17px;font-weight:850;white-space:nowrap;letter-spacing:0;color:var(--g800);}
 .hd-left .sub{font-size:10px;color:var(--g500);font-weight:700;letter-spacing:.08em;text-transform:uppercase;}
 .hd-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-.hd-theme{height:34px;min-width:118px;background:var(--surface);box-shadow:0 1px 2px rgba(17,17,17,.03);}
-.hd-theme .theme-opt{padding:5px 9px;font-size:11px;font-weight:800;}
+.hd-theme{height:34px;min-width:72px;background:var(--surface);box-shadow:0 1px 2px rgba(17,17,17,.03);}
+.hd-theme .theme-opt{padding:5px 8px;font-size:15px;font-weight:800;line-height:1;}
 .date-nav{display:flex;align-items:center;gap:5px;background:var(--surface);border-radius:8px;padding:4px 10px;border:1px solid var(--g200);box-shadow:0 1px 2px rgba(17,17,17,.03);}
 .date-sel{background:transparent;border:none;color:var(--g800);border-radius:5px;padding:3px 4px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;appearance:auto;-webkit-appearance:auto;text-align:center;min-width:54px;}
 .date-sel:focus{outline:none;}
@@ -341,8 +341,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   .date-sel{font-size:11px;min-width:36px;}
   .btn-today{font-size:11px;padding:3px 8px;}
   .btn-author,.btn-settings{font-size:11px;padding:3px 8px;}
-  .hd-theme{min-width:88px;height:31px;flex-shrink:0;}
-  .hd-theme .theme-opt{font-size:10px;padding:4px 5px;}
+  .hd-theme{min-width:70px;height:31px;flex-shrink:0;}
+  .hd-theme .theme-opt{font-size:14px;padding:4px 6px;}
 
   /* ── タブバー（横はみ出し防止・装飾ロゴは非表示）── */
   .tabs{padding:0 8px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;}
@@ -718,8 +718,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <button onclick="goToday()" class="btn-today" title="今日">今日</button>
     </div>
     <div class="theme-toggle hd-theme no-print" id="theme-toggle" role="group" aria-label="テーマ切替">
-      <button type="button" class="theme-opt" data-theme-val="light" onclick="setTheme('light')" title="ライトモード">ライト</button>
-      <button type="button" class="theme-opt" data-theme-val="dark" onclick="setTheme('dark')" title="ダークモード">ダーク</button>
+      <button type="button" class="theme-opt" data-theme-val="light" onclick="setTheme('light')" title="ライトモード" aria-label="ライトモード">☀️</button>
+      <button type="button" class="theme-opt" data-theme-val="dark" onclick="setTheme('dark')" title="ダークモード" aria-label="ダークモード">🌙</button>
     </div>
     <div class="author-chip" onclick="openSettings()">
       <span id="author-chip-label">未設定</span>
