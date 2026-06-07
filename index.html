@@ -68,17 +68,17 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 /* ─── SUBMIT CARD ────────────────────── */
 .submit-card{background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:14px;border:1px solid var(--g200);}
 /* ── 入力タブ 2カラム（テーブル＋ライブ円グラフ） ── */
-.input-layout{display:flex;gap:12px;align-items:flex-start;max-width:1360px;margin:0 auto;}
+.input-layout{display:flex;gap:14px;align-items:flex-start;max-width:1400px;margin:0 auto;}
 .input-layout .submit-card{flex:1;min-width:0;}
 /* ── 左サイドバー（単位・ステップ制御） ── */
-.input-sidebar{position:sticky;top:calc(var(--tabs-h,90px) + 16px);width:64px;flex-shrink:0;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--g200);padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:10px;align-self:flex-start;}
-.sb-label{font-size:9px;font-weight:700;color:var(--g400);text-align:center;letter-spacing:.04em;}
-.sb-divider{width:70%;height:1px;background:var(--g200);}
-.sb-section{display:flex;flex-direction:column;align-items:center;gap:6px;}
-.unit-toggle.vertical{flex-direction:column;gap:0;padding:2px;}
-.unit-toggle.vertical .unit-opt{padding:4px 6px;font-size:9px;text-align:center;width:100%;}
-.step-pills.vertical{flex-direction:column;gap:2px;}
-.step-pills.vertical .step-pill{text-align:center;padding:4px 6px;font-size:9px;width:100%;}
+.input-sidebar{position:sticky;top:calc(var(--tabs-h,90px) + 16px);width:104px;flex-shrink:0;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--g200);padding:16px 12px;display:flex;flex-direction:column;align-items:center;gap:14px;align-self:flex-start;}
+.sb-label{font-size:11px;font-weight:700;color:var(--g400);text-align:center;letter-spacing:.04em;}
+.sb-divider{width:80%;height:1px;background:var(--g200);}
+.sb-section{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;}
+.unit-toggle.vertical{flex-direction:column;gap:0;padding:3px;width:100%;}
+.unit-toggle.vertical .unit-opt{padding:9px 6px;font-size:13px;text-align:center;width:100%;border-radius:5px;}
+.step-pills.vertical{flex-direction:column;gap:5px;width:100%;}
+.step-pills.vertical .step-pill{text-align:center;padding:9px 6px;font-size:13px;width:100%;border-radius:6px;}
 .input-live-pie{position:sticky;top:calc(var(--tabs-h,90px) + 16px);width:460px;flex-shrink:0;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--g200);padding:22px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;}
 .input-live-pie h3{font-size:14px;font-weight:700;color:var(--g700);margin:0;text-align:center;}
 /* ── 操作欄を「本日の内訳」カード上部へ移設した際の縦積みスタイル ── */
@@ -717,7 +717,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <div class="sb-section">
       <span class="sb-label">単位</span>
       <div class="unit-toggle vertical" id="unit-toggle" role="group" aria-label="入力単位切替">
-        <button type="button" class="unit-opt active" data-unit="h">時間</button>
+        <button type="button" class="unit-opt active" data-unit="h">h</button>
         <button type="button" class="unit-opt" data-unit="min">分</button>
       </div>
     </div>
@@ -745,8 +745,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
             <th class="th-main">大分類</th>
             <th class="th-cd">コード</th>
             <th class="th-name">中分類（クリックで加算）</th>
-            <th class="th-hours">通常時間 (h)</th>
-            <th class="th-hours">残業時間 (h)</th>
+            <th class="th-hours">通常時間 (<span class="th-unit">h</span>)</th>
+            <th class="th-hours">残業時間 (<span class="th-unit">h</span>)</th>
           </tr>
         </thead>
         <tbody id="entry-tbody"></tbody>
@@ -2431,6 +2431,7 @@ function renderUnitUI(){
   });
   const ul = document.getElementById('step-unit-label');
   if (ul) ul.textContent = _unit==='min' ? '分' : 'h';
+  document.querySelectorAll('.th-unit').forEach(s => s.textContent = _unit==='min' ? '分' : 'h');
   refreshStepHints();
 }
 function setUnit(unit){
