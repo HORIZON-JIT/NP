@@ -1703,16 +1703,14 @@ async function gasJsonpRetry(url, params, retries=1) {
 async function gasJsonpWrite(url, params, timeoutMs = 10000) {
   const body = JSON.stringify(params);
 
-  // ① fetch発火→500ms後abort（リクエストは送信されるがレスポンスは待たない）
+  // ① fetch POST(fire-and-forget: no-corsでレスポンスは不要、中断せずバックグラウンドで完走させる)
   try {
-    const ctrl = new AbortController();
-    fetch(url, {
+    const p = fetch(url, {
       method: 'POST', credentials: 'include', mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain' },
-      body, signal: ctrl.signal,
+      body,
     }).catch(() => {});
-    await new Promise(r => setTimeout(r, 500));
-    ctrl.abort();
+    await Promise.race([p, new Promise(r => setTimeout(r, 2000))]);
     return { ok: true, source: 'post' };
   } catch (e) { console.warn('gasJsonpWrite POST失敗:', e.message); }
 
