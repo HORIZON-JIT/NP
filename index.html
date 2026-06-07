@@ -68,8 +68,17 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 /* ─── SUBMIT CARD ────────────────────── */
 .submit-card{background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:14px;border:1px solid var(--g200);}
 /* ── 入力タブ 2カラム（テーブル＋ライブ円グラフ） ── */
-.input-layout{display:flex;gap:20px;align-items:flex-start;max-width:1280px;margin:0 auto;}
+.input-layout{display:flex;gap:12px;align-items:flex-start;max-width:1360px;margin:0 auto;}
 .input-layout .submit-card{flex:1;min-width:0;}
+/* ── 左サイドバー（単位・ステップ制御） ── */
+.input-sidebar{position:sticky;top:calc(var(--tabs-h,90px) + 16px);width:64px;flex-shrink:0;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--g200);padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:10px;align-self:flex-start;}
+.sb-label{font-size:9px;font-weight:700;color:var(--g400);text-align:center;letter-spacing:.04em;}
+.sb-divider{width:70%;height:1px;background:var(--g200);}
+.sb-section{display:flex;flex-direction:column;align-items:center;gap:6px;}
+.unit-toggle.vertical{flex-direction:column;gap:0;padding:2px;}
+.unit-toggle.vertical .unit-opt{padding:4px 6px;font-size:9px;text-align:center;width:100%;}
+.step-pills.vertical{flex-direction:column;gap:2px;}
+.step-pills.vertical .step-pill{text-align:center;padding:4px 6px;font-size:9px;width:100%;}
 .input-live-pie{position:sticky;top:calc(var(--tabs-h,90px) + 16px);width:460px;flex-shrink:0;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--g200);padding:22px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;}
 .input-live-pie h3{font-size:14px;font-weight:700;color:var(--g700);margin:0;text-align:center;}
 /* ── 操作欄を「本日の内訳」カード上部へ移設した際の縦積みスタイル ── */
@@ -117,8 +126,6 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 .submit-header h2{font-size:13px;font-weight:700;color:var(--g700);}
 .data-status{font-size:11px;color:var(--g400);}
 .data-status.loaded{color:var(--success);font-weight:700;}
-.step-row{display:flex;align-items:center;gap:4px;width:100%;flex-wrap:wrap;}
-.step-label{font-size:10px;color:var(--g400);font-weight:600;white-space:nowrap;}
 .step-pills{display:flex;gap:2px;}
 .step-pill{border:none;background:var(--g100);color:var(--g500);font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;cursor:pointer;font-family:inherit;transition:.15s;line-height:1.2;}
 .step-pill:hover{background:var(--g200);color:var(--g700);}
@@ -327,8 +334,16 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   .tabs::-webkit-scrollbar{display:none;}
   .tab{font-size:12px;padding:8px 11px;flex-shrink:0;white-space:nowrap;}
   .tab-link{font-size:11px;padding:4px 7px;flex-shrink:0;white-space:nowrap;}
-  .step-row{gap:3px;}.step-pill{font-size:9px;padding:2px 6px;}
+  .step-pill{font-size:9px;padding:2px 6px;}
   .tabs-logo{display:none!important;}
+
+  /* ── サイドバー→横並びバーに折り畳み ── */
+  .input-sidebar{position:static;width:100%;flex-direction:row;justify-content:center;gap:12px;padding:8px 10px;border-radius:0;box-shadow:none;border:none;border-bottom:1px solid var(--g100);order:-1;}
+  .sb-divider{width:1px;height:auto;min-height:20px;}
+  .unit-toggle.vertical{flex-direction:row;}
+  .step-pills.vertical{flex-direction:row;flex-wrap:wrap;}
+  .unit-toggle.vertical .unit-opt{width:auto;}
+  .step-pills.vertical .step-pill{width:auto;}
 
   /* ── コンテナ ── */
   .container{padding:10px 10px;}
@@ -698,26 +713,30 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 <!-- ═══ 入力タブ ═══ -->
 <div id="view-input" class="tab-content active">
 <div class="input-layout">
+  <div class="input-sidebar no-print" id="input-sidebar">
+    <div class="sb-section">
+      <span class="sb-label">単位</span>
+      <div class="unit-toggle vertical" id="unit-toggle" role="group" aria-label="入力単位切替">
+        <button type="button" class="unit-opt active" data-unit="h">時間</button>
+        <button type="button" class="unit-opt" data-unit="min">分</button>
+      </div>
+    </div>
+    <div class="sb-divider"></div>
+    <div class="sb-section">
+      <span class="sb-label">加算<span id="step-unit-label">h</span></span>
+      <div class="step-pills vertical" id="step-pills">
+        <button class="step-pill active" data-step="0.25">0.25</button>
+        <button class="step-pill" data-step="0.5">0.50</button>
+        <button class="step-pill" data-step="1">1.00</button>
+        <button class="step-pill" data-step="2">2.00</button>
+        <button class="step-pill" data-step="4">4.00</button>
+      </div>
+    </div>
+  </div>
   <div class="submit-card">
     <div class="submit-header">
       <h2>作業時間入力</h2>
       <span class="data-status" id="data-status">未入力</span>
-      <div class="step-row">
-        <span class="step-label">入力単位:</span>
-        <div class="unit-toggle" id="unit-toggle" role="group" aria-label="入力単位切替">
-          <button type="button" class="unit-opt active" data-unit="h">時間</button>
-          <button type="button" class="unit-opt" data-unit="min">分</button>
-        </div>
-        <span class="step-label" style="margin-left:8px;">クリック加算:</span>
-        <div class="step-pills" id="step-pills">
-          <button class="step-pill active" data-step="0.25">0.25</button>
-          <button class="step-pill" data-step="0.5">0.50</button>
-          <button class="step-pill" data-step="1">1.00</button>
-          <button class="step-pill" data-step="2">2.00</button>
-          <button class="step-pill" data-step="4">4.00</button>
-        </div>
-        <span class="step-label" id="step-unit-label" style="color:var(--g300);">h</span>
-      </div>
     </div>
     <div class="table-wrap">
       <table class="entry-tbl">
