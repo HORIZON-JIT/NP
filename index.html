@@ -2529,10 +2529,17 @@ async function loadDay_and_render() {
       document.getElementById('data-status').textContent='未入力';
       document.getElementById('data-status').className='data-status';
     }
-    // 退勤時刻の復元
+    // 退勤時刻の復元（当日かつ未保存なら現在時刻を自動反映＝「現在時刻を反映」を押す手間を省く）
     const leaveEl = document.getElementById('input-leave');
     if (leaveEl) {
-      leaveEl.value = dayData.leaveTime||'';
+      if (dayData.leaveTime) {
+        leaveEl.value = dayData.leaveTime;
+      } else if (currentDate === todayStr()) {
+        const now = new Date();
+        leaveEl.value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      } else {
+        leaveEl.value = '';
+      }
       onLeaveChange();
     }
     document.getElementById('daily-memo').value=await loadMemo(currentDate,author);
