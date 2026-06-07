@@ -68,10 +68,14 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 /* ─── SUBMIT CARD ────────────────────── */
 .submit-card{background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:14px;border:1px solid var(--g200);}
 /* ── 入力タブ 2カラム（テーブル＋ライブ円グラフ） ── */
-.input-layout{display:flex;gap:20px;align-items:flex-start;max-width:1220px;margin:0 auto;}
+.input-layout{display:flex;gap:20px;align-items:flex-start;max-width:1280px;margin:0 auto;}
 .input-layout .submit-card{flex:1;min-width:0;}
-.input-live-pie{position:sticky;top:calc(var(--tabs-h,90px) + 16px);width:380px;flex-shrink:0;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--g200);padding:22px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;}
+.input-live-pie{position:sticky;top:calc(var(--tabs-h,90px) + 16px);width:430px;flex-shrink:0;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--g200);padding:22px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;}
 .input-live-pie h3{font-size:14px;font-weight:700;color:var(--g700);margin:0;text-align:center;}
+/* ── 操作欄を「本日の内訳」カード上部へ移設した際の縦積みスタイル ── */
+.input-live-pie .submit-footer{width:100%;flex-direction:column;align-items:stretch;padding:0 0 14px;margin:0 0 4px;gap:8px;border-bottom:1px solid var(--g100);justify-content:flex-start;}
+.input-live-pie .leave-row{border-top:none;background:transparent;padding:0;flex-wrap:wrap;}
+.input-live-pie .btn-submit{flex:1;}
 .live-pie-canvas{display:block;}
 .live-pie-total{font-size:28px;font-weight:800;color:var(--primary);letter-spacing:-.02em;}
 .live-pie-total-label{font-size:10px;color:var(--g400);margin-top:-2px;}
@@ -670,6 +674,10 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </tfoot>
       </table>
     </div>
+  </div>
+
+  <!-- ── ライブ円グラフ（入力内容をリアルタイム反映） ── -->
+  <div class="input-live-pie no-print" id="input-live-pie">
     <div class="submit-footer">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <button class="btn-submit" onclick="submitDay()">＋ 保存</button>
@@ -688,10 +696,6 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       </div>
       <div class="submit-hint no-print">同じ日に再度押すと上書き保存されます</div>
     </div>
-  </div>
-
-  <!-- ── ライブ円グラフ（入力内容をリアルタイム反映） ── -->
-  <div class="input-live-pie no-print" id="input-live-pie">
     <h3>本日の内訳</h3>
     <canvas class="live-pie-canvas" id="live-pie-cv" width="300" height="300"></canvas>
     <div class="live-pie-total" id="live-pie-total">0.00h</div>
