@@ -145,6 +145,9 @@ table.entry-tbl th.th-name{text-align:left;}
 table.entry-tbl th.th-hours{width:100px;}
 table.entry-tbl td{border-bottom:1px solid var(--g100);padding:3px 8px;vertical-align:middle;}
 table.entry-tbl tr:hover td{background:#FAF6F0;}
+table.entry-tbl tr.row-focus td{background:rgba(123,91,58,.08);}
+[data-theme="dark"] table.entry-tbl tr:hover td{background:rgba(255,255,255,.04);}
+[data-theme="dark"] table.entry-tbl tr.row-focus td{background:rgba(255,255,255,.07);}
 .td-main{text-align:center;font-weight:700;font-size:12px;border-right:3px solid;padding:4px 6px!important;vertical-align:middle!important;}
 .td-main .main-cd{display:block;font-size:16px;line-height:1.2;}
 .td-main .main-lbl{display:block;font-size:10px;margin-top:2px;}
@@ -2453,18 +2456,46 @@ function setUnit(unit){
     if (uopt) setUnit(uopt.dataset.unit);
   });
 })();
+function navMove(cur, dir) {
+  const id = cur.id, isOT = id.startsWith('ot_'), cd = id.slice(isOT ? 3 : 2);
+  const idx = _ALL_SUBS.indexOf(cd);
+  if (idx < 0) return;
+  let target;
+  if (dir === 'down' || dir === 'up') {
+    const ni = dir === 'down' ? idx + 1 : idx - 1;
+    if (ni < 0 || ni >= _ALL_SUBS.length) return;
+    target = _INP_CACHE[_ALL_SUBS[ni]]?.[isOT ? 'ot' : 'h'];
+  } else if (dir === 'next') {
+    if (!isOT) { target = _INP_CACHE[cd]?.ot; }
+    else { const ni = idx + 1; if (ni < _ALL_SUBS.length) target = _INP_CACHE[_ALL_SUBS[ni]]?.h; }
+  } else if (dir === 'prev') {
+    if (isOT) { target = _INP_CACHE[cd]?.h; }
+    else { const ni = idx - 1; if (ni >= 0) target = _INP_CACHE[_ALL_SUBS[ni]]?.ot; }
+  }
+  if (target) { target.focus(); target.select(); }
+}
 function makeHoursCell(id, cdSub, isOT) {
   const td=document.createElement('td'); td.style.textAlign='center';
   const wrap=document.createElement('div'); wrap.className='hours-wrap';
   const inp=document.createElement('input');
   inp.type='number'; inp.id=id; inp.value='0'; applyStepAttr(inp);
   if (isOT) {
-    // 残業列：通常が8h未満のときは読み取り専用表示（入力は可）
     inp.oninput=()=>{ refreshCellStyle(inp); scheduleUpdateTotals(); };
   } else {
-    // 通常列：8hを超えた分はその行の残業列へ自動振り替え
     inp.oninput=()=>{ clampNormal(cdSub); scheduleUpdateTotals(); };
   }
+  inp.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); navMove(this, e.shiftKey ? 'up' : 'down'); }
+    else if (e.key === 'Tab') { e.preventDefault(); navMove(this, e.shiftKey ? 'prev' : 'next'); }
+    else if (e.key === 'Escape') { this.blur(); }
+  });
+  inp.addEventListener('focus', function() {
+    this.select();
+    const row = this.closest('tr'); if (row) row.classList.add('row-focus');
+  });
+  inp.addEventListener('blur', function() {
+    const row = this.closest('tr'); if (row) row.classList.remove('row-focus');
+  });
   wrap.appendChild(inp); td.appendChild(wrap); return td;
 }
 function addQuarter(cdSub) {
