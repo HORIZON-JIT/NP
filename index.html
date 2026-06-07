@@ -82,6 +82,14 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 .side-totals .st-lbl{font-size:10px;font-weight:600;color:var(--g400);letter-spacing:.04em;text-transform:uppercase;}
 .side-totals .st-val{font-size:22px;font-weight:800;color:var(--primary);letter-spacing:-.02em;line-height:1;}
 .side-totals .st-val.ot{color:var(--danger);}
+.side-totals .st-target{font-size:11px;font-weight:600;color:var(--g400);line-height:1;margin-top:1px;}
+.st-bar{width:100%;height:4px;border-radius:2px;background:var(--g100);margin-top:4px;overflow:hidden;}
+.st-bar-fill{height:100%;border-radius:2px;background:var(--primary);transition:width .3s ease;width:0%;}
+@keyframes barGlowPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(212,175,55,.3);}
+  50%{box-shadow:0 0 6px 2px rgba(232,199,90,.7);}
+}
+.st-bar-fill.complete{background:linear-gradient(90deg,#D4AF37,#F2D86F);animation:barGlowPulse 1.3s ease-in-out infinite;}
 /* ── 右パネル操作行 ── */
 .side-actions{display:flex;gap:8px;width:100%;align-items:center;}
 .side-actions .btn-submit{padding:7px 18px;font-size:13px;border-radius:8px;gap:4px;box-shadow:0 2px 8px rgba(123,91,58,.25);}
@@ -711,8 +719,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   <!-- ── ライブ円グラフ（入力内容をリアルタイム反映） ── -->
   <div class="input-live-pie no-print" id="input-live-pie">
     <div class="side-totals">
-      <div class="st-cell"><span class="st-lbl">通常</span><span class="st-val" id="side-normal">0.00</span></div>
-      <div class="st-cell"><span class="st-lbl">残業</span><span class="st-val ot" id="side-ot">0.00</span></div>
+      <div class="st-cell"><span class="st-lbl">通常</span><span class="st-val" id="side-normal">0.00</span><span class="st-target" id="side-normal-target"></span><div class="st-bar" id="side-normal-bar-wrap" style="display:none;"><div class="st-bar-fill" id="side-normal-bar"></div></div></div>
+      <div class="st-cell"><span class="st-lbl">残業</span><span class="st-val ot" id="side-ot">0.00</span><span class="st-target" id="side-ot-target"></span><div class="st-bar" id="side-ot-bar-wrap" style="display:none;"><div class="st-bar-fill" id="side-ot-bar"></div></div></div>
     </div>
     <div class="submit-footer">
       <div class="side-actions">
@@ -2473,15 +2481,38 @@ function updateTotals() {
 function setSaveGlow(on) {
   document.querySelectorAll('.btn-submit').forEach(b => b.classList.toggle('save-glow', !!on));
 }
+function updateSideBars(calc, normal, ot) {
+  const ntEl = document.getElementById('side-normal-target');
+  const otEl = document.getElementById('side-ot-target');
+  const nbWrap = document.getElementById('side-normal-bar-wrap');
+  const obWrap = document.getElementById('side-ot-bar-wrap');
+  const nbFill = document.getElementById('side-normal-bar');
+  const obFill = document.getElementById('side-ot-bar');
+  if (!ntEl) return;
+  if (!calc) {
+    ntEl.textContent = ''; otEl.textContent = '';
+    nbWrap.style.display = 'none'; obWrap.style.display = 'none';
+    return;
+  }
+  ntEl.textContent = `/ ${calc.normal.toFixed(2)}h`;
+  otEl.textContent = calc.ot > 0 ? `/ ${calc.ot.toFixed(2)}h` : '';
+  nbWrap.style.display = ''; obWrap.style.display = calc.ot > 0 ? '' : 'none';
+  const nPct = calc.normal > 0 ? Math.min(100, normal / calc.normal * 100) : 0;
+  const oPct = calc.ot > 0 ? Math.min(100, ot / calc.ot * 100) : 0;
+  nbFill.style.width = nPct + '%';
+  obFill.style.width = oPct + '%';
+  nbFill.classList.toggle('complete', nPct >= 100 && normal > 0);
+  obFill.classList.toggle('complete', oPct >= 100 && ot > 0);
+}
 function checkHoursSafety(normal, ot) {
   const warnEl  = document.getElementById('hours-safety-warn');
   if (!warnEl) return;
 
   const leaveTime = document.getElementById('input-leave')?.value || '';
-  if (!leaveTime) { if (warnEl.style.display !== 'none') warnEl.style.display = 'none'; setSaveGlow(false); checkHoursSafety._lastKey = ''; return; }
+  if (!leaveTime) { if (warnEl.style.display !== 'none') warnEl.style.display = 'none'; setSaveGlow(false); updateSideBars(null, 0, 0); checkHoursSafety._lastKey = ''; return; }
 
   const calc = calcFromLeave(leaveTime);
-  if (!calc) { if (warnEl.style.display !== 'none') warnEl.style.display = 'none'; setSaveGlow(false); checkHoursSafety._lastKey = ''; return; }
+  if (!calc) { if (warnEl.style.display !== 'none') warnEl.style.display = 'none'; setSaveGlow(false); updateSideBars(null, 0, 0); checkHoursSafety._lastKey = ''; return; }
 
   // 実勤務時間上限 = 通常 + 残業（0.25刻みに切り捨て）
   const limitRaw = (calc.normal + calc.ot);
@@ -2492,6 +2523,8 @@ function checkHoursSafety(normal, ot) {
   const key = `${state}_${limit}_${total}`;
   if (checkHoursSafety._lastKey === key) return;
   checkHoursSafety._lastKey = key;
+
+  updateSideBars(calc, normal, ot);
 
   // 入力合計＝実働時間が一致したら保存ボタンを金色に光らせる（入力ありのときのみ）
   setSaveGlow(state === 'match' && total > 0);
