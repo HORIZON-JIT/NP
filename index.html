@@ -92,7 +92,7 @@ header{background:linear-gradient(90deg,#3C2415 0%,#5D4037 50%,#7B5B3A 100%);col
 .st-bar-fill.complete{background:linear-gradient(90deg,#D4AF37,#F2D86F);animation:barGlowPulse 1.3s ease-in-out infinite;}
 /* ── 右パネル操作行 ── */
 .side-actions{display:flex;gap:10px;flex-wrap:wrap;width:100%;align-items:center;}
-.side-actions .btn-submit{flex:1.6;justify-content:center;padding:11px 0;font-size:15px;border-radius:9px;gap:4px;box-shadow:0 2px 8px rgba(123,91,58,.25);}
+.side-actions .btn-submit{flex:1;justify-content:center;padding:10px 0;font-size:14px;border-radius:9px;gap:4px;box-shadow:0 2px 8px rgba(123,91,58,.25);}
 .side-actions .btn-clear{flex:1;padding:10px 0;font-size:14px;border-radius:9px;text-align:center;}
 #save-msg{flex-basis:100%;}
 .side-leave{display:flex;align-items:center;gap:8px;width:100%;flex-wrap:wrap;}
@@ -3867,7 +3867,7 @@ function _drawLivePie(canvas, data, total) {
       const elbowX = cx + dir * (rOuter + 12);
       const textX = cx + dir * (rOuter + 20);
       // リーダー線
-      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(elbowX, it.y); ctx.lineTo(textX - dir * 4, it.y);
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(sx, it.y, elbowX, it.y); ctx.lineTo(textX - dir * 4, it.y);
       ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.stroke();
       // 色ドット
       ctx.beginPath(); ctx.arc(textX - dir * 4, it.y, 2.5, 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill();
