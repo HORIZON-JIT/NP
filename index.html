@@ -2526,8 +2526,23 @@ function makeHoursCell(id, cdSub, isOT) {
   });
   wrap.appendChild(inp); td.appendChild(wrap); return td;
 }
+function getLeaveWorkLimit() {
+  const leaveTime = document.getElementById('input-leave')?.value || '';
+  const calc = calcFromLeave(leaveTime);
+  if (!calc) return null;
+  return Math.floor((calc.normal + calc.ot) * 4) / 4;
+}
 function addQuarter(cdSub) {
-  const step = _clickStep;                    // 加算量は常に時間(h)
+  let step = _clickStep;                      // 加算量は常に時間(h)
+  const leaveLimit = getLeaveWorkLimit();
+  if (leaveLimit !== null) {
+    const currentTotal = Math.round((getTotalNormal() + getTotalOT()) * 100) / 100;
+    const nextTotal = Math.round((currentTotal + step) * 100) / 100;
+    if (currentTotal < leaveLimit && nextTotal > leaveLimit) {
+      step = Math.round((leaveLimit - currentTotal) * 100) / 100;
+      if (step <= 0) return;
+    }
+  }
   const normalTotal = getTotalNormal();
   const remaining = Math.max(0, REGULAR_H - normalTotal);
   if (remaining > 0) {
@@ -2601,6 +2616,11 @@ function clampNormal(cdSub) {
 function getTotalNormal() {
   let n = 0;
   for (const cd in _INP_CACHE) { n += getH(_INP_CACHE[cd].h); }
+  return Math.round(n * 100) / 100;
+}
+function getTotalOT() {
+  let n = 0;
+  for (const cd in _INP_CACHE) { n += getH(_INP_CACHE[cd].ot); }
   return Math.round(n * 100) / 100;
 }
 function refreshCellStyle(inp){ inp.classList.toggle('has-val', parseFloat(inp.value)>0); }
