@@ -3817,10 +3817,11 @@ function drawPie(uid,rows) {
   const canvas=document.getElementById(uid), legend=document.getElementById('leg_'+uid);
   if(!canvas||!legend) return;
   const dpr=window.devicePixelRatio||1;
+  const scale=Math.min(Math.max(dpr,1)*2,4);  // スーパーサンプリングでシャープに
   const S=PIE_SIZE;
-  canvas.width=S*dpr;canvas.height=S*dpr;canvas.style.width=S+'px';canvas.style.height=S+'px';
+  canvas.width=Math.round(S*scale);canvas.height=Math.round(S*scale);canvas.style.width=S+'px';canvas.style.height=S+'px';
   const ctx=canvas.getContext('2d');
-  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.setTransform(scale,0,0,scale,0,0);
   const cx=S/2, cy=S/2, rOuter=S*0.41, rInner=S*0.20;
   const fontPx=Math.max(9,Math.round(S*0.085));
   const catMap={};
@@ -3939,11 +3940,12 @@ function toggleLiveLegend() {
 
 function _drawLivePie(canvas, data, total) {
   const dpr = window.devicePixelRatio || 1;
+  const scale = Math.min(Math.max(dpr, 1) * 2, 4);  // スーパーサンプリングで曲線・文字をシャープに
   const W = 400, H = 310;
-  const bw = Math.round(W * dpr), bh = Math.round(H * dpr);
+  const bw = Math.round(W * scale), bh = Math.round(H * scale);
   if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; canvas.style.width = W + 'px'; canvas.style.height = H + 'px'; }
   const ctx = canvas.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.clearRect(0, 0, W, H);
   const cx = W / 2, cy = H / 2, rOuter = H * 0.375, rInner = H * 0.225;
   const surface = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#fff';
