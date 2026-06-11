@@ -1845,6 +1845,16 @@ function lsCacheGet(key) {
     return obj.data;
   } catch(e) { return null; }
 }
+// 期限切れでも削除せず stale フラグ付きで返す（Stale-While-Revalidate用）
+function lsCacheGetStale(key) {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + key);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (obj.exp >= 0 && obj.exp < 1577836800000) obj.exp = -1; // 旧形式は無期限扱い
+    return { data: obj.data, fresh: obj.exp === -1 || Date.now() <= obj.exp };
+  } catch(e) { return null; }
+}
 function lsCacheSet(key, data, ttl) {
   try {
     // ttl=-1 は無期限（exp=-1 で保存）
@@ -1998,8 +2008,8 @@ async function loadDashData(date) {
   const mem = cacheGet(ck);
   if (mem) { console.log('[loadDashData] memory cache hit'); return mem; }
 
-  // 2. localStorageキャッシュを確認 → あれば即返してバックグラウンド更新
-  const ls = lsCacheGet(ck);
+  // 2. localStorageキャッシュ → 期限切れでも即返し、裏で最新化（SWR）
+  const lsw = lsCacheGetStale(ck);
   const url = getGasUrl();
   if (!url) {
     // ローカルモード：作業ログ＋退勤ログを両方取得
@@ -2021,11 +2031,13 @@ async function loadDashData(date) {
     return result;
   }
 
-  if (ls) {
-    cacheSet(ck, ls);
-    // バックグラウンドで最新を取得してキャッシュ更新（当日・前営業日）
-    if (date === todayStr() || date === prevBusinessDay()) _bgRefreshDaily(date, ck);
-    return ls;
+  if (lsw && lsw.data) {
+    cacheSet(ck, lsw.data);
+    // 期限切れ or 当日・前営業日 → 裏で最新を取得し、変化があれば静かに再描画
+    if (!lsw.fresh || date === todayStr() || date === prevBusinessDay()) {
+      _bgRefreshDaily(date, ck).then(() => _dashRerenderIfChanged(ck, lsw.data));
+    }
+    return lsw.data;
   }
 
   // 3. キャッシュなし → GASへ問い合わせ
@@ -2108,8 +2120,8 @@ async function loadRangeData(startDate, endDate, periodYear, periodMonth) {
   const mem = cacheGet(ck);
   if (mem) return mem;
 
-  // 2. localStorageキャッシュ → あれば即返してバックグラウンド更新
-  const ls = lsCacheGet(ck);
+  // 2. localStorageキャッシュ → 期限切れでも即返し、裏で最新化（SWR）
+  const lsw = lsCacheGetStale(ck);
   const url = getGasUrl();
   if (!url) {
     // ローカルモード（集計）：作業ログ＋退勤ログを両方集計
@@ -2150,13 +2162,17 @@ async function loadRangeData(startDate, endDate, periodYear, periodMonth) {
     return result;
   }
 
-  if (ls) {
+  if (lsw && lsw.data) {
     // ★ _leaveMap がないキャッシュ（機能追加前に保存された古いキャッシュ）は無効扱い
-    if (ls._leaveMap === undefined) {
+    if (lsw.data._leaveMap === undefined) {
       lsCacheDelete(ck);
     } else {
-      cacheSet(ck, ls);
-      return ls;
+      cacheSet(ck, lsw.data);
+      if (!lsw.fresh) {
+        // 期限切れ → 即返しつつ裏で更新、変化があれば表示中のダッシュボードを静かに再描画
+        _bgRefreshRange(startDate, endDate, ck, ttl).then(() => _dashRerenderIfChanged(ck, lsw.data));
+      }
+      return lsw.data;
     }
   }
 
@@ -2187,6 +2203,20 @@ async function _bgRefreshRange(startDate, endDate, ck, ttl=CACHE_TTL_RANGE) {
   try {
     await _fetchRangeFromGas(startDate, endDate, ck, ttl);
   } catch(e){ /* バックグラウンドなので無視 */ }
+}
+
+// バックグラウンド更新後、データに変化があれば表示中のダッシュボードを静かに再描画
+function _dashRerenderIfChanged(ck, oldData) {
+  try {
+    const fresh = cacheGet(ck);
+    if (!fresh || JSON.stringify(fresh) === JSON.stringify(oldData)) return;
+    _renderCache.daily = _renderCache.monthly = _renderCache.yearly = null;
+    if (_currentTab === 'dash') {
+      if (_dashTab === 'monthly') renderMonthlyDash(true);
+      else if (_dashTab === 'yearly') renderYearlyDash(true);
+      else renderDash(true);
+    }
+  } catch(e) { /* 無視 */ }
 }
 
 async function loadMemo(date,author){ return localStorage.getItem(memoKey(date||currentDate,author||getAuthor()))||''; }
@@ -2928,10 +2958,10 @@ async function exportPdf(tab) {
   }
 }
 
-async function renderDash() {
+async function renderDash(silent) {
   updateDailyNavLabel();
   console.log('[renderDash] currentDate=', currentDate);
-  setLoading(true);
+  if (!silent) setLoading(true);
   try {
     let byAuthor;
     try { byAuthor=await loadDashData(currentDate); }
@@ -2940,6 +2970,10 @@ async function renderDash() {
         `<p class="no-data-msg">データ読込失敗 — <a href="#" onclick="renderDash();return false;" style="color:var(--primary);">再試行</a></p>`;
       return;
     }
+    // レンダリングキャッシュ: 同一日・同一データならDOM/canvas再構築をスキップ
+    const renderKeyD = currentDate + '|' + JSON.stringify(byAuthor);
+    if (_renderCache.daily === renderKeyD) return;
+    _renderCache.daily = renderKeyD;
     const leaves   = byAuthor._leaves||{};
     const authors  = Object.keys(byAuthor).filter(k=>k!=='_leaves');
     // ★ 退勤ログにいる担当者も含めて集計
@@ -3011,7 +3045,7 @@ async function renderDash() {
       otData[a]=[{cdSub:'_ot',hoursNormal:normalByAuthorD[a]||0,hoursOT:otByAuthor[a]||0}];
     });
     requestAnimationFrame(()=>renderOTBarEnhanced(otData,'daily-ot-canvas','daily-ot-empty',avgPerPerson,totalOT));
-  } finally { setLoading(false); }
+  } finally { if (!silent) setLoading(false); }
 }
 
 // ═══════════════════════════════════════════
@@ -3084,12 +3118,12 @@ async function refreshMonthly() {
   try { await renderMonthlyDash(); } finally { _forceNoCache = false; }
 }
 
-async function renderMonthlyDash() {
+async function renderMonthlyDash(silent) {
   const {startDate,endDate,label,range}=getPeriodDates(currentPeriod.year,currentPeriod.month);
   // レンダリングキャッシュ: 同一期間ならデータ再処理とDOM再構築をスキップ
   const renderKey = `${startDate}_${endDate}`;
   if (_renderCache.monthly === renderKey) return;
-  setLoading(true);
+  if (!silent) setLoading(true);
   try {
     document.getElementById('period-range').textContent   =range;
     document.getElementById('monthly-ot-sub').textContent =`${range}　— 破線 = 平均残業時間`;
@@ -3181,7 +3215,7 @@ async function renderMonthlyDash() {
     });
     requestAnimationFrame(()=>renderOTBarEnhanced(otData,'monthly-ot-canvas','monthly-ot-empty',avgPerPerson,0));
     _renderCache.monthly = renderKey;
-  } finally { setLoading(false); }
+  } finally { if (!silent) setLoading(false); }
 }
 
 function countDays(startDate,endDate) {
@@ -3256,11 +3290,11 @@ function onYearSelChange() {
   if(!isNaN(v)){ currentFiscalYear=v; renderYearlyDash(); }
 }
 
-async function renderYearlyDash() {
+async function renderYearlyDash(silent) {
   // レンダリングキャッシュ: 同一年度ならデータ再処理とDOM再構築をスキップ
   const renderKey = `fy_${currentFiscalYear}`;
   if (_renderCache.yearly === renderKey) return;
-  setLoading(true);
+  if (!silent) setLoading(true);
   try {
     // 会計年度（10月スタート）: currentFiscalYear=2025 → 10月期〜翌9月期
     const fiscalPeriods = getFiscalPeriods(currentFiscalYear);
@@ -3433,7 +3467,7 @@ async function renderYearlyDash() {
     });
     renderPersonPies(yearByAuthorFlat,'yearly-person-grid',leaveNormalY,leaveOTY);
     _renderCache.yearly = renderKey;
-  } finally { setLoading(false); }
+  } finally { if (!silent) setLoading(false); }
 }
 
 // ─── 年次：月別残業推移（棒＋前年比＋累計平均折線＋破線平均）───
@@ -4368,6 +4402,23 @@ async function refreshRecentCache() {
   console.log('[差分更新] 完了');
 }
 
+// ─── 年次ダッシュボード用プリフェッチ ───
+// 当年度＋前年度の未キャッシュ期を裏で逐次取得（年次タブ初回表示を高速化）。
+// 過去期は無期限TTLなので通常は初回起動時のみ実際の取得が走る。
+async function _idlePrefetchFiscal() {
+  if (!isShared()) return;
+  const periods = [...getFiscalPeriods(currentFiscalYear), ...getFiscalPeriods(currentFiscalYear - 1)];
+  for (const {year, month} of periods) {
+    const {startDate, endDate} = getPeriodDates(year, month);
+    const ck = `range_${startDate}_${endDate}`;
+    const c = lsCacheGetStale(ck);
+    if (c && c.fresh && c.data && c.data._leaveMap !== undefined) continue; // 有効キャッシュあり
+    const ttl = isCurrentPeriod(year, month) ? CACHE_TTL_RANGE_CURRENT : CACHE_TTL_RANGE;
+    try { await _fetchRangeFromGas(startDate, endDate, ck, ttl); } catch(e) { /* 静かに失敗 */ }
+    await new Promise(r => setTimeout(r, 300)); // GASクォータ配慮
+  }
+}
+
 // sticky高さをCSS変数に反映（ガタつき防止）
 function updateStickyOffsets() {
   const hH = document.querySelector('header')?.offsetHeight || 48;
@@ -4440,11 +4491,13 @@ function updateStickyOffsets() {
     }, 300);
   }
 
-  // ─── 起動時 差分更新（過去7日）───
+  // ─── 起動時 差分更新（過去7日）→ 完了後に年次用プリフェッチ ───
   // GAS負荷軽減のため、初回は5秒後、以降は十分な間隔を空けて実行
   if (isShared()) {
     setTimeout(() => {
-      refreshRecentCache().catch(e => console.warn('[差分更新] エラー:', e));
+      refreshRecentCache()
+        .catch(e => console.warn('[差分更新] エラー:', e))
+        .finally(() => { _idlePrefetchFiscal().catch(()=>{}); });
     }, 5000);
 
   }
