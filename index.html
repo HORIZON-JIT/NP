@@ -1098,6 +1098,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       </div>
       <button class="btn btn-outline btn-sm" onclick="importCurrentPeriodFromSheetToFirebase()" style="width:100%;margin-top:8px;">表示月度をFirebaseへ取込</button>
       <button class="btn btn-outline btn-sm" onclick="importAllSheetToFirebase()" style="width:100%;margin-top:8px;">全期間をFirebaseへ取込</button>
+      <button class="btn btn-outline btn-sm" onclick="preloadSheetHistoryCache()" style="width:100%;margin-top:8px;">Spreadsheet履歴をキャッシュ</button>
       <div id="firebase-sync-res" style="font-size:11px;color:var(--g500);margin-top:8px;"></div>
     </div>
     <div class="modal-sec" id="preload-section" style="display:none;">
@@ -2254,6 +2255,85 @@ function withTimeout(promise, ms, message) {
       error => { clearTimeout(timer); reject(error); }
     );
   });
+}
+
+function periodForDate(dateStr) {
+  const [y,m,d] = dateStr.split('-').map(Number);
+  if (d >= 16) {
+    return m === 12 ? {year:y+1, month:1} : {year:y, month:m+1};
+  }
+  return {year:y, month:m};
+}
+
+function nextPeriod(period) {
+  return period.month === 12
+    ? {year:period.year + 1, month:1}
+    : {year:period.year, month:period.month + 1};
+}
+
+function periodKey(period) {
+  return `${period.year}-${pad(period.month)}`;
+}
+
+function buildPeriodTargetsBetween(startDate, endDate) {
+  const targets = [];
+  const seen = new Set();
+  let p = periodForDate(startDate);
+  const endP = periodForDate(endDate);
+  for (let guard=0; guard<240; guard++) {
+    const key = periodKey(p);
+    if (!seen.has(key)) {
+      seen.add(key);
+      const d = getPeriodDates(p.year, p.month);
+      if (d.endDate >= startDate && d.startDate <= endDate) {
+        targets.push({year:p.year, month:p.month, startDate:d.startDate, endDate:d.endDate, ck:`range_${d.startDate}_${d.endDate}`});
+      }
+    }
+    if (p.year === endP.year && p.month === endP.month) break;
+    p = nextPeriod(p);
+  }
+  return targets;
+}
+
+async function preloadSheetHistoryCache() {
+  const url = getGasUrl();
+  if (!url) { alert('GAS URL is not configured.'); return; }
+  const startDate = prompt('Cache start date (YYYY-MM-DD)', '2020-01-01');
+  if (!startDate) return;
+  const endDate = prompt('Cache end date (YYYY-MM-DD)', todayStr());
+  if (!endDate) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) {
+    alert('Date range is invalid.');
+    return;
+  }
+  const targets = buildPeriodTargetsBetween(startDate, endDate);
+  if (!targets.length) { alert('No periods to cache.'); return; }
+  if (!confirm(`Cache ${targets.length} spreadsheet periods from ${startDate} to ${endDate}?`)) return;
+  const res = document.getElementById('firebase-sync-res');
+  let done = 0, skipped = 0, failed = 0;
+  setLoading(true);
+  try {
+    for (const t of targets) {
+      const existing = lsCacheGet(t.ck);
+      if (existing && existing._leaveMap !== undefined) {
+        skipped++;
+      } else {
+        if (res) res.textContent = `${done + skipped + failed + 1}/${targets.length} caching ${t.startDate} - ${t.endDate}...`;
+        try {
+          await withTimeout(_fetchRangeFromGas(t.startDate, t.endDate, t.ck, -1, true), 45000, `Spreadsheet range read timed out: ${t.startDate} - ${t.endDate}`);
+          done++;
+        } catch(e) {
+          failed++;
+          console.error('Cache failed for', t, e);
+        }
+        await new Promise(r => setTimeout(r, 250));
+      }
+      if (res) res.textContent = `${done + skipped + failed}/${targets.length} periods cached (new ${done}, skipped ${skipped}, failed ${failed})`;
+    }
+    if (res) res.textContent = `Spreadsheet cache complete: new ${done}, skipped ${skipped}, failed ${failed}.`;
+  } finally {
+    setLoading(false);
+  }
 }
 
 async function importOneSheetDateToFirebase(date) {
