@@ -1370,6 +1370,7 @@ const FIREBASE_ALLOWED_DOMAIN = 'horizon.co.jp';
 const USE_FIREBASE = !!(window.firebase && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf('YOUR_') === -1);
 const DATA_SOURCE_KEY = 'np_data_source';
 const DATA_SOURCE_RESET_KEY = 'np_data_source_reset_firebase_primary_20260614';
+const SHEET_SYNC_CURSOR_KEY = 'np_sheet_sync_cursor_v1';
 let fdb = null;
 let fauth = null;
 let firebaseUser = null;
@@ -2207,12 +2208,23 @@ function timestampMillis(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function needsSheetSync(report) {
+function getSheetSyncCursorMillis() {
+  const value = localStorage.getItem(SHEET_SYNC_CURSOR_KEY);
+  const parsed = value ? new Date(value).getTime() : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function setSheetSyncCursorMillis(ms) {
+  localStorage.setItem(SHEET_SYNC_CURSOR_KEY, new Date(ms).toISOString());
+}
+
+function needsSheetSync(report, cursorMillis) {
   const updatedAt = timestampMillis(report.updatedAt);
+  if (!updatedAt || !cursorMillis) return false;
+  if (updatedAt <= cursorMillis) return false;
   const sheetSyncedAt = timestampMillis(report.sheetSyncedAt);
-  if (!sheetSyncedAt) return true;
-  if (!updatedAt) return true;
-  return updatedAt > sheetSyncedAt;
+  if (sheetSyncedAt && updatedAt <= sheetSyncedAt) return false;
+  return true;
 }
 
 async function syncDateRangeDiffToSheet() {
@@ -2235,13 +2247,25 @@ async function syncDateRangeDiffToSheet() {
   if (res) res.textContent = `${startDate} - ${endDate} の差分を確認中...`;
   try {
     await ensureFirebaseReady();
+    const syncStartedAt = Date.now();
     const snap = await fdb.collection('dailyReports')
       .where('date', '>=', startDate)
       .where('date', '<=', endDate)
       .get();
+    let cursorMillis = getSheetSyncCursorMillis();
+    if (!cursorMillis) {
+      cursorMillis = snap.docs.reduce((max, doc) => {
+        const syncedAt = timestampMillis((doc.data() || {}).sheetSyncedAt);
+        return syncedAt && syncedAt > max ? syncedAt : max;
+      }, 0);
+      if (!cursorMillis) cursorMillis = syncStartedAt;
+      setSheetSyncCursorMillis(cursorMillis);
+      if (res) res.textContent = '初回の差分同期基準を作成しました。既存履歴の重複防止のため、今回は書き出しません。次回以降のFirebase更新分だけ同期されます。';
+      return;
+    }
     const docs = snap.docs.filter(doc => {
       const d = doc.data() || {};
-      return d.date && d.author && needsSheetSync(d);
+      return d.date && d.author && needsSheetSync(d, cursorMillis);
     });
 
     if (!docs.length) {
@@ -2264,6 +2288,7 @@ async function syncDateRangeDiffToSheet() {
       count++;
       await new Promise(r => setTimeout(r, 150));
     }
+    setSheetSyncCursorMillis(syncStartedAt);
     if (res) res.textContent = `${startDate} - ${endDate}: 差分 ${count}件をスプレッドシートへ同期しました。`;
   } catch(e) {
     if (res) res.textContent = `Sync failed: ${e.message}`;
