@@ -1079,27 +1079,18 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       </a>
     </div>
     <div class="modal-sec" id="firebase-sync-section" style="display:none;">
-      <h4>Firebase primary / Spreadsheet export</h4>
+      <h4>Firebase / Spreadsheet</h4>
       <div style="font-size:12px;color:var(--g600);margin-bottom:10px;line-height:1.7;">
-        Daily reads and saves use Firebase. Spreadsheet is kept as an export and backup destination.
+        Firebaseを通常の保存先として使用中です。必要な時だけスプレッドシートへ書き出せます。
       </div>
-      <button class="btn btn-outline btn-sm" onclick="checkFirebaseConnection()" style="width:100%;margin-bottom:8px;">Firebase login/check</button>
       <div style="border:1px solid var(--g200);border-radius:8px;padding:9px 10px;margin-bottom:10px;background:var(--g50);">
-        <div style="font-size:12px;color:var(--g600);font-weight:700;margin-bottom:7px;">Current read source: <span id="firebase-source-label">Firebase</span></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <button class="btn btn-primary btn-sm" onclick="setDataSource('firebase')">Use Firebase</button>
-          <button class="btn btn-outline btn-sm" onclick="setDataSource('sheet')">Use Spreadsheet</button>
-        </div>
-        <div style="font-size:11px;color:var(--g500);margin-top:7px;">Use Spreadsheet only for migration checks. Normal operation should stay on Firebase.</div>
+        <div style="font-size:12px;color:var(--g600);font-weight:700;">読込元: <span id="firebase-source-label">Firebase</span></div>
+        <div id="firebase-sync-res" style="font-size:11px;color:var(--g500);margin-top:6px;"></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <button class="btn btn-outline btn-sm" onclick="syncCurrentDayToSheet()">Export day to Sheet</button>
-        <button class="btn btn-outline btn-sm" onclick="syncCurrentPeriodToSheet()">Export period to Sheet</button>
+        <button class="btn btn-outline btn-sm" onclick="syncCurrentDayToSheet()">表示日を書き出し</button>
+        <button class="btn btn-outline btn-sm" onclick="syncCurrentPeriodToSheet()">表示月度を書き出し</button>
       </div>
-      <button class="btn btn-outline btn-sm" onclick="importCurrentPeriodFromSheetToFirebase()" style="width:100%;margin-top:8px;">表示月度をFirebaseへ取込</button>
-      <button class="btn btn-outline btn-sm" onclick="importAllSheetToFirebase()" style="width:100%;margin-top:8px;">全期間をFirebaseへ取込</button>
-      <button class="btn btn-outline btn-sm" onclick="preloadSheetHistoryCache()" style="width:100%;margin-top:8px;">Spreadsheet履歴をキャッシュ</button>
-      <div id="firebase-sync-res" style="font-size:11px;color:var(--g500);margin-top:8px;"></div>
     </div>
     <div class="modal-sec" id="preload-section" style="display:none;">
       <h4>過去データ プリロード</h4>
@@ -1377,7 +1368,7 @@ function openSettings() {
   const fbSync = document.getElementById('firebase-sync-section');
   if (fbSync) fbSync.style.display=USE_FIREBASE&&url?'block':'none';
   const fbSyncRes = document.getElementById('firebase-sync-res');
-  if (fbSyncRes) fbSyncRes.textContent='';
+  if (fbSyncRes) fbSyncRes.textContent=firebaseConfigured() ? 'Firebase有効' : '';
   updateDataSourceUI();
   document.getElementById('preload-section').style.display=url&&!useFirebaseReads()?'block':'none';
   document.getElementById('cats-update-section').style.display=url?'block':'none';
