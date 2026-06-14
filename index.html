@@ -1083,6 +1083,14 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <div style="font-size:12px;color:var(--g600);margin-bottom:10px;line-height:1.7;">
         Firebase mode is active. Daily reads and saves use Firestore. Use these buttons only when you want to copy Firebase data back to the spreadsheet.
       </div>
+      <div style="border:1px solid var(--g200);border-radius:8px;padding:9px 10px;margin-bottom:10px;background:var(--g50);">
+        <div style="font-size:12px;color:var(--g600);font-weight:700;margin-bottom:7px;">移行中の参照元: <span id="firebase-source-label">Firebase</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button class="btn btn-outline btn-sm" onclick="setDataSource('firebase')">Firebaseを参照</button>
+          <button class="btn btn-outline btn-sm" onclick="setDataSource('sheet')">Spreadsheetを参照</button>
+        </div>
+        <div style="font-size:11px;color:var(--g500);margin-top:7px;">移行確認中だけSpreadsheet参照にすると、既存シートの履歴を見ながらFirebaseへ取込できます。</div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <button class="btn btn-outline btn-sm" onclick="syncCurrentDayToSheet()">表示日を同期</button>
         <button class="btn btn-outline btn-sm" onclick="syncCurrentPeriodToSheet()">表示月度を同期</button>
@@ -1344,6 +1352,7 @@ const firebaseConfig = {
 };
 const FIREBASE_ALLOWED_DOMAIN = 'horizon.co.jp';
 const USE_FIREBASE = !!(window.firebase && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf('YOUR_') === -1);
+const DATA_SOURCE_KEY = 'np_data_source';
 let fdb = null;
 let fauth = null;
 let firebaseUser = null;
@@ -1365,7 +1374,8 @@ function openSettings() {
   if (fbSync) fbSync.style.display=USE_FIREBASE&&url?'block':'none';
   const fbSyncRes = document.getElementById('firebase-sync-res');
   if (fbSyncRes) fbSyncRes.textContent='';
-  document.getElementById('preload-section').style.display=url&&!firebaseConfigured()?'block':'none';
+  updateDataSourceUI();
+  document.getElementById('preload-section').style.display=url&&!useFirebaseReads()?'block':'none';
   document.getElementById('cats-update-section').style.display=url?'block':'none';
   document.getElementById('cats-update-res').textContent='';
   document.getElementById('preload-progress').style.display='none';
@@ -1938,6 +1948,34 @@ function firebaseConfigured() {
   return USE_FIREBASE && firebaseConfig.projectId && firebaseConfig.projectId.indexOf('YOUR_') === -1;
 }
 
+function getDataSource() {
+  if (!firebaseConfigured()) return 'sheet';
+  return localStorage.getItem(DATA_SOURCE_KEY) || 'firebase';
+}
+
+function useFirebaseReads() {
+  return firebaseConfigured() && getDataSource() !== 'sheet';
+}
+
+async function setDataSource(source) {
+  if (!firebaseConfigured()) return;
+  localStorage.setItem(DATA_SOURCE_KEY, source === 'sheet' ? 'sheet' : 'firebase');
+  updateDataSourceUI();
+  _cache.clear();
+  await loadDay_and_render();
+  if (_currentTab === 'dash') {
+    _renderCache.daily = _renderCache.monthly = _renderCache.yearly = null;
+    if (_dashTab === 'monthly') renderMonthlyDash(true);
+    else if (_dashTab === 'yearly') renderYearlyDash(true);
+    else renderDash(true);
+  }
+}
+
+function updateDataSourceUI() {
+  const label = document.getElementById('firebase-source-label');
+  if (label) label.textContent = getDataSource() === 'sheet' ? 'Spreadsheet' : 'Firebase';
+}
+
 function initFirebase() {
   if (!firebaseConfigured()) return false;
   if (fdb) return true;
@@ -2304,7 +2342,7 @@ function calcOTFromLeave(leaveHHMM) {
 }
 
 async function loadDay(date, author) {
-  if (firebaseConfigured()) return loadDayFirebase(date||currentDate, author||getAuthor());
+  if (useFirebaseReads()) return loadDayFirebase(date||currentDate, author||getAuthor());
   const url=getGasUrl();
   const d0=date||currentDate, a0=author||getAuthor();
   const ck=`input_${d0}_${a0}`;
@@ -2353,7 +2391,7 @@ async function loadDashData(date) {
   // 1. メモリキャッシュ優先
   const mem = cacheGet(ck);
   if (mem) { console.log('[loadDashData] memory cache hit'); return mem; }
-  if (firebaseConfigured()) {
+  if (useFirebaseReads()) {
     const result = await loadDashDataFirebase(date);
     cacheSet(ck, result);
     lsCacheSet(ck, result, date === todayStr() ? CACHE_TTL_DAILY : CACHE_TTL_DAILY_PAST);
@@ -2471,7 +2509,7 @@ async function loadRangeData(startDate, endDate, periodYear, periodMonth) {
   // 1. メモリキャッシュ優先
   const mem = cacheGet(ck);
   if (mem) return mem;
-  if (firebaseConfigured()) return loadRangeDataFirebase(startDate, endDate, ck, ttl);
+  if (useFirebaseReads()) return loadRangeDataFirebase(startDate, endDate, ck, ttl);
 
   // 2. localStorageキャッシュ → 期限切れでも即返し、裏で最新化（SWR）
   const lsw = lsCacheGetStale(ck);
@@ -4833,7 +4871,7 @@ function updateStickyOffsets() {
   // ─── GASウォームアップ ping（コールドスタート対策）───
   // GAS URLが設定済みであれば、ページ読み込みと同時にバックグラウンドでpingを送信。
   // これにより、ユーザーが操作するころにはGASが温まっていることが多くなる。
-  if (isShared() && !firebaseConfigured()) {
+  if (isShared() && !useFirebaseReads()) {
     gasJsonp(getGasUrl(), {action:'test'}).catch(()=>{});
   }
 
@@ -4857,7 +4895,7 @@ function updateStickyOffsets() {
 
   // ─── ダッシュボード用データをバックグラウンドプリフェッチ ───
   // デフォルトの月次タブ用データを先行取得（キャッシュに入れておく）
-  if (isShared() && !firebaseConfigured()) {
+  if (isShared() && !useFirebaseReads()) {
     setTimeout(()=>{
       const {startDate,endDate}=getPeriodDates(currentPeriod.year,currentPeriod.month);
       loadRangeData(startDate,endDate,currentPeriod.year,currentPeriod.month).catch(()=>{});
@@ -4866,7 +4904,7 @@ function updateStickyOffsets() {
 
   // ─── 起動時 差分更新（過去7日）→ 完了後に年次用プリフェッチ ───
   // GAS負荷軽減のため、初回は5秒後、以降は十分な間隔を空けて実行
-  if (isShared() && !firebaseConfigured()) {
+  if (isShared() && !useFirebaseReads()) {
     setTimeout(() => {
       refreshRecentCache()
         .catch(e => console.warn('[差分更新] エラー:', e))
