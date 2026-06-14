@@ -1070,6 +1070,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <span class="admin-status" id="admin-master-status"></span>
+      <button class="btn btn-primary btn-sm" onclick="saveCurrentMasterToFirebase()">Firebaseへ一括保存</button>
       <button class="btn btn-outline btn-sm" onclick="loadMasterFromFirebase(true)">再読込</button>
     </div>
   </div>
@@ -1372,6 +1373,24 @@ async function seedMasterToFirebase() {
   });
   await batch.commit();
   return true;
+}
+
+async function saveCurrentMasterToFirebase() {
+  if (!firebaseConfigured()) {
+    alert('Firebase is not configured.');
+    return;
+  }
+  if (!confirm('現在表示中の大分類・中分類マスタをFirebaseへ一括保存します。よろしいですか？')) return;
+  setAdminStatus('Firebaseへ一括保存中...');
+  try {
+    await seedMasterToFirebase();
+    await loadMasterFromFirebase(false);
+    setAdminStatus('現在のマスタをFirebaseへ一括保存しました。');
+  } catch(e) {
+    console.error(e);
+    setAdminStatus('Firebaseへの一括保存に失敗しました。', true);
+    alert('保存に失敗しました: ' + e.message);
+  }
 }
 
 async function loadMasterFromFirebase(force = false) {
