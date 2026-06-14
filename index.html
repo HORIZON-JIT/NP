@@ -302,6 +302,31 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .btn-danger{background:var(--surface);color:var(--danger);border:1.5px solid #fda4af;}
 .btn-danger:hover{background:#fff1f2;}
 
+/* ─── MASTER ADMIN ─── */
+.admin-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+.admin-note{font-size:12px;color:var(--g600);line-height:1.7;max-width:820px;}
+.admin-grid{display:grid;grid-template-columns:minmax(280px,1fr) minmax(360px,1.35fr);gap:14px;align-items:start;}
+.admin-card{background:var(--surface);border:1px solid var(--g200);border-radius:8px;box-shadow:var(--sh);padding:16px;min-width:0;}
+.admin-card h2{font-size:14px;font-weight:800;color:var(--g800);margin-bottom:12px;}
+.admin-form{display:grid;grid-template-columns:92px minmax(0,1fr) 42px auto;gap:8px;margin-bottom:12px;align-items:center;}
+.admin-form.sub{grid-template-columns:minmax(0,1fr) minmax(130px,.7fr) auto;}
+.admin-form input,.admin-form select{height:36px;border:1.5px solid var(--g200);border-radius:7px;padding:6px 9px;background:var(--panel);color:var(--g800);font-family:inherit;font-size:13px;min-width:0;}
+.admin-form input:focus,.admin-form select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 4px var(--focus);}
+.admin-color{padding:2px !important;cursor:pointer;}
+.admin-list{display:flex;flex-direction:column;gap:8px;}
+.admin-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--g200);border-radius:8px;background:var(--panel);}
+.admin-row.selected{border-color:var(--accent);box-shadow:0 0 0 3px rgba(160,122,72,.14);background:var(--surface);}
+.admin-row.inactive{opacity:.56;}
+.admin-drag{font-size:15px;color:var(--g400);text-align:center;cursor:grab;}
+.admin-main{min-width:0;display:flex;align-items:center;gap:8px;}
+.admin-swatch{width:11px;height:11px;border-radius:3px;border:1px solid var(--g200);flex-shrink:0;}
+.admin-title{font-size:13px;font-weight:800;color:var(--g800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.admin-meta{font-size:11px;color:var(--g500);font-weight:600;}
+.admin-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;}
+.admin-empty{padding:20px;text-align:center;color:var(--g400);font-size:13px;border:1px dashed var(--g200);border-radius:8px;background:var(--g50);}
+.admin-status{font-size:12px;color:var(--g500);font-weight:600;min-height:18px;}
+@media(max-width:900px){.admin-grid{grid-template-columns:1fr;}.admin-form,.admin-form.sub{grid-template-columns:1fr;}.admin-form .btn{justify-content:center;}}
+
 /* ─── LOADING ────────────────────────── */
 #loading{display:none;position:fixed;inset:0;background:rgba(255,255,255,.8);z-index:300;align-items:center;justify-content:center;flex-direction:column;gap:10px;backdrop-filter:blur(2px);}
 #loading.show{display:flex;}
@@ -742,6 +767,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 <div class="tabs no-print">
   <button class="tab active" id="tab-input" onclick="showTab('input')">入力</button>
   <button class="tab" id="tab-dash"  onclick="showTab('dash')">ダッシュボード</button>
+  <button class="tab" id="tab-admin" onclick="showTab('admin')">管理</button>
   <div style="flex:1;"></div>
   <a href="#" onclick="window.open('https://horizon-jit.github.io/NP-TASK/','kokuban','width=560,height=700,scrollbars=yes,resizable=yes');return false;" class="tab-link no-print" title="黒板">黒板</a>
   <a href="https://horizon-jit.github.io/Manual-Management-System_v3/" target="_blank" class="tab-link no-print" title="手順書">手順書</a>
@@ -1037,6 +1063,41 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 
 </div><!-- /view-dash -->
 
+<div id="view-admin" class="tab-content">
+  <div class="admin-toolbar no-print">
+    <div class="admin-note">
+      Firebaseのマスタを編集します。入力画面には有効な項目だけ表示されます。過去の日報を守るため、使わなくなった項目は削除ではなく無効化してください。
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span class="admin-status" id="admin-master-status"></span>
+      <button class="btn btn-outline btn-sm" onclick="loadMasterFromFirebase(true)">再読込</button>
+    </div>
+  </div>
+
+  <div class="admin-grid">
+    <section class="admin-card">
+      <h2>大分類マスタ</h2>
+      <div class="admin-form">
+        <input id="admin-cat-cd" maxlength="4" placeholder="略号">
+        <input id="admin-cat-label" placeholder="大分類名">
+        <input id="admin-cat-color" class="admin-color" type="color" value="#3b82f6" title="色">
+        <button class="btn btn-primary btn-sm" onclick="addAdminCategory()">追加</button>
+      </div>
+      <div class="admin-list" id="admin-cat-list"></div>
+    </section>
+
+    <section class="admin-card">
+      <h2>中分類マスタ</h2>
+      <div class="admin-form sub">
+        <input id="admin-sub-label" placeholder="中分類名">
+        <select id="admin-sub-cat"></select>
+        <button class="btn btn-primary btn-sm" onclick="addAdminSubCategory()">追加</button>
+      </div>
+      <div class="admin-list" id="admin-sub-list"></div>
+    </section>
+  </div>
+</div>
+
 </div><!-- /.container -->
 
 <footer class="app-footer no-print">
@@ -1158,18 +1219,50 @@ const CATS_DEFAULT = [
 ];
 const CATS_STORAGE_KEY  = '__catsCustom__';
 const CATS_UPDATED_KEY  = '__catsUpdatedAt__'; // 最終GAS取得日時
+const MASTER_CATS_COLLECTION = 'masterCategories';
+const MASTER_SUBS_COLLECTION = 'masterSubCategories';
+let _selectedAdminCatCd = '';
 
 // ── localStorageへの読み書き ──
 function loadCatsFromStorage() {
   try {
     const raw = localStorage.getItem(CATS_STORAGE_KEY);
-    if (raw) { const parsed = JSON.parse(raw); if (Array.isArray(parsed) && parsed.length) return parsed; }
+    if (raw) { const parsed = JSON.parse(raw); if (Array.isArray(parsed) && parsed.length) return normalizeMasterCats(parsed); }
   } catch(e) {}
-  return JSON.parse(JSON.stringify(CATS_DEFAULT));
+  return normalizeMasterCats(CATS_DEFAULT);
 }
 function saveCatsToStorage(cats) {
-  localStorage.setItem(CATS_STORAGE_KEY, JSON.stringify(cats));
+  localStorage.setItem(CATS_STORAGE_KEY, JSON.stringify(normalizeMasterCats(cats)));
   localStorage.setItem(CATS_UPDATED_KEY, new Date().toISOString());
+}
+
+function normalizeMasterCats(cats) {
+  return JSON.parse(JSON.stringify(cats || []))
+    .filter(c => c && c.cd)
+    .map((c, ci) => ({
+      cd: String(c.cd).trim(),
+      label: String(c.label || c.cd).trim(),
+      color: c.color || '#6b7280',
+      order: Number.isFinite(Number(c.order)) ? Number(c.order) : ci,
+      active: c.active !== false,
+      subs: (c.subs || [])
+        .filter(s => s && s.cd)
+        .map((s, si) => ({
+          cd: String(s.cd).trim(),
+          label: String(s.label || s.cd).trim(),
+          order: Number.isFinite(Number(s.order)) ? Number(s.order) : si,
+          active: s.active !== false
+        }))
+        .sort((a, b) => a.order - b.order || a.cd.localeCompare(b.cd, 'ja'))
+    }))
+    .sort((a, b) => a.order - b.order || a.cd.localeCompare(b.cd, 'ja'));
+}
+
+function activeInputCats() {
+  return CATS
+    .filter(c => c.active !== false)
+    .map(c => ({...c, subs:(c.subs || []).filter(s => s.active !== false)}))
+    .filter(c => c.subs.length);
 }
 
 // ── GASから項目定義を取得してキャッシュ更新 ──
@@ -1208,11 +1301,7 @@ async function fetchCatsFromGas(force = false) {
   try {
     const d = await gasJsonpRetry(url, { action: 'getCategories' });
     if (d.ok && Array.isArray(d.cats) && d.cats.length) {
-      saveCatsToStorage(d.cats);
-      CATS.length = 0;
-      d.cats.forEach(c => CATS.push(c));
-      rebuildSubMap();
-      buildTable(); // 入力タブを再描画
+      applyMasterCats(d.cats);
       console.log('[項目定義] GASから取得・更新完了');
       return true;
     }
@@ -1227,14 +1316,287 @@ let CATS = loadCatsFromStorage();
 
 function rebuildSubMap() {
   Object.keys(SUB_MAP).forEach(k => delete SUB_MAP[k]);
-  CATS.forEach(c => c.subs.forEach(s => { SUB_MAP[s.cd] = {...s, mainCd:c.cd, mainLabel:c.label, color:c.color}; }));
-  _ALL_SUBS = Object.keys(SUB_MAP);
+  CATS.forEach(c => (c.subs || []).forEach(s => { SUB_MAP[s.cd] = {...s, mainCd:c.cd, mainLabel:c.label, color:c.color, mainActive:c.active !== false, active:s.active !== false}; }));
+  _ALL_SUBS = Object.keys(SUB_MAP).filter(cd => SUB_MAP[cd].mainActive && SUB_MAP[cd].active);
   _INP_CACHE = {};
 }
 const SUB_MAP = {};
 let _ALL_SUBS = [];
 let _INP_CACHE = {};
 rebuildSubMap();
+
+function escHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+function setAdminStatus(text, danger = false) {
+  const el = document.getElementById('admin-master-status');
+  if (!el) return;
+  el.textContent = text || '';
+  el.style.color = danger ? 'var(--danger)' : 'var(--g500)';
+}
+
+function applyMasterCats(cats, options = {}) {
+  const normalized = normalizeMasterCats(cats);
+  CATS.length = 0;
+  normalized.forEach(c => CATS.push(c));
+  saveCatsToStorage(CATS);
+  rebuildSubMap();
+  buildTable();
+  renderUnitUI();
+  updateLivePie();
+  _renderCache.daily = _renderCache.monthly = _renderCache.yearly = null;
+  if (!_selectedAdminCatCd || !CATS.some(c => c.cd === _selectedAdminCatCd)) _selectedAdminCatCd = CATS[0]?.cd || '';
+  if (!options.skipAdminRender) renderAdminMasters();
+}
+
+async function seedMasterToFirebase() {
+  if (!firebaseConfigured()) return false;
+  await ensureFirebaseReady();
+  const batch = fdb.batch();
+  normalizeMasterCats(CATS).forEach((cat, ci) => {
+    batch.set(fdb.collection(MASTER_CATS_COLLECTION).doc(cat.cd), {
+      cd: cat.cd, label: cat.label, color: cat.color, order: cat.order ?? ci,
+      active: cat.active !== false,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: firebaseUser ? firebaseUser.email : ''
+    }, {merge:true});
+    (cat.subs || []).forEach((sub, si) => {
+      batch.set(fdb.collection(MASTER_SUBS_COLLECTION).doc(sub.cd), {
+        cd: sub.cd, label: sub.label, mainCd: cat.cd, order: sub.order ?? si,
+        active: sub.active !== false,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedBy: firebaseUser ? firebaseUser.email : ''
+      }, {merge:true});
+    });
+  });
+  await batch.commit();
+  return true;
+}
+
+async function loadMasterFromFirebase(force = false) {
+  if (!firebaseConfigured()) {
+    renderAdminMasters();
+    return false;
+  }
+  setAdminStatus(force ? 'マスタを再読込中...' : '');
+  try {
+    await ensureFirebaseReady();
+    const [catSnap, subSnap] = await Promise.all([
+      fdb.collection(MASTER_CATS_COLLECTION).get(),
+      fdb.collection(MASTER_SUBS_COLLECTION).get()
+    ]);
+    if (catSnap.empty && subSnap.empty) {
+      await seedMasterToFirebase();
+      setAdminStatus('Firebaseへ初期マスタを作成しました。');
+      renderAdminMasters();
+      return true;
+    }
+    const cats = catSnap.docs.map((doc, i) => {
+      const d = doc.data() || {};
+      return {cd:String(d.cd || doc.id), label:String(d.label || d.cd || doc.id), color:d.color || '#6b7280', order:Number.isFinite(Number(d.order)) ? Number(d.order) : i, active:d.active !== false, subs:[]};
+    });
+    const byCd = Object.fromEntries(cats.map(c => [c.cd, c]));
+    subSnap.docs.forEach((doc, i) => {
+      const d = doc.data() || {};
+      const mainCd = String(d.mainCd || '');
+      if (!byCd[mainCd]) return;
+      byCd[mainCd].subs.push({cd:String(d.cd || doc.id), label:String(d.label || d.cd || doc.id), order:Number.isFinite(Number(d.order)) ? Number(d.order) : i, active:d.active !== false});
+    });
+    if (cats.length) applyMasterCats(cats);
+    setAdminStatus(force ? 'マスタを再読込しました。' : '');
+    return true;
+  } catch(e) {
+    console.warn('Master load failed:', e.message);
+    setAdminStatus('Firebaseマスタを読込できませんでした。キャッシュを使用中です。', true);
+    renderAdminMasters();
+    return false;
+  }
+}
+
+async function writeMasterCategory(cat) {
+  if (!firebaseConfigured()) throw new Error('Firebase is not configured.');
+  await ensureFirebaseReady();
+  await fdb.collection(MASTER_CATS_COLLECTION).doc(cat.cd).set({
+    cd: cat.cd, label: cat.label, color: cat.color || '#6b7280', order: cat.order || 0,
+    active: cat.active !== false,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: firebaseUser ? firebaseUser.email : ''
+  }, {merge:true});
+}
+
+async function writeMasterSub(mainCd, sub) {
+  if (!firebaseConfigured()) throw new Error('Firebase is not configured.');
+  await ensureFirebaseReady();
+  await fdb.collection(MASTER_SUBS_COLLECTION).doc(sub.cd).set({
+    cd: sub.cd, label: sub.label, mainCd, order: sub.order || 0,
+    active: sub.active !== false,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: firebaseUser ? firebaseUser.email : ''
+  }, {merge:true});
+}
+
+function renderAdminMasters() {
+  const catList = document.getElementById('admin-cat-list');
+  const subList = document.getElementById('admin-sub-list');
+  const subCat = document.getElementById('admin-sub-cat');
+  if (!catList || !subList || !subCat) return;
+  if (!_selectedAdminCatCd || !CATS.some(c => c.cd === _selectedAdminCatCd)) _selectedAdminCatCd = CATS[0]?.cd || '';
+  subCat.innerHTML = CATS.map(c => `<option value="${escHtml(c.cd)}"${c.cd === _selectedAdminCatCd ? ' selected' : ''}>${escHtml(c.cd)} : ${escHtml(c.label)}</option>`).join('');
+  subCat.onchange = () => { _selectedAdminCatCd = subCat.value; renderAdminMasters(); };
+  catList.innerHTML = CATS.length ? CATS.map((cat, i) => `
+    <div class="admin-row ${cat.cd === _selectedAdminCatCd ? 'selected' : ''} ${cat.active === false ? 'inactive' : ''}" onclick="selectAdminCat('${escHtml(cat.cd)}')">
+      <div class="admin-drag">☷</div>
+      <div class="admin-main"><span class="admin-swatch" style="background:${escHtml(cat.color)}"></span><div style="min-width:0;"><div class="admin-title">[${escHtml(cat.cd)}] ${escHtml(cat.label)}</div><div class="admin-meta">${(cat.subs || []).filter(s => s.active !== false).length}件 / ${(cat.subs || []).length}件</div></div></div>
+      <div class="admin-actions" onclick="event.stopPropagation()">
+        <button class="btn btn-outline btn-sm" onclick="moveAdminCategory('${escHtml(cat.cd)}',-1)" ${i===0?'disabled':''}>↑</button>
+        <button class="btn btn-outline btn-sm" onclick="moveAdminCategory('${escHtml(cat.cd)}',1)" ${i===CATS.length-1?'disabled':''}>↓</button>
+        <button class="btn btn-outline btn-sm" onclick="editAdminCategory('${escHtml(cat.cd)}')">編集</button>
+        <button class="btn btn-danger btn-sm" onclick="toggleAdminCategory('${escHtml(cat.cd)}')">${cat.active === false ? '有効化' : '無効化'}</button>
+      </div>
+    </div>
+  `).join('') : '<div class="admin-empty">大分類がありません。</div>';
+  const cat = CATS.find(c => c.cd === _selectedAdminCatCd);
+  const subs = cat ? (cat.subs || []) : [];
+  subList.innerHTML = cat ? (subs.length ? subs.map((sub, i) => `
+    <div class="admin-row ${sub.active === false ? 'inactive' : ''}">
+      <div class="admin-drag">☷</div>
+      <div class="admin-main"><span class="admin-swatch" style="background:${escHtml(cat.color)}"></span><div style="min-width:0;"><div class="admin-title">${escHtml(sub.cd)} ${escHtml(sub.label)}</div><div class="admin-meta">${escHtml(cat.cd)} : ${escHtml(cat.label)}</div></div></div>
+      <div class="admin-actions">
+        <button class="btn btn-outline btn-sm" onclick="moveAdminSub('${escHtml(sub.cd)}',-1)" ${i===0?'disabled':''}>↑</button>
+        <button class="btn btn-outline btn-sm" onclick="moveAdminSub('${escHtml(sub.cd)}',1)" ${i===subs.length-1?'disabled':''}>↓</button>
+        <button class="btn btn-outline btn-sm" onclick="editAdminSub('${escHtml(sub.cd)}')">編集</button>
+        <button class="btn btn-danger btn-sm" onclick="toggleAdminSub('${escHtml(sub.cd)}')">${sub.active === false ? '有効化' : '無効化'}</button>
+      </div>
+    </div>
+  `).join('') : '<div class="admin-empty">この大分類には中分類がありません。</div>') : '<div class="admin-empty">大分類を選択してください。</div>';
+}
+
+function selectAdminCat(cd) {
+  _selectedAdminCatCd = cd;
+  renderAdminMasters();
+}
+
+function nextSubCd(mainCd) {
+  const cat = CATS.find(c => c.cd === mainCd);
+  const used = new Set(CATS.flatMap(c => (c.subs || []).map(s => s.cd)));
+  const escaped = mainCd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const nums = (cat?.subs || []).map(s => {
+    const m = String(s.cd).match(new RegExp('^' + escaped + '(\\d+)$'));
+    return m ? Number(m[1]) : 0;
+  });
+  let n = Math.max(0, ...nums) + 1;
+  while (used.has(`${mainCd}${n}`)) n++;
+  return `${mainCd}${n}`;
+}
+
+async function addAdminCategory() {
+  const cdEl = document.getElementById('admin-cat-cd');
+  const labelEl = document.getElementById('admin-cat-label');
+  const colorEl = document.getElementById('admin-cat-color');
+  const cd = cdEl.value.trim().toUpperCase();
+  const label = labelEl.value.trim();
+  if (!cd || !label) { alert('略号と大分類名を入力してください。'); return; }
+  if (CATS.some(c => c.cd === cd)) { alert('同じ略号の大分類が既にあります。'); return; }
+  const cat = {cd, label, color:colorEl.value || '#6b7280', order:CATS.length, active:true, subs:[]};
+  try { await writeMasterCategory(cat); _selectedAdminCatCd = cd; applyMasterCats([...CATS, cat]); cdEl.value = ''; labelEl.value = ''; setAdminStatus('大分類を追加しました。'); }
+  catch(e) { alert('保存に失敗しました: ' + e.message); }
+}
+
+async function editAdminCategory(cd) {
+  const cat = CATS.find(c => c.cd === cd);
+  if (!cat) return;
+  const label = prompt('大分類名を入力してください。', cat.label);
+  if (label == null || !label.trim()) return;
+  const color = prompt('色を入力してください。', cat.color || '#6b7280');
+  if (color == null || !color.trim()) return;
+  cat.label = label.trim();
+  cat.color = color.trim();
+  try { await writeMasterCategory(cat); applyMasterCats(CATS); setAdminStatus('大分類を更新しました。'); }
+  catch(e) { alert('保存に失敗しました: ' + e.message); }
+}
+
+async function toggleAdminCategory(cd) {
+  const cat = CATS.find(c => c.cd === cd);
+  if (!cat) return;
+  cat.active = cat.active === false;
+  try { await writeMasterCategory(cat); applyMasterCats(CATS); setAdminStatus(cat.active ? '大分類を有効化しました。' : '大分類を無効化しました。'); }
+  catch(e) { alert('保存に失敗しました: ' + e.message); }
+}
+
+async function moveAdminCategory(cd, delta) {
+  const cats = normalizeMasterCats(CATS);
+  const i = cats.findIndex(c => c.cd === cd);
+  const j = i + delta;
+  if (i < 0 || j < 0 || j >= cats.length) return;
+  [cats[i], cats[j]] = [cats[j], cats[i]];
+  cats.forEach((c, idx) => c.order = idx);
+  try { await Promise.all(cats.map(writeMasterCategory)); applyMasterCats(cats); setAdminStatus('大分類の並び順を更新しました。'); }
+  catch(e) { alert('保存に失敗しました: ' + e.message); }
+}
+
+async function addAdminSubCategory() {
+  const labelEl = document.getElementById('admin-sub-label');
+  const mainCd = document.getElementById('admin-sub-cat').value || _selectedAdminCatCd;
+  const cat = CATS.find(c => c.cd === mainCd);
+  const label = labelEl.value.trim();
+  if (!cat || !label) { alert('大分類と中分類名を入力してください。'); return; }
+  const sub = {cd:nextSubCd(mainCd), label, order:(cat.subs || []).length, active:true};
+  cat.subs = [...(cat.subs || []), sub];
+  try { await writeMasterSub(mainCd, sub); applyMasterCats(CATS); labelEl.value = ''; setAdminStatus('中分類を追加しました。'); }
+  catch(e) { alert('保存に失敗しました: ' + e.message); }
+}
+
+function findSubWithCat(cd) {
+  for (const cat of CATS) {
+    const sub = (cat.subs || []).find(s => s.cd === cd);
+    if (sub) return {cat, sub};
+  }
+  return null;
+}
+
+async function editAdminSub(cd) {
+  const found = findSubWithCat(cd);
+  if (!found) return;
+  const label = prompt('中分類名を入力してください。', found.sub.label);
+  if (label == null || !label.trim()) return;
+  const mainCd = prompt('所属大分類コードを入力してください。', found.cat.cd);
+  if (mainCd == null || !mainCd.trim()) return;
+  const target = CATS.find(c => c.cd === mainCd.trim());
+  if (!target) { alert('指定された大分類がありません。'); return; }
+  found.sub.label = label.trim();
+  if (target.cd !== found.cat.cd) {
+    found.cat.subs = (found.cat.subs || []).filter(s => s.cd !== cd);
+    found.sub.order = (target.subs || []).length;
+    target.subs = [...(target.subs || []), found.sub];
+    _selectedAdminCatCd = target.cd;
+  }
+  try { await writeMasterSub(target.cd, found.sub); applyMasterCats(CATS); setAdminStatus('中分類を更新しました。'); }
+  catch(e) { alert('保存に失敗しました: ' + e.message); }
+}
+
+async function toggleAdminSub(cd) {
+  const found = findSubWithCat(cd);
+  if (!found) return;
+  found.sub.active = found.sub.active === false;
+  try { await writeMasterSub(found.cat.cd, found.sub); applyMasterCats(CATS); setAdminStatus(found.sub.active ? '中分類を有効化しました。' : '中分類を無効化しました。'); }
+  catch(e) { alert('保存に失敗しました: ' + e.message); }
+}
+
+async function moveAdminSub(cd, delta) {
+  const found = findSubWithCat(cd);
+  if (!found) return;
+  const subs = [...(found.cat.subs || [])];
+  const i = subs.findIndex(s => s.cd === cd);
+  const j = i + delta;
+  if (i < 0 || j < 0 || j >= subs.length) return;
+  [subs[i], subs[j]] = [subs[j], subs[i]];
+  subs.forEach((s, idx) => s.order = idx);
+  found.cat.subs = subs;
+  try { await Promise.all(subs.map(s => writeMasterSub(found.cat.cd, s))); applyMasterCats(CATS); setAdminStatus('中分類の並び順を更新しました。'); }
+  catch(e) { alert('保存に失敗しました: ' + e.message); }
+}
+
 
 // ── パフォーマンス: updateTotals を RAF でコアレス ──
 let _updateTotalsRAF = 0;
@@ -1394,7 +1756,7 @@ function openSettings() {
   if (fbSyncRes) fbSyncRes.textContent=firebaseConfigured() ? 'Firebase有効' : '';
   updateDataSourceUI();
   document.getElementById('preload-section').style.display=url&&!useFirebaseReads()?'block':'none';
-  document.getElementById('cats-update-section').style.display=url?'block':'none';
+  document.getElementById('cats-update-section').style.display='none';
   document.getElementById('cats-update-res').textContent='';
   document.getElementById('preload-progress').style.display='none';
   document.getElementById('preload-bar').style.width='0%';
@@ -3066,7 +3428,7 @@ async function jumpToDate(dateStr) { if (dateStr) _navigateTo(dateStr); }
 function buildTable() {
   const tbody=document.getElementById('entry-tbody');
   tbody.innerHTML='';
-  CATS.forEach(cat=>{
+  activeInputCats().forEach(cat=>{
     cat.subs.forEach((sub,i)=>{
       const tr=document.createElement('tr');
       if (i===0) {
@@ -3552,6 +3914,8 @@ async function showTab(name) {
     if (_dashTab==='daily') await renderDash();
     else if (_dashTab==='yearly') { initYearSelector(); await renderYearlyDash(); }
     else { initPeriodSelectors(); await renderMonthlyDash(); }
+  } else if (name==='admin') {
+    renderAdminMasters();
   }
 }
 
@@ -5114,6 +5478,7 @@ function updateStickyOffsets() {
 (async function init(){
   applyTheme(getTheme());   // ダーク/ライトのチャート色・トグル状態を初期化
   normalizeDataSourceForFirebasePrimary();
+  await loadMasterFromFirebase(false);
   buildTable();
   renderUnitUI();           // 保存済みの入力単位（時間/分）をUIに反映
   updateLivePie();
