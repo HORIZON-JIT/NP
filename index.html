@@ -1220,8 +1220,8 @@ const CATS_DEFAULT = [
 ];
 const CATS_STORAGE_KEY  = '__catsCustom__';
 const CATS_UPDATED_KEY  = '__catsUpdatedAt__'; // 最終GAS取得日時
-const MASTER_CATS_COLLECTION = 'masterCategories';
-const MASTER_SUBS_COLLECTION = 'masterSubCategories';
+const MASTER_DOC_COLLECTION = 'dailyReports';
+const MASTER_DOC_ID = '__master_categories__';
 let _selectedAdminCatCd = '';
 
 // ── localStorageへの読み書き ──
@@ -1351,28 +1351,22 @@ function applyMasterCats(cats, options = {}) {
   if (!options.skipAdminRender) renderAdminMasters();
 }
 
-async function seedMasterToFirebase() {
+async function saveMasterCatsToFirebase(cats) {
   if (!firebaseConfigured()) return false;
   await ensureFirebaseReady();
-  const batch = fdb.batch();
-  normalizeMasterCats(CATS).forEach((cat, ci) => {
-    batch.set(fdb.collection(MASTER_CATS_COLLECTION).doc(cat.cd), {
-      cd: cat.cd, label: cat.label, color: cat.color, order: cat.order ?? ci,
-      active: cat.active !== false,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      updatedBy: firebaseUser ? firebaseUser.email : ''
-    }, {merge:true});
-    (cat.subs || []).forEach((sub, si) => {
-      batch.set(fdb.collection(MASTER_SUBS_COLLECTION).doc(sub.cd), {
-        cd: sub.cd, label: sub.label, mainCd: cat.cd, order: sub.order ?? si,
-        active: sub.active !== false,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedBy: firebaseUser ? firebaseUser.email : ''
-      }, {merge:true});
-    });
-  });
-  await batch.commit();
+  await fdb.collection(MASTER_DOC_COLLECTION).doc(MASTER_DOC_ID).set({
+    date: MASTER_DOC_ID,
+    author: '__system__',
+    type: 'masterCategories',
+    cats: normalizeMasterCats(cats),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: firebaseUser ? firebaseUser.email : ''
+  }, {merge:true});
   return true;
+}
+
+async function seedMasterToFirebase() {
+  return saveMasterCatsToFirebase(CATS);
 }
 
 async function saveCurrentMasterToFirebase() {
@@ -1401,27 +1395,15 @@ async function loadMasterFromFirebase(force = false) {
   setAdminStatus(force ? 'マスタを再読込中...' : '');
   try {
     await ensureFirebaseReady();
-    const [catSnap, subSnap] = await Promise.all([
-      fdb.collection(MASTER_CATS_COLLECTION).get(),
-      fdb.collection(MASTER_SUBS_COLLECTION).get()
-    ]);
-    if (catSnap.empty && subSnap.empty) {
+    const snap = await fdb.collection(MASTER_DOC_COLLECTION).doc(MASTER_DOC_ID).get();
+    if (!snap.exists) {
       await seedMasterToFirebase();
       setAdminStatus('Firebaseへ初期マスタを作成しました。');
       renderAdminMasters();
       return true;
     }
-    const cats = catSnap.docs.map((doc, i) => {
-      const d = doc.data() || {};
-      return {cd:String(d.cd || doc.id), label:String(d.label || d.cd || doc.id), color:d.color || '#6b7280', order:Number.isFinite(Number(d.order)) ? Number(d.order) : i, active:d.active !== false, subs:[]};
-    });
-    const byCd = Object.fromEntries(cats.map(c => [c.cd, c]));
-    subSnap.docs.forEach((doc, i) => {
-      const d = doc.data() || {};
-      const mainCd = String(d.mainCd || '');
-      if (!byCd[mainCd]) return;
-      byCd[mainCd].subs.push({cd:String(d.cd || doc.id), label:String(d.label || d.cd || doc.id), order:Number.isFinite(Number(d.order)) ? Number(d.order) : i, active:d.active !== false});
-    });
+    const data = snap.data() || {};
+    const cats = Array.isArray(data.cats) ? data.cats : [];
     if (cats.length) applyMasterCats(cats);
     setAdminStatus(force ? 'マスタを再読込しました。' : '');
     return true;
@@ -1434,25 +1416,11 @@ async function loadMasterFromFirebase(force = false) {
 }
 
 async function writeMasterCategory(cat) {
-  if (!firebaseConfigured()) throw new Error('Firebase is not configured.');
-  await ensureFirebaseReady();
-  await fdb.collection(MASTER_CATS_COLLECTION).doc(cat.cd).set({
-    cd: cat.cd, label: cat.label, color: cat.color || '#6b7280', order: cat.order || 0,
-    active: cat.active !== false,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    updatedBy: firebaseUser ? firebaseUser.email : ''
-  }, {merge:true});
+  await seedMasterToFirebase();
 }
 
 async function writeMasterSub(mainCd, sub) {
-  if (!firebaseConfigured()) throw new Error('Firebase is not configured.');
-  await ensureFirebaseReady();
-  await fdb.collection(MASTER_SUBS_COLLECTION).doc(sub.cd).set({
-    cd: sub.cd, label: sub.label, mainCd, order: sub.order || 0,
-    active: sub.active !== false,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    updatedBy: firebaseUser ? firebaseUser.email : ''
-  }, {merge:true});
+  await seedMasterToFirebase();
 }
 
 function renderAdminMasters() {
@@ -1518,7 +1486,8 @@ async function addAdminCategory() {
   if (!cd || !label) { alert('略号と大分類名を入力してください。'); return; }
   if (CATS.some(c => c.cd === cd)) { alert('同じ略号の大分類が既にあります。'); return; }
   const cat = {cd, label, color:colorEl.value || '#6b7280', order:CATS.length, active:true, subs:[]};
-  try { await writeMasterCategory(cat); _selectedAdminCatCd = cd; applyMasterCats([...CATS, cat]); cdEl.value = ''; labelEl.value = ''; setAdminStatus('大分類を追加しました。'); }
+  const nextCats = [...CATS, cat];
+  try { await saveMasterCatsToFirebase(nextCats); _selectedAdminCatCd = cd; applyMasterCats(nextCats); cdEl.value = ''; labelEl.value = ''; setAdminStatus('大分類を追加しました。'); }
   catch(e) { alert('保存に失敗しました: ' + e.message); }
 }
 
@@ -1550,7 +1519,7 @@ async function moveAdminCategory(cd, delta) {
   if (i < 0 || j < 0 || j >= cats.length) return;
   [cats[i], cats[j]] = [cats[j], cats[i]];
   cats.forEach((c, idx) => c.order = idx);
-  try { await Promise.all(cats.map(writeMasterCategory)); applyMasterCats(cats); setAdminStatus('大分類の並び順を更新しました。'); }
+  try { await saveMasterCatsToFirebase(cats); applyMasterCats(cats); setAdminStatus('大分類の並び順を更新しました。'); }
   catch(e) { alert('保存に失敗しました: ' + e.message); }
 }
 
