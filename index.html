@@ -2266,6 +2266,12 @@ async function syncDateRangeDiffToSheet() {
     const docs = snap.docs.filter(doc => {
       const d = doc.data() || {};
       return d.date && d.author && needsSheetSync(d, cursorMillis);
+    }).sort((a, b) => {
+      const ad = a.data() || {};
+      const bd = b.data() || {};
+      const dateOrder = String(ad.date || '').localeCompare(String(bd.date || ''));
+      if (dateOrder) return dateOrder;
+      return String(ad.author || '').localeCompare(String(bd.author || ''), 'ja');
     });
 
     if (!docs.length) {
