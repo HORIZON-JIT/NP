@@ -1083,6 +1083,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <div style="font-size:12px;color:var(--g600);margin-bottom:10px;line-height:1.7;">
         Firebase mode is active. Daily reads and saves use Firestore. Use these buttons only when you want to copy Firebase data back to the spreadsheet.
       </div>
+      <button class="btn btn-outline btn-sm" onclick="checkFirebaseConnection()" style="width:100%;margin-bottom:8px;">Firebase login/check</button>
       <div style="border:1px solid var(--g200);border-radius:8px;padding:9px 10px;margin-bottom:10px;background:var(--g50);">
         <div style="font-size:12px;color:var(--g600);font-weight:700;margin-bottom:7px;">移行中の参照元: <span id="firebase-source-label">Firebase</span></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
@@ -1096,6 +1097,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <button class="btn btn-outline btn-sm" onclick="syncCurrentPeriodToSheet()">表示月度を同期</button>
       </div>
       <button class="btn btn-outline btn-sm" onclick="importCurrentPeriodFromSheetToFirebase()" style="width:100%;margin-top:8px;">表示月度をFirebaseへ取込</button>
+      <button class="btn btn-outline btn-sm" onclick="importAllSheetToFirebase()" style="width:100%;margin-top:8px;">全期間をFirebaseへ取込</button>
       <div id="firebase-sync-res" style="font-size:11px;color:var(--g500);margin-top:8px;"></div>
     </div>
     <div class="modal-sec" id="preload-section" style="display:none;">
@@ -1994,12 +1996,18 @@ function ensureFirebaseReady() {
   if (!initFirebase()) return Promise.resolve(false);
   if (firebaseReadyPromise) return firebaseReadyPromise;
   firebaseReadyPromise = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      firebaseReadyPromise = null;
+      reject(new Error('Firebase login timed out. Check Google login, Authentication provider, and authorized domains.'));
+    }, 30000);
+    const done = value => { clearTimeout(timer); resolve(value); };
+    const fail = err => { clearTimeout(timer); firebaseReadyPromise = null; reject(err); };
     const off = fauth.onAuthStateChanged(async user => {
       off();
       try {
         if (user && firebaseEmailAllowed(user.email)) {
           firebaseUser = user;
-          resolve(true);
+          done(true);
           return;
         }
         if (user) await fauth.signOut();
@@ -2009,25 +2017,36 @@ function ensureFirebaseReady() {
           const cred = await fauth.signInWithPopup(provider);
           if (!cred.user || !firebaseEmailAllowed(cred.user.email)) {
             await fauth.signOut();
-            reject(new Error('Firebase login is limited to @' + FIREBASE_ALLOWED_DOMAIN));
+            fail(new Error('Firebase login is limited to @' + FIREBASE_ALLOWED_DOMAIN));
             return;
           }
           firebaseUser = cred.user;
-          resolve(true);
+          done(true);
         } catch(e) {
-          try {
-            await fauth.signInWithRedirect(provider);
-            reject(new Error('Firebase login redirect started. Please reload after login.'));
-          } catch(e2) {
-            reject(e2 || e);
-          }
+          fail(e);
         }
       } catch(e) {
-        reject(e);
+        fail(e);
       }
     });
   });
   return firebaseReadyPromise;
+}
+
+async function checkFirebaseConnection() {
+  const res = document.getElementById('firebase-sync-res');
+  if (res) res.textContent = 'Checking Firebase login...';
+  setLoading(true);
+  try {
+    await ensureFirebaseReady();
+    await fdb.collection('dailyReports').limit(1).get();
+    if (res) res.textContent = `Firebase OK: ${firebaseUser ? firebaseUser.email : 'signed in'}`;
+  } catch(e) {
+    if (res) res.textContent = `Firebase check failed: ${e.message}`;
+    console.error(e);
+  } finally {
+    setLoading(false);
+  }
 }
 
 function dailyDocId(date, author) {
@@ -2216,25 +2235,62 @@ function eachDateInRange(startDate, endDate) {
   return dates;
 }
 
+function withTimeout(promise, ms, message) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message || 'Operation timed out')), ms);
+    promise.then(
+      value => { clearTimeout(timer); resolve(value); },
+      error => { clearTimeout(timer); reject(error); }
+    );
+  });
+}
+
 async function importCurrentPeriodFromSheetToFirebase() {
+  const {startDate,endDate}=getPeriodDates(currentPeriod.year,currentPeriod.month);
+  if (!confirm(`Import ${startDate} - ${endDate} from spreadsheet to Firebase. Existing Firebase reports in this range will be overwritten. Continue?`)) return;
+  await importSheetRangeToFirebase(startDate, endDate);
+}
+
+async function importAllSheetToFirebase() {
+  const defaultStart = '2020-01-01';
+  const startDate = prompt('Import start date (YYYY-MM-DD)', defaultStart);
+  if (!startDate) return;
+  const endDate = prompt('Import end date (YYYY-MM-DD)', todayStr());
+  if (!endDate) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) {
+    alert('Date range is invalid.');
+    return;
+  }
+  if (!confirm(`Import ${startDate} - ${endDate} from spreadsheet to Firebase. This may take several minutes. Existing Firebase reports in this range will be overwritten. Continue?`)) return;
+  await importSheetRangeToFirebase(startDate, endDate);
+}
+
+async function importSheetRangeToFirebase(startDate, endDate) {
   if (!firebaseConfigured()) { alert('Firebase is not configured.'); return; }
   const url = getGasUrl();
   if (!url) { alert('GAS URL is not configured.'); return; }
-  const {startDate,endDate}=getPeriodDates(currentPeriod.year,currentPeriod.month);
-  if (!confirm(`${startDate} - ${endDate} のスプレッドシートデータをFirebaseへ取り込みます。既存の同日・同担当者データは上書きされます。よろしいですか？`)) return;
   const res = document.getElementById('firebase-sync-res');
   const dates = eachDateInRange(startDate, endDate);
   let count = 0;
-  if (res) res.textContent = 'Importing spreadsheet data...';
+  let emptyDays = 0;
+  if (res) res.textContent = 'Signing in to Firebase...';
   setLoading(true);
   try {
     await ensureFirebaseReady();
+    if (res) res.textContent = 'Firebase login OK. Reading spreadsheet...';
     for (let i=0; i<dates.length; i++) {
       const date = dates[i];
-      const day = await _fetchDailyFromGas(date, `firebase_import_${date}`, true);
+      if (res) res.textContent = `${i+1}/${dates.length} reading ${date} from spreadsheet...`;
+      const day = await withTimeout(
+        _fetchDailyFromGas(date, `firebase_import_${date}`, true),
+        30000,
+        `Spreadsheet read timed out: ${date}`
+      );
       const leaves = day._leaves || {};
       const authors = new Set([...Object.keys(day).filter(k => !k.startsWith('_')), ...Object.keys(leaves)]);
+      if (!authors.size) emptyDays++;
       for (const author of authors) {
+        if (res) res.textContent = `${i+1}/${dates.length} writing ${date} / ${author} to Firebase...`;
         await saveDayFirebase(date, author, day[author] || []);
         await saveLeaveTimeFirebase(date, author, leaves[author] || '');
         count++;
@@ -2244,7 +2300,7 @@ async function importCurrentPeriodFromSheetToFirebase() {
     }
     _cache.clear();
     lsCacheDeleteRange();
-    if (res) res.textContent = `${count}件をFirebaseへ取り込みました。`;
+    if (res) res.textContent = `Imported ${count} reports to Firebase. Empty days: ${emptyDays}.`;
   } catch(e) {
     if (res) res.textContent = `Import failed: ${e.message}`;
     console.error(e);
