@@ -1111,10 +1111,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <div style="font-size:12px;color:var(--g600);font-weight:700;">読込元: <span id="firebase-source-label">Firebase</span></div>
         <div id="firebase-sync-res" style="font-size:11px;color:var(--g500);margin-top:6px;"></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <button class="btn btn-outline btn-sm" onclick="syncCurrentDayToSheet()">表示日を書き出し</button>
-        <button class="btn btn-outline btn-sm" onclick="syncCurrentPeriodToSheet()">表示月度を書き出し</button>
-      </div>
+      <button class="btn btn-outline btn-sm" onclick="syncDateRangeDiffToSheet()" style="width:100%;">期間を差分同期</button>
+      <div style="font-size:11px;color:var(--g500);margin-top:6px;line-height:1.6;">Firestoreで更新があった日報だけをスプレッドシートへ書き出します。</div>
     </div>
     <div class="modal-sec" id="preload-section" style="display:none;">
       <h4>過去データ プリロード</h4>
@@ -2201,57 +2199,75 @@ async function saveLeaveTimeToGas(date, author, leaveTime) {
   finally { forceGasForSheetSync = false; }
 }
 
-async function syncCurrentDayToSheet() {
-  if (!firebaseConfigured()) { alert('Firebase is not configured.'); return; }
-  const author = getAuthor();
-  if (!author) { alert('担当者名を設定してください'); return; }
-  const res = document.getElementById('firebase-sync-res');
-  if (res) res.textContent = 'Syncing current day...';
-  setLoading(true);
-  try {
-    const d = await loadDayFirebase(currentDate, author);
-    await saveDayToGas(currentDate, author, d.rows || []);
-    await saveLeaveTimeToGas(currentDate, author, d.leaveTime || '');
-    await getDailyRef(currentDate, author).set({sheetSyncedAt:firebase.firestore.FieldValue.serverTimestamp()}, {merge:true});
-    if (res) res.textContent = `${currentDate} / ${author} synced to spreadsheet.`;
-  } catch(e) {
-    if (res) res.textContent = `Sync failed: ${e.message}`;
-    console.error(e);
-  } finally {
-    setLoading(false);
-  }
+function timestampMillis(value) {
+  if (!value) return null;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (value.seconds != null) return value.seconds * 1000;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
-async function syncCurrentPeriodToSheet() {
+function needsSheetSync(report) {
+  const updatedAt = timestampMillis(report.updatedAt);
+  const sheetSyncedAt = timestampMillis(report.sheetSyncedAt);
+  if (!sheetSyncedAt) return true;
+  if (!updatedAt) return true;
+  return updatedAt > sheetSyncedAt;
+}
+
+async function syncDateRangeDiffToSheet() {
   if (!firebaseConfigured()) { alert('Firebase is not configured.'); return; }
-  const {startDate,endDate}=getPeriodDates(currentPeriod.year,currentPeriod.month);
-  if (!confirm(`${startDate} - ${endDate} のFirebaseデータをスプレッドシートへ同期します。よろしいですか？`)) return;
+  const defaults = getPeriodDates(currentPeriod.year, currentPeriod.month);
+  const startDate = prompt('差分同期する開始日を入力してください (YYYY-MM-DD)', defaults.startDate);
+  if (!startDate) return;
+  const endDate = prompt('差分同期する終了日を入力してください (YYYY-MM-DD)', defaults.endDate);
+  if (!endDate) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+    alert('日付は YYYY-MM-DD 形式で入力してください。');
+    return;
+  }
+  if (startDate > endDate) {
+    alert('終了日は開始日以降にしてください。');
+    return;
+  }
+
   const res = document.getElementById('firebase-sync-res');
-  if (res) res.textContent = 'Loading Firebase data...';
-  setLoading(true);
-  let count = 0;
+  if (res) res.textContent = `${startDate} - ${endDate} の差分を確認中...`;
   try {
     await ensureFirebaseReady();
     const snap = await fdb.collection('dailyReports')
       .where('date', '>=', startDate)
       .where('date', '<=', endDate)
       .get();
-    for (const doc of snap.docs) {
+    const docs = snap.docs.filter(doc => {
       const d = doc.data() || {};
-      if (!d.date || !d.author) continue;
+      return d.date && d.author && needsSheetSync(d);
+    });
+
+    if (!docs.length) {
+      if (res) res.textContent = `${startDate} - ${endDate}: 同期が必要な差分はありません。`;
+      return;
+    }
+
+    if (!confirm(`${startDate} - ${endDate} の差分 ${docs.length}件をスプレッドシートへ同期します。よろしいですか？`)) {
+      if (res) res.textContent = '差分同期をキャンセルしました。';
+      return;
+    }
+
+    let count = 0;
+    for (const doc of docs) {
+      const d = doc.data() || {};
+      if (res) res.textContent = `${count + 1}/${docs.length} syncing ${d.date} / ${d.author}...`;
       await saveDayToGas(d.date, d.author, normalizeRows(d.rows || []));
       await saveLeaveTimeToGas(d.date, d.author, d.leaveTime || '');
       await doc.ref.set({sheetSyncedAt:firebase.firestore.FieldValue.serverTimestamp()}, {merge:true});
       count++;
-      if (res) res.textContent = `${count}/${snap.docs.length} synced...`;
-      await new Promise(r => setTimeout(r, 250));
+      await new Promise(r => setTimeout(r, 150));
     }
-    if (res) res.textContent = `${count}件をスプレッドシートへ同期しました。`;
+    if (res) res.textContent = `${startDate} - ${endDate}: 差分 ${count}件をスプレッドシートへ同期しました。`;
   } catch(e) {
     if (res) res.textContent = `Sync failed: ${e.message}`;
     console.error(e);
-  } finally {
-    setLoading(false);
   }
 }
 
