@@ -81,6 +81,9 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
 
 /* ─── CONTAINER ──────────────────────── */
 .container{max-width:1800px;margin:0 auto;padding:16px 20px;}
+.app-footer{max-width:1260px;margin:64px auto 28px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;color:var(--g400);font-size:11px;font-weight:600;}
+.app-footer-right{display:flex;align-items:center;gap:16px;}
+@media(max-width:760px){.app-footer{margin:36px auto 20px;flex-direction:column;align-items:flex-start;gap:6px;padding:0 14px;}.app-footer-right{gap:10px;}}
 
 /* ─── SUBMIT CARD ────────────────────── */
 .submit-card{background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:14px;border:1px solid var(--g200);}
@@ -1035,6 +1038,14 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 </div><!-- /view-dash -->
 
 </div><!-- /.container -->
+
+<footer class="app-footer no-print">
+  <div>Developed by Yuma Tani</div>
+  <div class="app-footer-right">
+    <span>Build 2026</span>
+    <span>Version 1.0</span>
+  </div>
+</footer>
 
 <!-- SETTINGS MODAL -->
 <div class="backdrop" id="settings-modal">
