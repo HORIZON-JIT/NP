@@ -1077,7 +1077,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <div id="test-res" class="test-res"></div>
     </div>
     <div class="modal-sec">
-      <h4>マスターデータ保存先</h4>
+      <h4>バックアップ保存先</h4>
       <a href="https://docs.google.com/spreadsheets/d/1LlQVpi8O7RMmugpVkOlXckiNGrSzE2isS73drWsgxYk/edit" target="_blank"
          style="display:flex;align-items:center;gap:7px;padding:8px 10px;background:var(--g50);border:1px solid var(--g200);border-radius:8px;text-decoration:none;color:var(--g700);font-size:12px;font-weight:600;transition:.15s;"
          onmouseover="this.style.background='var(--primary-lt)';this.style.borderColor='var(--accent)'"
@@ -1085,6 +1085,19 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <div>
           <div>日報データ</div>
           <div style="font-size:10px;color:var(--g400);font-weight:400;margin-top:1px;">Google スプレッドシート</div>
+        </div>
+        <span style="margin-left:auto;font-size:11px;color:var(--g400);">開く</span>
+      </a>
+    </div>
+    <div class="modal-sec">
+      <h4>マスターデータ保存先</h4>
+      <a href="https://console.firebase.google.com/u/0/project/nippou-f191c/firestore/databases/-default-/data" target="_blank"
+         style="display:flex;align-items:center;gap:7px;padding:8px 10px;background:var(--g50);border:1px solid var(--g200);border-radius:8px;text-decoration:none;color:var(--g700);font-size:12px;font-weight:600;transition:.15s;"
+         onmouseover="this.style.background='var(--primary-lt)';this.style.borderColor='var(--accent)'"
+         onmouseout="this.style.background='var(--g50)';this.style.borderColor='var(--g200)'">
+        <div>
+          <div>Firebase</div>
+          <div style="font-size:10px;color:var(--g400);font-weight:400;margin-top:1px;">Cloud Firestore / nippou-f191c</div>
         </div>
         <span style="margin-left:auto;font-size:11px;color:var(--g400);">開く</span>
       </a>
@@ -1666,10 +1679,6 @@ function _showAuthGuidance(el, authIssue) {
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 
 // ─── 初回起動ポップアップ ───
-function closeFirstLaunch() {
-  document.getElementById('first-launch-overlay').style.display = 'none';
-  localStorage.setItem('launched_once', '1');
-}
 
 // ═══════════════════════════════════════════
 //  LOADING OVERLAY
@@ -5063,10 +5072,6 @@ function updateStickyOffsets() {
   updateLivePie();
   updateDateLabel();
 
-  // ── 初回起動チェック：launched_once がなければポップアップ表示 ──
-  if (!localStorage.getItem('launched_once')) {
-    document.getElementById('first-launch-overlay').style.display = 'flex';
-  }
   updateStickyOffsets();
   window.addEventListener('resize', () => {
     if (!updateStickyOffsets._raf) {
