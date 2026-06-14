@@ -2090,6 +2090,17 @@ async function saveLeaveTimeFirebase(date, author, leaveTime) {
   }, {merge:true});
 }
 
+function dailyReportDoc(date, author, rows, leaveTime) {
+  return {
+    date,
+    author,
+    rows: normalizeRows(rows),
+    leaveTime: leaveTime || '',
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: firebaseUser ? firebaseUser.email : ''
+  };
+}
+
 async function loadDayFirebase(date, author) {
   await ensureFirebaseReady();
   const snap = await getDailyRef(date, author).get();
@@ -2245,6 +2256,23 @@ function withTimeout(promise, ms, message) {
   });
 }
 
+async function importOneSheetDateToFirebase(date) {
+  const day = await withTimeout(
+    _fetchDailyFromGas(date, `firebase_import_${date}`, true),
+    30000,
+    `Spreadsheet read timed out: ${date}`
+  );
+  const leaves = day._leaves || {};
+  const authors = new Set([...Object.keys(day).filter(k => !k.startsWith('_')), ...Object.keys(leaves)]);
+  if (!authors.size) return {date, count:0, empty:true};
+  const batch = fdb.batch();
+  authors.forEach(author => {
+    batch.set(getDailyRef(date, author), dailyReportDoc(date, author, day[author] || [], leaves[author] || ''), {merge:true});
+  });
+  await withTimeout(batch.commit(), 30000, `Firebase write timed out: ${date}`);
+  return {date, count:authors.size, empty:false};
+}
+
 async function importCurrentPeriodFromSheetToFirebase() {
   const {startDate,endDate}=getPeriodDates(currentPeriod.year,currentPeriod.month);
   if (!confirm(`Import ${startDate} - ${endDate} from spreadsheet to Firebase. Existing Firebase reports in this range will be overwritten. Continue?`)) return;
@@ -2277,30 +2305,39 @@ async function importSheetRangeToFirebase(startDate, endDate) {
   setLoading(true);
   try {
     await ensureFirebaseReady();
-    if (res) res.textContent = 'Firebase login OK. Reading spreadsheet...';
-    for (let i=0; i<dates.length; i++) {
-      const date = dates[i];
-      if (res) res.textContent = `${i+1}/${dates.length} reading ${date} from spreadsheet...`;
-      const day = await withTimeout(
-        _fetchDailyFromGas(date, `firebase_import_${date}`, true),
-        30000,
-        `Spreadsheet read timed out: ${date}`
-      );
-      const leaves = day._leaves || {};
-      const authors = new Set([...Object.keys(day).filter(k => !k.startsWith('_')), ...Object.keys(leaves)]);
-      if (!authors.size) emptyDays++;
-      for (const author of authors) {
-        if (res) res.textContent = `${i+1}/${dates.length} writing ${date} / ${author} to Firebase...`;
-        await saveDayFirebase(date, author, day[author] || []);
-        await saveLeaveTimeFirebase(date, author, leaves[author] || '');
-        count++;
+    if (res) res.textContent = `Firebase login OK. Importing ${dates.length} days...`;
+    const concurrency = 4;
+    let cursor = 0;
+    let done = 0;
+    const failures = [];
+    async function worker() {
+      while (cursor < dates.length) {
+        const date = dates[cursor++];
+        try {
+          const imported = await importOneSheetDateToFirebase(date);
+          count += imported.count;
+          if (imported.empty) emptyDays++;
+        } catch(e) {
+          failures.push({date, message:e.message});
+          console.error('Import failed for', date, e);
+        } finally {
+          done++;
+          if (res) {
+            const failed = failures.length ? `, failed ${failures.length}` : '';
+            res.textContent = `${done}/${dates.length} days imported (${count} reports, empty ${emptyDays}${failed})`;
+          }
+        }
       }
-      if (res) res.textContent = `${i+1}/${dates.length} days imported (${count} reports)...`;
-      await new Promise(r => setTimeout(r, 250));
     }
+    await Promise.all(Array.from({length:Math.min(concurrency, dates.length)}, () => worker()));
     _cache.clear();
     lsCacheDeleteRange();
-    if (res) res.textContent = `Imported ${count} reports to Firebase. Empty days: ${emptyDays}.`;
+    if (failures.length) {
+      const sample = failures.slice(0,5).map(f => `${f.date}: ${f.message}`).join(' / ');
+      if (res) res.textContent = `Imported ${count} reports. Empty days: ${emptyDays}. Failed days: ${failures.length}. ${sample}`;
+    } else if (res) {
+      res.textContent = `Imported ${count} reports to Firebase. Empty days: ${emptyDays}.`;
+    }
   } catch(e) {
     if (res) res.textContent = `Import failed: ${e.message}`;
     console.error(e);
