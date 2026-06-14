@@ -317,6 +317,9 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .admin-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--g200);border-radius:8px;background:var(--panel);}
 .admin-row.selected{border-color:var(--accent);box-shadow:0 0 0 3px rgba(160,122,72,.14);background:var(--surface);}
 .admin-row.inactive{opacity:.56;}
+.admin-row.drag-over{border-color:var(--primary);box-shadow:0 0 0 3px rgba(123,91,58,.14);}
+.admin-row[draggable="true"]{cursor:grab;}
+.admin-row[draggable="true"]:active{cursor:grabbing;}
 .admin-drag{font-size:15px;color:var(--g400);text-align:center;cursor:grab;}
 .admin-main{min-width:0;display:flex;align-items:center;gap:8px;}
 .admin-swatch{width:11px;height:11px;border-radius:3px;border:1px solid var(--g200);flex-shrink:0;}
@@ -1432,13 +1435,14 @@ function renderAdminMasters() {
   subCat.innerHTML = CATS.map(c => `<option value="${escHtml(c.cd)}"${c.cd === _selectedAdminCatCd ? ' selected' : ''}>${escHtml(c.cd)} : ${escHtml(c.label)}</option>`).join('');
   subCat.onchange = () => { _selectedAdminCatCd = subCat.value; renderAdminMasters(); };
   catList.innerHTML = CATS.length ? CATS.map((cat, i) => `
-    <div class="admin-row ${cat.cd === _selectedAdminCatCd ? 'selected' : ''} ${cat.active === false ? 'inactive' : ''}" onclick="selectAdminCat('${escHtml(cat.cd)}')">
+    <div class="admin-row ${cat.cd === _selectedAdminCatCd ? 'selected' : ''} ${cat.active === false ? 'inactive' : ''}" draggable="true" ondragstart="adminDragStart('cat','${escHtml(cat.cd)}',event)" ondragover="adminDragOver(event)" ondragleave="adminDragLeave(event)" ondrop="adminDrop('cat','${escHtml(cat.cd)}',event)" onclick="selectAdminCat('${escHtml(cat.cd)}')">
       <div class="admin-drag">☷</div>
       <div class="admin-main"><span class="admin-swatch" style="background:${escHtml(cat.color)}"></span><div style="min-width:0;"><div class="admin-title">[${escHtml(cat.cd)}] ${escHtml(cat.label)}</div><div class="admin-meta">${(cat.subs || []).filter(s => s.active !== false).length}件 / ${(cat.subs || []).length}件</div></div></div>
       <div class="admin-actions" onclick="event.stopPropagation()">
         <button class="btn btn-outline btn-sm" onclick="moveAdminCategory('${escHtml(cat.cd)}',-1)" ${i===0?'disabled':''}>↑</button>
         <button class="btn btn-outline btn-sm" onclick="moveAdminCategory('${escHtml(cat.cd)}',1)" ${i===CATS.length-1?'disabled':''}>↓</button>
         <button class="btn btn-outline btn-sm" onclick="editAdminCategory('${escHtml(cat.cd)}')">編集</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteAdminCategory('${escHtml(cat.cd)}')">削除</button>
         <button class="btn btn-danger btn-sm" onclick="toggleAdminCategory('${escHtml(cat.cd)}')">${cat.active === false ? '有効化' : '無効化'}</button>
       </div>
     </div>
@@ -1446,13 +1450,14 @@ function renderAdminMasters() {
   const cat = CATS.find(c => c.cd === _selectedAdminCatCd);
   const subs = cat ? (cat.subs || []) : [];
   subList.innerHTML = cat ? (subs.length ? subs.map((sub, i) => `
-    <div class="admin-row ${sub.active === false ? 'inactive' : ''}">
+    <div class="admin-row ${sub.active === false ? 'inactive' : ''}" draggable="true" ondragstart="adminDragStart('sub','${escHtml(sub.cd)}',event)" ondragover="adminDragOver(event)" ondragleave="adminDragLeave(event)" ondrop="adminDrop('sub','${escHtml(sub.cd)}',event)">
       <div class="admin-drag">☷</div>
       <div class="admin-main"><span class="admin-swatch" style="background:${escHtml(cat.color)}"></span><div style="min-width:0;"><div class="admin-title">${escHtml(sub.cd)} ${escHtml(sub.label)}</div><div class="admin-meta">${escHtml(cat.cd)} : ${escHtml(cat.label)}</div></div></div>
       <div class="admin-actions">
         <button class="btn btn-outline btn-sm" onclick="moveAdminSub('${escHtml(sub.cd)}',-1)" ${i===0?'disabled':''}>↑</button>
         <button class="btn btn-outline btn-sm" onclick="moveAdminSub('${escHtml(sub.cd)}',1)" ${i===subs.length-1?'disabled':''}>↓</button>
         <button class="btn btn-outline btn-sm" onclick="editAdminSub('${escHtml(sub.cd)}')">編集</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteAdminSub('${escHtml(sub.cd)}')">削除</button>
         <button class="btn btn-danger btn-sm" onclick="toggleAdminSub('${escHtml(sub.cd)}')">${sub.active === false ? '有効化' : '無効化'}</button>
       </div>
     </div>
@@ -1462,6 +1467,63 @@ function renderAdminMasters() {
 function selectAdminCat(cd) {
   _selectedAdminCatCd = cd;
   renderAdminMasters();
+}
+
+let _adminDrag = null;
+
+function adminDragStart(kind, cd, event) {
+  _adminDrag = {kind, cd};
+  if (event?.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', `${kind}:${cd}`);
+  }
+}
+
+function adminDragOver(event) {
+  event.preventDefault();
+  event.currentTarget?.classList.add('drag-over');
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+}
+
+function adminDragLeave(event) {
+  event.currentTarget?.classList.remove('drag-over');
+}
+
+async function adminDrop(kind, targetCd, event) {
+  event.preventDefault();
+  event.currentTarget?.classList.remove('drag-over');
+  if (!_adminDrag || _adminDrag.kind !== kind || _adminDrag.cd === targetCd) return;
+  if (kind === 'cat') await reorderAdminCategories(_adminDrag.cd, targetCd);
+  else await reorderAdminSubs(_adminDrag.cd, targetCd);
+  _adminDrag = null;
+}
+
+async function reorderAdminCategories(sourceCd, targetCd) {
+  const cats = normalizeMasterCats(CATS);
+  const from = cats.findIndex(c => c.cd === sourceCd);
+  const to = cats.findIndex(c => c.cd === targetCd);
+  if (from < 0 || to < 0 || from === to) return;
+  const [moved] = cats.splice(from, 1);
+  cats.splice(to, 0, moved);
+  cats.forEach((c, idx) => c.order = idx);
+  try { await saveMasterCatsToFirebase(cats); applyMasterCats(cats); setAdminStatus('大分類の並び順を更新しました。'); }
+  catch(e) { alert('保存に失敗しました: ' + e.message); }
+}
+
+async function reorderAdminSubs(sourceCd, targetCd) {
+  const found = findSubWithCat(sourceCd);
+  const target = findSubWithCat(targetCd);
+  if (!found || !target || found.cat.cd !== target.cat.cd) return;
+  const subs = [...(found.cat.subs || [])];
+  const from = subs.findIndex(s => s.cd === sourceCd);
+  const to = subs.findIndex(s => s.cd === targetCd);
+  if (from < 0 || to < 0 || from === to) return;
+  const [moved] = subs.splice(from, 1);
+  subs.splice(to, 0, moved);
+  subs.forEach((s, idx) => s.order = idx);
+  found.cat.subs = subs;
+  try { await saveMasterCatsToFirebase(CATS); applyMasterCats(CATS); setAdminStatus('中分類の並び順を更新しました。'); }
+  catch(e) { alert('保存に失敗しました: ' + e.message); }
 }
 
 function nextSubCd(mainCd) {
@@ -1510,6 +1572,23 @@ async function toggleAdminCategory(cd) {
   cat.active = cat.active === false;
   try { await writeMasterCategory(cat); applyMasterCats(CATS); setAdminStatus(cat.active ? '大分類を有効化しました。' : '大分類を無効化しました。'); }
   catch(e) { alert('保存に失敗しました: ' + e.message); }
+}
+
+async function deleteAdminCategory(cd) {
+  const cat = CATS.find(c => c.cd === cd);
+  if (!cat) return;
+  const subCount = (cat.subs || []).length;
+  const msg = `大分類 [${cat.cd}] ${cat.label} を削除します。\n配下の中分類 ${subCount}件もマスタから削除されます。\n過去の日報にこのコードが使われている場合、集計で名称や色を解決できなくなる可能性があります。\n\n削除する場合は OK を押してください。`;
+  if (!confirm(msg)) return;
+  const nextCats = normalizeMasterCats(CATS).filter(c => c.cd !== cd).map((c, idx) => ({...c, order:idx}));
+  try {
+    await saveMasterCatsToFirebase(nextCats);
+    if (_selectedAdminCatCd === cd) _selectedAdminCatCd = nextCats[0]?.cd || '';
+    applyMasterCats(nextCats);
+    setAdminStatus('大分類を削除しました。');
+  } catch(e) {
+    alert('削除に失敗しました: ' + e.message);
+  }
 }
 
 async function moveAdminCategory(cd, delta) {
@@ -1571,6 +1650,23 @@ async function toggleAdminSub(cd) {
   catch(e) { alert('保存に失敗しました: ' + e.message); }
 }
 
+async function deleteAdminSub(cd) {
+  const found = findSubWithCat(cd);
+  if (!found) return;
+  const msg = `中分類 ${found.sub.cd} ${found.sub.label} を削除します。\n過去の日報にこのコードが使われている場合、集計で名称や色を解決できなくなる可能性があります。\n\n削除する場合は OK を押してください。`;
+  if (!confirm(msg)) return;
+  found.cat.subs = (found.cat.subs || [])
+    .filter(s => s.cd !== cd)
+    .map((s, idx) => ({...s, order:idx}));
+  try {
+    await saveMasterCatsToFirebase(CATS);
+    applyMasterCats(CATS);
+    setAdminStatus('中分類を削除しました。');
+  } catch(e) {
+    alert('削除に失敗しました: ' + e.message);
+  }
+}
+
 async function moveAdminSub(cd, delta) {
   const found = findSubWithCat(cd);
   if (!found) return;
@@ -1581,7 +1677,7 @@ async function moveAdminSub(cd, delta) {
   [subs[i], subs[j]] = [subs[j], subs[i]];
   subs.forEach((s, idx) => s.order = idx);
   found.cat.subs = subs;
-  try { await Promise.all(subs.map(s => writeMasterSub(found.cat.cd, s))); applyMasterCats(CATS); setAdminStatus('中分類の並び順を更新しました。'); }
+  try { await saveMasterCatsToFirebase(CATS); applyMasterCats(CATS); setAdminStatus('中分類の並び順を更新しました。'); }
   catch(e) { alert('保存に失敗しました: ' + e.message); }
 }
 
