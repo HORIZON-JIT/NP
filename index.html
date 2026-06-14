@@ -2369,11 +2369,39 @@ async function importAllSheetToFirebase() {
     alert('Date range is invalid.');
     return;
   }
-  if (!confirm(`Import ${startDate} - ${endDate} from spreadsheet to Firebase. This may take several minutes. Existing Firebase reports in this range will be overwritten. Continue?`)) return;
-  await importSheetRangeToFirebase(startDate, endDate);
+  const targets = buildPeriodTargetsBetween(startDate, endDate);
+  if (!targets.length) { alert('No periods to import.'); return; }
+  if (!confirm(`Import ${targets.length} periods from spreadsheet to Firebase (${startDate} - ${endDate}). This may take several minutes. Continue?`)) return;
+  await importSheetPeriodsToFirebase(targets);
 }
 
-async function importSheetRangeToFirebase(startDate, endDate) {
+async function importSheetPeriodsToFirebase(targets) {
+  if (!firebaseConfigured()) { alert('Firebase is not configured.'); return; }
+  const url = getGasUrl();
+  if (!url) { alert('GAS URL is not configured.'); return; }
+  const res = document.getElementById('firebase-sync-res');
+  let totalReports = 0, totalEmpty = 0, totalFailed = 0;
+  if (res) res.textContent = 'Signing in to Firebase...';
+  try {
+    await ensureFirebaseReady();
+    for (let i=0; i<targets.length; i++) {
+      const t = targets[i];
+      if (res) res.textContent = `${i+1}/${targets.length} periods: importing ${t.startDate} - ${t.endDate}...`;
+      const r = await importSheetRangeToFirebase(t.startDate, t.endDate, {useLoading:false, silent:true});
+      totalReports += r.count;
+      totalEmpty += r.emptyDays;
+      totalFailed += r.failures.length;
+      if (res) res.textContent = `${i+1}/${targets.length} periods imported (${totalReports} reports, empty ${totalEmpty}, failed ${totalFailed})`;
+      await new Promise(r => setTimeout(r, 300));
+    }
+    if (res) res.textContent = `All-period import complete: ${totalReports} reports, empty ${totalEmpty}, failed ${totalFailed}.`;
+  } catch(e) {
+    if (res) res.textContent = `Import failed: ${e.message}`;
+    console.error(e);
+  }
+}
+
+async function importSheetRangeToFirebase(startDate, endDate, options={}) {
   if (!firebaseConfigured()) { alert('Firebase is not configured.'); return; }
   const url = getGasUrl();
   if (!url) { alert('GAS URL is not configured.'); return; }
@@ -2382,9 +2410,9 @@ async function importSheetRangeToFirebase(startDate, endDate) {
   let count = 0;
   let emptyDays = 0;
   if (res) res.textContent = 'Signing in to Firebase...';
-  setLoading(true);
+  if (options.useLoading !== false) setLoading(true);
   try {
-    await ensureFirebaseReady();
+    if (!firebaseUser) await ensureFirebaseReady();
     if (res) res.textContent = `Firebase login OK. Importing ${dates.length} days...`;
     const concurrency = 4;
     let cursor = 0;
@@ -2412,6 +2440,8 @@ async function importSheetRangeToFirebase(startDate, endDate) {
     await Promise.all(Array.from({length:Math.min(concurrency, dates.length)}, () => worker()));
     _cache.clear();
     lsCacheDeleteRange();
+    const summary = {count, emptyDays, failures};
+    if (options.silent) return summary;
     if (failures.length) {
       const sample = failures.slice(0,5).map(f => `${f.date}: ${f.message}`).join(' / ');
       if (res) res.textContent = `Imported ${count} reports. Empty days: ${emptyDays}. Failed days: ${failures.length}. ${sample}`;
@@ -2421,9 +2451,11 @@ async function importSheetRangeToFirebase(startDate, endDate) {
   } catch(e) {
     if (res) res.textContent = `Import failed: ${e.message}`;
     console.error(e);
+    if (options.silent) return {count, emptyDays, failures:[{date:`${startDate}..${endDate}`, message:e.message}]};
   } finally {
-    setLoading(false);
+    if (options.useLoading !== false) setLoading(false);
   }
+  return {count, emptyDays, failures:[]};
 }
 
 async function saveDay(date, author, rows) {
