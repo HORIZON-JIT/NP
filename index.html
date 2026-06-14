@@ -1079,22 +1079,22 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       </a>
     </div>
     <div class="modal-sec" id="firebase-sync-section" style="display:none;">
-      <h4>Firebase / Spreadsheet sync</h4>
+      <h4>Firebase primary / Spreadsheet export</h4>
       <div style="font-size:12px;color:var(--g600);margin-bottom:10px;line-height:1.7;">
-        Firebase mode is active. Daily reads and saves use Firestore. Use these buttons only when you want to copy Firebase data back to the spreadsheet.
+        Daily reads and saves use Firebase. Spreadsheet is kept as an export and backup destination.
       </div>
       <button class="btn btn-outline btn-sm" onclick="checkFirebaseConnection()" style="width:100%;margin-bottom:8px;">Firebase login/check</button>
       <div style="border:1px solid var(--g200);border-radius:8px;padding:9px 10px;margin-bottom:10px;background:var(--g50);">
-        <div style="font-size:12px;color:var(--g600);font-weight:700;margin-bottom:7px;">移行中の参照元: <span id="firebase-source-label">Firebase</span></div>
+        <div style="font-size:12px;color:var(--g600);font-weight:700;margin-bottom:7px;">Current read source: <span id="firebase-source-label">Firebase</span></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <button class="btn btn-outline btn-sm" onclick="setDataSource('firebase')">Firebaseを参照</button>
-          <button class="btn btn-outline btn-sm" onclick="setDataSource('sheet')">Spreadsheetを参照</button>
+          <button class="btn btn-primary btn-sm" onclick="setDataSource('firebase')">Use Firebase</button>
+          <button class="btn btn-outline btn-sm" onclick="setDataSource('sheet')">Use Spreadsheet</button>
         </div>
-        <div style="font-size:11px;color:var(--g500);margin-top:7px;">移行確認中だけSpreadsheet参照にすると、既存シートの履歴を見ながらFirebaseへ取込できます。</div>
+        <div style="font-size:11px;color:var(--g500);margin-top:7px;">Use Spreadsheet only for migration checks. Normal operation should stay on Firebase.</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <button class="btn btn-outline btn-sm" onclick="syncCurrentDayToSheet()">表示日を同期</button>
-        <button class="btn btn-outline btn-sm" onclick="syncCurrentPeriodToSheet()">表示月度を同期</button>
+        <button class="btn btn-outline btn-sm" onclick="syncCurrentDayToSheet()">Export day to Sheet</button>
+        <button class="btn btn-outline btn-sm" onclick="syncCurrentPeriodToSheet()">Export period to Sheet</button>
       </div>
       <button class="btn btn-outline btn-sm" onclick="importCurrentPeriodFromSheetToFirebase()" style="width:100%;margin-top:8px;">表示月度をFirebaseへ取込</button>
       <button class="btn btn-outline btn-sm" onclick="importAllSheetToFirebase()" style="width:100%;margin-top:8px;">全期間をFirebaseへ取込</button>
@@ -1356,6 +1356,7 @@ const firebaseConfig = {
 const FIREBASE_ALLOWED_DOMAIN = 'horizon.co.jp';
 const USE_FIREBASE = !!(window.firebase && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf('YOUR_') === -1);
 const DATA_SOURCE_KEY = 'np_data_source';
+const DATA_SOURCE_RESET_KEY = 'np_data_source_reset_firebase_primary_20260614';
 let fdb = null;
 let fauth = null;
 let firebaseUser = null;
@@ -1954,6 +1955,13 @@ function firebaseConfigured() {
 function getDataSource() {
   if (!firebaseConfigured()) return 'sheet';
   return localStorage.getItem(DATA_SOURCE_KEY) || 'firebase';
+}
+
+function normalizeDataSourceForFirebasePrimary() {
+  if (!firebaseConfigured()) return;
+  if (localStorage.getItem(DATA_SOURCE_RESET_KEY)) return;
+  localStorage.setItem(DATA_SOURCE_KEY, 'firebase');
+  localStorage.setItem(DATA_SOURCE_RESET_KEY, '1');
 }
 
 function useFirebaseReads() {
@@ -5047,6 +5055,7 @@ function updateStickyOffsets() {
 
 (async function init(){
   applyTheme(getTheme());   // ダーク/ライトのチャート色・トグル状態を初期化
+  normalizeDataSourceForFirebasePrimary();
   buildTable();
   renderUnitUI();           // 保存済みの入力単位（時間/分）をUIに反映
   updateLivePie();
