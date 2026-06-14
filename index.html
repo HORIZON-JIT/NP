@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>日報アプリ｜ホリゾン生産管理</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root{
   /* ── Manual-Management-System v3 inspired neutral brand ── */
@@ -1075,6 +1078,18 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <span style="margin-left:auto;font-size:11px;color:var(--g400);">開く</span>
       </a>
     </div>
+    <div class="modal-sec" id="firebase-sync-section" style="display:none;">
+      <h4>Firebase / Spreadsheet sync</h4>
+      <div style="font-size:12px;color:var(--g600);margin-bottom:10px;line-height:1.7;">
+        Firebase mode is active. Daily reads and saves use Firestore. Use these buttons only when you want to copy Firebase data back to the spreadsheet.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button class="btn btn-outline btn-sm" onclick="syncCurrentDayToSheet()">表示日を同期</button>
+        <button class="btn btn-outline btn-sm" onclick="syncCurrentPeriodToSheet()">表示月度を同期</button>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="importCurrentPeriodFromSheetToFirebase()" style="width:100%;margin-top:8px;">表示月度をFirebaseへ取込</button>
+      <div id="firebase-sync-res" style="font-size:11px;color:var(--g500);margin-top:8px;"></div>
+    </div>
     <div class="modal-sec" id="preload-section" style="display:none;">
       <h4>過去データ プリロード</h4>
       <div style="font-size:12px;color:var(--g600);margin-bottom:10px;">月次・年次（過去24ヶ月）と日別（過去30日）をまとめて取得してキャッシュします。<br>実行後はダッシュボードが高速に動作します。<br><span style="color:var(--primary);font-weight:700;">月1回程度を目安に更新してください。</span></div>
@@ -1318,6 +1333,21 @@ function setTheme(theme){
 //  SETTINGS
 // ═══════════════════════════════════════════
 const GAS_URL_DEFAULT = 'https://script.google.com/a/macros/horizon.co.jp/s/AKfycbxx96D5Lz_I3B_L-Bia9WftcUP6Em-l6mTulefZBB6Xu9BEITm0DLroTwB1CHjLkkL6/exec';
+const firebaseConfig = {
+  apiKey: 'YOUR_FIREBASE_API_KEY',
+  authDomain: 'YOUR_PROJECT.firebaseapp.com',
+  projectId: 'YOUR_PROJECT_ID',
+  storageBucket: 'YOUR_PROJECT.firebasestorage.app',
+  messagingSenderId: 'YOUR_SENDER_ID',
+  appId: 'YOUR_APP_ID'
+};
+const FIREBASE_ALLOWED_DOMAIN = 'horizon.co.jp';
+const USE_FIREBASE = !!(window.firebase && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf('YOUR_') === -1);
+let fdb = null;
+let fauth = null;
+let firebaseUser = null;
+let firebaseReadyPromise = null;
+let forceGasForSheetSync = false;
 function getGasUrl() { return localStorage.getItem('gas_url') || GAS_URL_DEFAULT; }
 function getAuthor() { return localStorage.getItem('author')||''; }
 function isShared()  { return !!getGasUrl(); }
@@ -1330,7 +1360,11 @@ function openSettings() {
   buildAuthorSelector();
   document.getElementById('s-gasurl').value=url;
   document.getElementById('test-res').className='test-res';
-  document.getElementById('preload-section').style.display=url?'block':'none';
+  const fbSync = document.getElementById('firebase-sync-section');
+  if (fbSync) fbSync.style.display=USE_FIREBASE&&url?'block':'none';
+  const fbSyncRes = document.getElementById('firebase-sync-res');
+  if (fbSyncRes) fbSyncRes.textContent='';
+  document.getElementById('preload-section').style.display=url&&!firebaseConfigured()?'block':'none';
   document.getElementById('cats-update-section').style.display=url?'block':'none';
   document.getElementById('cats-update-res').textContent='';
   document.getElementById('preload-progress').style.display='none';
@@ -1899,7 +1933,289 @@ function lsCacheDeleteRange() {
   }
 }
 
+function firebaseConfigured() {
+  return USE_FIREBASE && firebaseConfig.projectId && firebaseConfig.projectId.indexOf('YOUR_') === -1;
+}
+
+function initFirebase() {
+  if (!firebaseConfigured()) return false;
+  if (fdb) return true;
+  firebase.initializeApp(firebaseConfig);
+  fdb = firebase.firestore();
+  fauth = firebase.auth();
+  try { fdb.enablePersistence({synchronizeTabs:true}).catch(()=>{}); } catch(_) {}
+  return true;
+}
+
+function firebaseEmailAllowed(email) {
+  return !!email && email.toLowerCase().endsWith('@' + FIREBASE_ALLOWED_DOMAIN);
+}
+
+function ensureFirebaseReady() {
+  if (!initFirebase()) return Promise.resolve(false);
+  if (firebaseReadyPromise) return firebaseReadyPromise;
+  firebaseReadyPromise = new Promise((resolve, reject) => {
+    const off = fauth.onAuthStateChanged(async user => {
+      off();
+      try {
+        if (user && firebaseEmailAllowed(user.email)) {
+          firebaseUser = user;
+          resolve(true);
+          return;
+        }
+        if (user) await fauth.signOut();
+        const provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({hd:FIREBASE_ALLOWED_DOMAIN});
+        try {
+          const cred = await fauth.signInWithPopup(provider);
+          if (!cred.user || !firebaseEmailAllowed(cred.user.email)) {
+            await fauth.signOut();
+            reject(new Error('Firebase login is limited to @' + FIREBASE_ALLOWED_DOMAIN));
+            return;
+          }
+          firebaseUser = cred.user;
+          resolve(true);
+        } catch(e) {
+          try {
+            await fauth.signInWithRedirect(provider);
+            reject(new Error('Firebase login redirect started. Please reload after login.'));
+          } catch(e2) {
+            reject(e2 || e);
+          }
+        }
+      } catch(e) {
+        reject(e);
+      }
+    });
+  });
+  return firebaseReadyPromise;
+}
+
+function dailyDocId(date, author) {
+  return `${date}__${encodeURIComponent(author || '').replace(/\./g, '%2E')}`;
+}
+
+function normalizeRows(rows) {
+  return (rows || [])
+    .filter(r => r && r.cdSub)
+    .map(r => ({
+      cdSub: String(r.cdSub),
+      hoursNormal: Number(r.hoursNormal || 0),
+      hoursOT: Number(r.hoursOT || 0)
+    }))
+    .filter(r => r.hoursNormal > 0 || r.hoursOT > 0);
+}
+
+function getDailyRef(date, author) {
+  return fdb.collection('dailyReports').doc(dailyDocId(date, author));
+}
+
+async function saveDayFirebase(date, author, rows) {
+  await ensureFirebaseReady();
+  await getDailyRef(date, author).set({
+    date,
+    author,
+    rows: normalizeRows(rows),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: firebaseUser ? firebaseUser.email : ''
+  }, {merge:true});
+}
+
+async function saveLeaveTimeFirebase(date, author, leaveTime) {
+  await ensureFirebaseReady();
+  await getDailyRef(date, author).set({
+    date,
+    author,
+    leaveTime: leaveTime || '',
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: firebaseUser ? firebaseUser.email : ''
+  }, {merge:true});
+}
+
+async function loadDayFirebase(date, author) {
+  await ensureFirebaseReady();
+  const snap = await getDailyRef(date, author).get();
+  if (!snap.exists) {
+    const url = getGasUrl();
+    if (url) {
+      try {
+        const d = await _fetchDayFromGas(url, date, author);
+        if ((d.rows && d.rows.length) || d.leaveTime) {
+          await saveDayFirebase(date, author, d.rows || []);
+          await saveLeaveTimeFirebase(date, author, d.leaveTime || '');
+        }
+        return d;
+      } catch(e) {
+        console.warn('GAS fallback load failed:', e.message);
+      }
+    }
+    return {rows:[], leaveTime:''};
+  }
+  const d = snap.data() || {};
+  return {rows:normalizeRows(d.rows || []), leaveTime:d.leaveTime || ''};
+}
+
+async function loadDashDataFirebase(date) {
+  await ensureFirebaseReady();
+  const snap = await fdb.collection('dailyReports').where('date', '==', date).get();
+  const result = {};
+  const leaves = {};
+  snap.docs.forEach(doc => {
+    const d = doc.data() || {};
+    if (!d.author) return;
+    const rows = normalizeRows(d.rows || []);
+    if (rows.length) result[d.author] = rows;
+    if (d.leaveTime) leaves[d.author] = d.leaveTime;
+  });
+  result._leaves = leaves;
+  return result;
+}
+
+async function loadRangeDataFirebase(startDate, endDate, ck, ttl) {
+  await ensureFirebaseReady();
+  const snap = await fdb.collection('dailyReports')
+    .where('date', '>=', startDate)
+    .where('date', '<=', endDate)
+    .get();
+  const tmp = {};
+  const leaveMap = {};
+  snap.docs.forEach(doc => {
+    const d = doc.data() || {};
+    if (!d.author || !d.date) return;
+    normalizeRows(d.rows || []).forEach(r => {
+      if (!tmp[d.author]) tmp[d.author] = {};
+      if (!tmp[d.author][r.cdSub]) tmp[d.author][r.cdSub] = {cdSub:r.cdSub, hoursNormal:0, hoursOT:0};
+      tmp[d.author][r.cdSub].hoursNormal += r.hoursNormal || 0;
+      tmp[d.author][r.cdSub].hoursOT += r.hoursOT || 0;
+    });
+    if (d.leaveTime) {
+      if (!leaveMap[d.author]) leaveMap[d.author] = {};
+      leaveMap[d.author][d.date] = d.leaveTime;
+    }
+  });
+  const result = {_leaveMap:leaveMap};
+  Object.entries(tmp).forEach(([author, map]) => { result[author] = Object.values(map); });
+  cacheSet(ck, result);
+  lsCacheSet(ck, result, ttl);
+  return result;
+}
+
+async function saveDayToGas(date, author, rows) {
+  forceGasForSheetSync = true;
+  try { return await saveDay(date, author, rows); }
+  finally { forceGasForSheetSync = false; }
+}
+
+async function saveLeaveTimeToGas(date, author, leaveTime) {
+  forceGasForSheetSync = true;
+  try { return await saveLeaveTime(date, author, leaveTime); }
+  finally { forceGasForSheetSync = false; }
+}
+
+async function syncCurrentDayToSheet() {
+  if (!firebaseConfigured()) { alert('Firebase is not configured.'); return; }
+  const author = getAuthor();
+  if (!author) { alert('担当者名を設定してください'); return; }
+  const res = document.getElementById('firebase-sync-res');
+  if (res) res.textContent = 'Syncing current day...';
+  setLoading(true);
+  try {
+    const d = await loadDayFirebase(currentDate, author);
+    await saveDayToGas(currentDate, author, d.rows || []);
+    await saveLeaveTimeToGas(currentDate, author, d.leaveTime || '');
+    await getDailyRef(currentDate, author).set({sheetSyncedAt:firebase.firestore.FieldValue.serverTimestamp()}, {merge:true});
+    if (res) res.textContent = `${currentDate} / ${author} synced to spreadsheet.`;
+  } catch(e) {
+    if (res) res.textContent = `Sync failed: ${e.message}`;
+    console.error(e);
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function syncCurrentPeriodToSheet() {
+  if (!firebaseConfigured()) { alert('Firebase is not configured.'); return; }
+  const {startDate,endDate}=getPeriodDates(currentPeriod.year,currentPeriod.month);
+  if (!confirm(`${startDate} - ${endDate} のFirebaseデータをスプレッドシートへ同期します。よろしいですか？`)) return;
+  const res = document.getElementById('firebase-sync-res');
+  if (res) res.textContent = 'Loading Firebase data...';
+  setLoading(true);
+  let count = 0;
+  try {
+    await ensureFirebaseReady();
+    const snap = await fdb.collection('dailyReports')
+      .where('date', '>=', startDate)
+      .where('date', '<=', endDate)
+      .get();
+    for (const doc of snap.docs) {
+      const d = doc.data() || {};
+      if (!d.date || !d.author) continue;
+      await saveDayToGas(d.date, d.author, normalizeRows(d.rows || []));
+      await saveLeaveTimeToGas(d.date, d.author, d.leaveTime || '');
+      await doc.ref.set({sheetSyncedAt:firebase.firestore.FieldValue.serverTimestamp()}, {merge:true});
+      count++;
+      if (res) res.textContent = `${count}/${snap.docs.length} synced...`;
+      await new Promise(r => setTimeout(r, 250));
+    }
+    if (res) res.textContent = `${count}件をスプレッドシートへ同期しました。`;
+  } catch(e) {
+    if (res) res.textContent = `Sync failed: ${e.message}`;
+    console.error(e);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function eachDateInRange(startDate, endDate) {
+  const dates = [];
+  const d = new Date(startDate + 'T00:00:00');
+  const end = new Date(endDate + 'T00:00:00');
+  while (d <= end) {
+    dates.push(d.toISOString().slice(0,10));
+    d.setDate(d.getDate() + 1);
+  }
+  return dates;
+}
+
+async function importCurrentPeriodFromSheetToFirebase() {
+  if (!firebaseConfigured()) { alert('Firebase is not configured.'); return; }
+  const url = getGasUrl();
+  if (!url) { alert('GAS URL is not configured.'); return; }
+  const {startDate,endDate}=getPeriodDates(currentPeriod.year,currentPeriod.month);
+  if (!confirm(`${startDate} - ${endDate} のスプレッドシートデータをFirebaseへ取り込みます。既存の同日・同担当者データは上書きされます。よろしいですか？`)) return;
+  const res = document.getElementById('firebase-sync-res');
+  const dates = eachDateInRange(startDate, endDate);
+  let count = 0;
+  if (res) res.textContent = 'Importing spreadsheet data...';
+  setLoading(true);
+  try {
+    await ensureFirebaseReady();
+    for (let i=0; i<dates.length; i++) {
+      const date = dates[i];
+      const day = await _fetchDailyFromGas(date, `firebase_import_${date}`, true);
+      const leaves = day._leaves || {};
+      const authors = new Set([...Object.keys(day).filter(k => !k.startsWith('_')), ...Object.keys(leaves)]);
+      for (const author of authors) {
+        await saveDayFirebase(date, author, day[author] || []);
+        await saveLeaveTimeFirebase(date, author, leaves[author] || '');
+        count++;
+      }
+      if (res) res.textContent = `${i+1}/${dates.length} days imported (${count} reports)...`;
+      await new Promise(r => setTimeout(r, 250));
+    }
+    _cache.clear();
+    lsCacheDeleteRange();
+    if (res) res.textContent = `${count}件をFirebaseへ取り込みました。`;
+  } catch(e) {
+    if (res) res.textContent = `Import failed: ${e.message}`;
+    console.error(e);
+  } finally {
+    setLoading(false);
+  }
+}
+
 async function saveDay(date, author, rows) {
+  if (firebaseConfigured() && !forceGasForSheetSync) return saveDayFirebase(date, author, rows);
   const url=getGasUrl();
   if (!url) { localStorage.setItem(logKey(date,author),JSON.stringify(rows)); return; }
   const entries=[];
@@ -1912,6 +2228,7 @@ async function saveDay(date, author, rows) {
 }
 
 async function saveLeaveTime(date, author, leaveTime) {
+  if (firebaseConfigured() && !forceGasForSheetSync) return saveLeaveTimeFirebase(date, author, leaveTime);
   const url=getGasUrl();
   if (!url) { localStorage.setItem(`leave_${date}_${author}`, leaveTime||''); return; }
   const d=await gasJsonpWrite(url,{action:'saveLeaveTime',date,author,leaveTime:leaveTime||''});
@@ -1986,6 +2303,7 @@ function calcOTFromLeave(leaveHHMM) {
 }
 
 async function loadDay(date, author) {
+  if (firebaseConfigured()) return loadDayFirebase(date||currentDate, author||getAuthor());
   const url=getGasUrl();
   const d0=date||currentDate, a0=author||getAuthor();
   const ck=`input_${d0}_${a0}`;
@@ -2034,6 +2352,12 @@ async function loadDashData(date) {
   // 1. メモリキャッシュ優先
   const mem = cacheGet(ck);
   if (mem) { console.log('[loadDashData] memory cache hit'); return mem; }
+  if (firebaseConfigured()) {
+    const result = await loadDashDataFirebase(date);
+    cacheSet(ck, result);
+    lsCacheSet(ck, result, date === todayStr() ? CACHE_TTL_DAILY : CACHE_TTL_DAILY_PAST);
+    return result;
+  }
 
   // 2. localStorageキャッシュ → 期限切れでも即返し、裏で最新化（SWR）
   const lsw = lsCacheGetStale(ck);
@@ -2146,6 +2470,7 @@ async function loadRangeData(startDate, endDate, periodYear, periodMonth) {
   // 1. メモリキャッシュ優先
   const mem = cacheGet(ck);
   if (mem) return mem;
+  if (firebaseConfigured()) return loadRangeDataFirebase(startDate, endDate, ck, ttl);
 
   // 2. localStorageキャッシュ → 期限切れでも即返し、裏で最新化（SWR）
   const lsw = lsCacheGetStale(ck);
@@ -4507,7 +4832,7 @@ function updateStickyOffsets() {
   // ─── GASウォームアップ ping（コールドスタート対策）───
   // GAS URLが設定済みであれば、ページ読み込みと同時にバックグラウンドでpingを送信。
   // これにより、ユーザーが操作するころにはGASが温まっていることが多くなる。
-  if (isShared()) {
+  if (isShared() && !firebaseConfigured()) {
     gasJsonp(getGasUrl(), {action:'test'}).catch(()=>{});
   }
 
@@ -4531,7 +4856,7 @@ function updateStickyOffsets() {
 
   // ─── ダッシュボード用データをバックグラウンドプリフェッチ ───
   // デフォルトの月次タブ用データを先行取得（キャッシュに入れておく）
-  if (isShared()) {
+  if (isShared() && !firebaseConfigured()) {
     setTimeout(()=>{
       const {startDate,endDate}=getPeriodDates(currentPeriod.year,currentPeriod.month);
       loadRangeData(startDate,endDate,currentPeriod.year,currentPeriod.month).catch(()=>{});
@@ -4540,7 +4865,7 @@ function updateStickyOffsets() {
 
   // ─── 起動時 差分更新（過去7日）→ 完了後に年次用プリフェッチ ───
   // GAS負荷軽減のため、初回は5秒後、以降は十分な間隔を空けて実行
-  if (isShared()) {
+  if (isShared() && !firebaseConfigured()) {
     setTimeout(() => {
       refreshRecentCache()
         .catch(e => console.warn('[差分更新] エラー:', e))
