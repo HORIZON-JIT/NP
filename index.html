@@ -1812,7 +1812,7 @@ const firebaseConfig = {
   appId: '1:572692409927:web:598e7009b1dbe9e04a0b62',
   measurementId: 'G-0YPCXED16F'
 };
-const FIREBASE_ALLOWED_DOMAIN = 'horizon.co.jp';
+const FIREBASE_ALLOWED_DOMAINS = ['horizon.co.jp', 'bp.horizon.co.jp'];
 const USE_FIREBASE = !!(window.firebase && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf('YOUR_') === -1);
 const DATA_SOURCE_KEY = 'np_data_source';
 const DATA_SOURCE_RESET_KEY = 'np_data_source_reset_firebase_primary_20260614';
@@ -2454,7 +2454,9 @@ function initFirebase() {
 }
 
 function firebaseEmailAllowed(email) {
-  return !!email && email.toLowerCase().endsWith('@' + FIREBASE_ALLOWED_DOMAIN);
+  if (!email) return false;
+  const lower = email.toLowerCase();
+  return FIREBASE_ALLOWED_DOMAINS.some(d => lower.endsWith('@' + d));
 }
 
 function ensureFirebaseReady() {
@@ -2477,12 +2479,11 @@ function ensureFirebaseReady() {
         }
         if (user) await fauth.signOut();
         const provider = new firebase.auth.GoogleAuthProvider();
-        provider.setCustomParameters({hd:FIREBASE_ALLOWED_DOMAIN});
         try {
           const cred = await fauth.signInWithPopup(provider);
           if (!cred.user || !firebaseEmailAllowed(cred.user.email)) {
             await fauth.signOut();
-            fail(new Error('Firebase login is limited to @' + FIREBASE_ALLOWED_DOMAIN));
+            fail(new Error('Firebase login is limited to @' + FIREBASE_ALLOWED_DOMAINS.join(' / @')));
             return;
           }
           firebaseUser = cred.user;
