@@ -846,7 +846,6 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <label class="leave-label" for="input-leave">退勤時刻</label>
         <input type="time" id="input-leave" class="leave-input" placeholder="--:--" step="60"
                oninput="onLeaveChangeDebounced()" />
-        <script>(function(){var d=new Date(),el=document.getElementById('input-leave');if(el)el.value=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');})()</script>
         <button class="btn-stamp no-print" onclick="stampNow()" title="現在時刻を入力">現在時刻を反映</button>
         <span id="leave-ot-preview" class="leave-ot-preview"></span>
       </div>
@@ -3859,10 +3858,7 @@ async function loadDay_and_render() {
   const st=document.getElementById('data-status');
   try {
     clearInputs();
-    if (currentDate === todayStr()) {
-      const _lv = document.getElementById('input-leave');
-      if (_lv) { const _n=new Date(); _lv.value=`${String(_n.getHours()).padStart(2,'0')}:${String(_n.getMinutes()).padStart(2,'0')}`; onLeaveChange(); }
-    }
+    if (currentDate === todayStr()) stampNow();
     const author=getAuthor();
     if (!author){ st.textContent='担当者名を設定してください'; return; }
     if (isShared()) { st.textContent='読み込み中...'; st.className='data-status'; }
@@ -3871,10 +3867,7 @@ async function loadDay_and_render() {
     catch(e) {
       st.innerHTML=`読込失敗 <a href="#" onclick="loadDay_and_render();return false;" style="color:var(--primary);text-decoration:underline;margin-left:4px;">再試行</a>`;
       st.className='data-status';
-      if (currentDate === todayStr()) {
-        const _lv = document.getElementById('input-leave');
-        if (_lv) { const _n=new Date(); _lv.value=`${String(_n.getHours()).padStart(2,'0')}:${String(_n.getMinutes()).padStart(2,'0')}`; onLeaveChange(); }
-      }
+      if (currentDate === todayStr()) stampNow();
       return;
     }
     const rows2 = dayData.rows||dayData; // 後方互換
@@ -3891,18 +3884,17 @@ async function loadDay_and_render() {
       document.getElementById('data-status').textContent='未入力';
       document.getElementById('data-status').className='data-status';
     }
-    // 退勤時刻の復元（当日かつ未保存なら現在時刻を自動反映＝「現在時刻を反映」を押す手間を省く）
     const leaveEl = document.getElementById('input-leave');
     if (leaveEl) {
       if (dayData.leaveTime) {
         leaveEl.value = dayData.leaveTime;
+        leaveEl.dispatchEvent(new Event('input'));
       } else if (currentDate === todayStr()) {
-        const now = new Date();
-        leaveEl.value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+        stampNow();
       } else {
         leaveEl.value = '';
+        onLeaveChange();
       }
-      onLeaveChange();
     }
     document.getElementById('daily-memo').value=await loadMemo(currentDate,author);
   } finally { setLoading(false); }
