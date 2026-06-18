@@ -846,7 +846,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <label class="leave-label" for="input-leave">退勤時刻</label>
         <input type="time" id="input-leave" class="leave-input" placeholder="--:--" step="60"
                oninput="onLeaveChangeDebounced()" />
-        <script>(function(){var d=new Date(),el=document.getElementById('input-leave');if(el)el.value=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');})()</script>
+        <script>(function(){var d=new Date(),el=document.getElementById('input-leave');if(!el)return;el.value=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');window.addEventListener('load',function(){try{stampNow();}catch(e){}});})()</script>
         <button class="btn-stamp no-print" onclick="stampNow()" title="現在時刻を入力">現在時刻を反映</button>
         <span id="leave-ot-preview" class="leave-ot-preview"></span>
       </div>
@@ -3842,14 +3842,16 @@ function checkHoursSafety(normal, ot) {
       : `ℹ 入力合計時間が退勤時刻から計算した実勤務時間より<strong>少ない</strong>です（上限: <span id="safety-limit">${limit.toFixed(2)}</span>h、入力: <span id="safety-input">${total.toFixed(2)}</span>h）`;
   }
 }
-function clearInputs() {
+function clearInputs(keepLeave) {
   CATS.forEach(c=>c.subs.forEach(s=>{
     const h=document.getElementById(`h_${s.cd}`), ot=document.getElementById(`ot_${s.cd}`);
     if(h) {h.value='0'; h.classList.remove('has-val');} if(ot){ot.value='0';ot.classList.remove('has-val');}
   }));
   updateTotals();
-  const leaveEl=document.getElementById('input-leave');
-  if(leaveEl){ leaveEl.value=''; onLeaveChange(); }
+  if (!keepLeave) {
+    const leaveEl=document.getElementById('input-leave');
+    if(leaveEl){ leaveEl.value=''; onLeaveChange(); }
+  }
   document.getElementById('data-status').textContent='クリア済み';
   document.getElementById('data-status').className='data-status';
 }
@@ -3858,8 +3860,7 @@ async function loadDay_and_render() {
   setLoading(true);
   const st=document.getElementById('data-status');
   try {
-    clearInputs();
-    if (currentDate === todayStr()) stampNow();
+    clearInputs(true);
     const author=getAuthor();
     if (!author){ st.textContent='担当者名を設定してください'; return; }
     if (isShared()) { st.textContent='読み込み中...'; st.className='data-status'; }
