@@ -1343,6 +1343,7 @@ function setAdminStatus(text, danger = false) {
 
 function applyMasterCats(cats, options = {}) {
   const normalized = normalizeMasterCats(cats);
+  if (!normalized.length) return;
   CATS.length = 0;
   normalized.forEach(c => CATS.push(c));
   saveCatsToStorage(CATS);
@@ -5568,6 +5569,10 @@ function updateStickyOffsets() {
   applyTheme(getTheme());   // ダーク/ライトのチャート色・トグル状態を初期化
   normalizeDataSourceForFirebasePrimary();
   await loadMasterFromFirebase(false);
+  if (!activeInputCats().length && CATS_DEFAULT.length) {
+    CATS.length = 0;
+    normalizeMasterCats(CATS_DEFAULT).forEach(c => CATS.push(c));
+  }
   buildTable();
   renderUnitUI();           // 保存済みの入力単位（時間/分）をUIに反映
   updateLivePie();
