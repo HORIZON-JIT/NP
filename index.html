@@ -3865,7 +3865,12 @@ async function loadDay_and_render() {
     try { dayData=await loadDay(currentDate,author); }
     catch(e) {
       st.innerHTML=`読込失敗 <a href="#" onclick="loadDay_and_render();return false;" style="color:var(--primary);text-decoration:underline;margin-left:4px;">再試行</a>`;
-      st.className='data-status'; return;
+      st.className='data-status';
+      if (currentDate === todayStr()) {
+        const _lv = document.getElementById('input-leave');
+        if (_lv) { const _n=new Date(); _lv.value=`${String(_n.getHours()).padStart(2,'0')}:${String(_n.getMinutes()).padStart(2,'0')}`; onLeaveChange(); }
+      }
+      return;
     }
     const rows2 = dayData.rows||dayData; // 後方互換
     if (rows2.length>0) {
@@ -5586,9 +5591,17 @@ function updateStickyOffsets() {
     saveMemoLocal(currentDate,getAuthor()||'?',this.value);
   });
 
+  // 退勤時刻: 当日ならページ読込み直後に現在時刻をセット（loadDay完了前でも即反映）
+  if (currentDate === todayStr()) {
+    const _leaveEl = document.getElementById('input-leave');
+    if (_leaveEl && !_leaveEl.value) {
+      const _now = new Date();
+      _leaveEl.value = `${String(_now.getHours()).padStart(2,'0')}:${String(_now.getMinutes()).padStart(2,'0')}`;
+      onLeaveChange();
+    }
+  }
+
   // ─── GASウォームアップ ping（コールドスタート対策）───
-  // GAS URLが設定済みであれば、ページ読み込みと同時にバックグラウンドでpingを送信。
-  // これにより、ユーザーが操作するころにはGASが温まっていることが多くなる。
   if (isShared() && !useFirebaseReads()) {
     gasJsonp(getGasUrl(), {action:'test'}).catch(()=>{});
   }
