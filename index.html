@@ -846,6 +846,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <label class="leave-label" for="input-leave">退勤時刻</label>
         <input type="time" id="input-leave" class="leave-input" placeholder="--:--" step="60"
                oninput="onLeaveChangeDebounced()" />
+        <script>(function(){var d=new Date(),el=document.getElementById('input-leave');if(el)el.value=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');})()</script>
         <button class="btn-stamp no-print" onclick="stampNow()" title="現在時刻を入力">現在時刻を反映</button>
         <span id="leave-ot-preview" class="leave-ot-preview"></span>
       </div>
