@@ -1180,6 +1180,24 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <button class="btn btn-outline btn-sm" onclick="syncDateRangeDiffToSheet()" style="width:100%;">期間を差分同期</button>
       <div style="font-size:11px;color:var(--g500);margin-top:6px;line-height:1.6;">Firestoreで更新があった日報だけをスプレッドシートへ書き出します。</div>
     </div>
+    <div class="modal-sec" id="excel-export-section" style="display:none;">
+      <h4>Excel出力</h4>
+      <div style="font-size:12px;color:var(--g600);margin-bottom:10px;line-height:1.7;">
+        指定した期間の日報データをFirebaseから取得し、スプレッドシートと同じ形式のExcelファイルとして出力します。
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <div style="flex:1;">
+          <label style="font-size:11px;color:var(--g500);font-weight:700;display:block;margin-bottom:3px;">開始日</label>
+          <input type="date" id="excel-start" style="width:100%;border:1.5px solid var(--g200);border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:var(--g50);"/>
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:11px;color:var(--g500);font-weight:700;display:block;margin-bottom:3px;">終了日</label>
+          <input type="date" id="excel-end" style="width:100%;border:1.5px solid var(--g200);border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:var(--g50);"/>
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="exportRangeToExcel()" id="btn-excel-export" style="width:100%;">Excelファイルを出力</button>
+      <div id="excel-export-res" style="font-size:11px;color:var(--g500);margin-top:6px;line-height:1.6;"></div>
+    </div>
     <div class="modal-sec" id="preload-section" style="display:none;">
       <h4>過去データ プリロード</h4>
       <div style="font-size:12px;color:var(--g600);margin-bottom:10px;">月次・年次（過去24ヶ月）と日別（過去30日）をまとめて取得してキャッシュします。<br>実行後はダッシュボードが高速に動作します。<br><span style="color:var(--primary);font-weight:700;">月1回程度を目安に更新してください。</span></div>
@@ -1841,6 +1859,18 @@ function openSettings() {
   const fbSyncRes = document.getElementById('firebase-sync-res');
   if (fbSyncRes) fbSyncRes.textContent=firebaseConfigured() ? 'Firebase有効' : '';
   updateDataSourceUI();
+  const excelSec = document.getElementById('excel-export-section');
+  if (excelSec) {
+    excelSec.style.display = firebaseConfigured() ? 'block' : 'none';
+    if (firebaseConfigured()) {
+      const def = getPeriodDates(currentPeriod.year, currentPeriod.month);
+      const es = document.getElementById('excel-start'), ee = document.getElementById('excel-end');
+      if (es && !es.value) es.value = def.startDate;
+      if (ee && !ee.value) ee.value = def.endDate;
+      const er = document.getElementById('excel-export-res');
+      if (er) er.textContent = '';
+    }
+  }
   document.getElementById('preload-section').style.display=url&&!useFirebaseReads()?'block':'none';
   document.getElementById('cats-update-section').style.display='none';
   document.getElementById('cats-update-res').textContent='';
@@ -2748,6 +2778,116 @@ async function syncDateRangeDiffToSheet() {
   } catch(e) {
     if (res) res.textContent = `Sync failed: ${e.message}`;
     console.error(e);
+  }
+}
+
+// ── Excel出力（SheetJSを必要時のみCDNから読込み）──
+let _xlsxLoading = null;
+function ensureXlsxLib() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (_xlsxLoading) return _xlsxLoading;
+  _xlsxLoading = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = () => window.XLSX ? resolve(window.XLSX) : reject(new Error('Excelライブラリの初期化に失敗しました'));
+    s.onerror = () => { _xlsxLoading = null; reject(new Error('Excelライブラリの読込みに失敗しました（ネットワークを確認してください）')); };
+    document.head.appendChild(s);
+  });
+  return _xlsxLoading;
+}
+
+// 中分類コードのCATS順インデックス（出力ソート用）
+function subCatRank(cdSub) {
+  const keys = Object.keys(SUB_MAP);
+  const i = keys.indexOf(cdSub);
+  return i < 0 ? keys.length : i;
+}
+
+async function exportRangeToExcel() {
+  if (!firebaseConfigured()) { alert('Firebaseが設定されていません。'); return; }
+  const startDate = (document.getElementById('excel-start')?.value || '').trim();
+  const endDate   = (document.getElementById('excel-end')?.value   || '').trim();
+  const res = document.getElementById('excel-export-res');
+  const btn = document.getElementById('btn-excel-export');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+    if (res) res.textContent = '開始日・終了日を入力してください。';
+    return;
+  }
+  if (startDate > endDate) {
+    if (res) res.textContent = '終了日は開始日以降にしてください。';
+    return;
+  }
+  if (btn) btn.disabled = true;
+  if (res) res.textContent = `${startDate} 〜 ${endDate} のデータを取得中...`;
+  try {
+    const [XLSX] = await Promise.all([
+      ensureXlsxLib(),
+      ensureFirebaseReady()
+    ]);
+    const snap = await fdb.collection('dailyReports')
+      .where('date', '>=', startDate)
+      .where('date', '<=', endDate)
+      .get();
+
+    // ── 日報ログ（1行＝中分類×区分）と退勤ログを構築 ──
+    const logRows = [];
+    const leaveRows = [];
+    snap.docs.forEach(doc => {
+      const d = doc.data() || {};
+      if (!d.date || !d.author) return;
+      normalizeRows(d.rows || []).forEach(r => {
+        const s = SUB_MAP[r.cdSub] || {};
+        if (r.hoursNormal > 0) logRows.push({
+          date:d.date, author:d.author, cdMain:s.mainCd||'', main:s.mainLabel||'',
+          cdSub:r.cdSub, sub:s.label||'', hours:r.hoursNormal, kubun:'通常', _rank:subCatRank(r.cdSub)
+        });
+        if (r.hoursOT > 0) logRows.push({
+          date:d.date, author:d.author, cdMain:s.mainCd||'', main:s.mainLabel||'',
+          cdSub:r.cdSub, sub:s.label||'', hours:r.hoursOT, kubun:'残業', _rank:subCatRank(r.cdSub)
+        });
+      });
+      if (d.leaveTime) leaveRows.push({date:d.date, author:d.author, leaveTime:d.leaveTime});
+    });
+
+    if (!logRows.length && !leaveRows.length) {
+      if (res) res.textContent = `${startDate} 〜 ${endDate}: 出力できるデータがありません。`;
+      return;
+    }
+
+    // 日付 → 担当者 → 中分類順 → 通常/残業 でソート
+    const kubunRank = k => k === '通常' ? 0 : 1;
+    logRows.sort((a, b) =>
+      a.date.localeCompare(b.date) ||
+      a.author.localeCompare(b.author, 'ja') ||
+      a._rank - b._rank ||
+      kubunRank(a.kubun) - kubunRank(b.kubun)
+    );
+    leaveRows.sort((a, b) =>
+      a.date.localeCompare(b.date) ||
+      a.author.localeCompare(b.author, 'ja')
+    );
+
+    // ── ワークブック生成 ──
+    const wb = XLSX.utils.book_new();
+    const logAoa = [['日付','担当者','大分類コード','大分類','中分類コード','中分類','時間','区分']];
+    logRows.forEach(r => logAoa.push([r.date, r.author, r.cdMain, r.main, r.cdSub, r.sub, r.hours, r.kubun]));
+    const wsLog = XLSX.utils.aoa_to_sheet(logAoa);
+    wsLog['!cols'] = [{wch:12},{wch:10},{wch:11},{wch:12},{wch:11},{wch:16},{wch:7},{wch:7}];
+    XLSX.utils.book_append_sheet(wb, wsLog, '日報ログ');
+
+    const leaveAoa = [['日付','担当者','退勤時刻']];
+    leaveRows.forEach(r => leaveAoa.push([r.date, r.author, r.leaveTime]));
+    const wsLeave = XLSX.utils.aoa_to_sheet(leaveAoa);
+    wsLeave['!cols'] = [{wch:12},{wch:10},{wch:10}];
+    XLSX.utils.book_append_sheet(wb, wsLeave, '退勤ログ');
+
+    XLSX.writeFile(wb, `日報ログ_${startDate}_${endDate}.xlsx`);
+    if (res) res.textContent = `${startDate} 〜 ${endDate}: 日報 ${logRows.length}件 / 退勤 ${leaveRows.length}件 を出力しました。`;
+  } catch(e) {
+    if (res) res.textContent = `出力に失敗しました: ${e.message}`;
+    console.error(e);
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
