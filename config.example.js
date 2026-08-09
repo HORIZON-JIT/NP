@@ -47,6 +47,9 @@ window.DEPARTMENT_CONFIG_OVERRIDE = {
   // 同じ会社ならそのまま。別ドメインを含む場合は追加。
   allowedDomains: ['horizon.co.jp', 'bp.horizon.co.jp'],
 
+  // 担当者選択の初期リスト（この部署のメンバー名）。各自は設定画面から追加も可能。
+  defaultAuthors: ['中西'],
+
   // 勤務ルールが生産管理課と同じなら、この rules ブロックは丸ごと削除してOK（既定値が使われます）。
   // 異なる場合のみ、必要な項目を指定:
   // rules: {

@@ -1225,6 +1225,9 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   </div>
 </div>
 
+<!-- 部署別設定（任意）。存在すれば window.DEPARTMENT_CONFIG_OVERRIDE を定義してDEFAULTを上書き。
+     相対パスなので /NP/config.js と /NP/homu/config.js が各サブフォルダで別々に読まれる。 -->
+<script src="config.js"></script>
 <script>
 // ═══════════════════════════════════════════
 //  DEPARTMENT CONFIG （部署ごとに変わる設定を一括集約）
@@ -1255,6 +1258,8 @@ const DEPARTMENT_CONFIG = (function(){
       measurementId: 'G-0YPCXED16F'
     },
     allowedDomains: ['horizon.co.jp', 'bp.horizon.co.jp'],
+    // 担当者選択の初期リスト（部署固有）。新規ブラウザで表示される既定の担当者。
+    defaultAuthors: ['ヘルプ','秋永','吉永','山田','須藤','平山','小野','田村','谷'],
     // 設定モーダル内の外部リンク（部署固有）。Firebaseコンソールは projectId から自動生成。
     links: {
       backupSheetUrl: 'https://docs.google.com/spreadsheets/d/1LlQVpi8O7RMmugpVkOlXckiNGrSzE2isS73drWsgxYk/edit'
@@ -1296,6 +1301,11 @@ const DEPARTMENT_CONFIG = (function(){
   catch(e) { return DEFAULT; }
 })();
 
+// localStorage 名前空間プレフィックス。
+// 同一オリジンでサブフォルダ配置する部署（deptId != 'np'）は、生産管理課とlocalStorageが
+// 衝突しないよう deptId で分離する。'np' は空プレフィックスで既存キーを温存（挙動不変）。
+const LS_NS = (DEPARTMENT_CONFIG.deptId === 'np') ? '' : DEPARTMENT_CONFIG.deptId + ':';
+
 // "HH:MM" → 分。不正値は0。
 function _hmToMin(hm){
   if (typeof hm !== 'string') return 0;
@@ -1327,8 +1337,8 @@ function applyDepartmentBranding(){
 // ═══════════════════════════════════════════
 // ── デフォルト項目定義（DEPARTMENT_CONFIG.defaultCats が種。カスタム定義はlocalStorage/Firebaseに保存） ──
 const CATS_DEFAULT = DEPARTMENT_CONFIG.defaultCats;
-const CATS_STORAGE_KEY  = '__catsCustom__';
-const CATS_UPDATED_KEY  = '__catsUpdatedAt__'; // 最終GAS取得日時
+const CATS_STORAGE_KEY  = LS_NS + '__catsCustom__';
+const CATS_UPDATED_KEY  = LS_NS + '__catsUpdatedAt__'; // 最終GAS取得日時
 const COLLECTION = DEPARTMENT_CONFIG.collection;
 const MASTER_DOC_COLLECTION = COLLECTION;
 const MASTER_DOC_ID = DEPARTMENT_CONFIG.deptId + '_master_categories';
@@ -1923,8 +1933,10 @@ let fauth = null;
 let firebaseUser = null;
 let firebaseReadyPromise = null;
 let forceGasForSheetSync = false;
-function getGasUrl() { return localStorage.getItem('gas_url') || GAS_URL_DEFAULT; }
-function getAuthor() { return localStorage.getItem('author')||''; }
+const GAS_URL_KEY = LS_NS + 'gas_url';   // 部署ごとに分離（サブフォルダ同一オリジン対策）
+const AUTHOR_KEY  = LS_NS + 'author';
+function getGasUrl() { return localStorage.getItem(GAS_URL_KEY) || GAS_URL_DEFAULT; }
+function getAuthor() { return localStorage.getItem(AUTHOR_KEY)||''; }
 function isShared()  { return !!getGasUrl(); }
 
 function updateModeUI() {
@@ -1964,7 +1976,7 @@ function openSettings() {
 }
 
 // 担当者リストキャッシュキー
-const AUTHOR_LIST_KEY = '__authorList__';
+const AUTHOR_LIST_KEY = LS_NS + '__authorList__';
 
 function getAuthorList() {
   try {
@@ -2147,15 +2159,15 @@ async function saveSettings() {
   const author = sel.value.trim();
   const url   =document.getElementById('s-gasurl').value.trim();
   if (!author){ alert('担当者名を選択または追加してください'); return; }
-  localStorage.setItem('author', author);
-  if (url) localStorage.setItem('gas_url',url); else localStorage.removeItem('gas_url');
+  localStorage.setItem(AUTHOR_KEY, author);
+  if (url) localStorage.setItem(GAS_URL_KEY,url); else localStorage.removeItem(GAS_URL_KEY);
   updateModeUI();
   closeModal('settings-modal');
   await loadDay_and_render();
 }
 async function clearGas() {
   if (!confirm('GAS接続を解除しますか？')) return;
-  localStorage.removeItem('gas_url');
+  localStorage.removeItem(GAS_URL_KEY);
   updateModeUI(); closeModal('settings-modal'); await loadDay_and_render();
 }
 // ── 接続テスト（高速版: POST スキップ、8秒タイムアウト、認証失敗検出）──
@@ -2392,7 +2404,7 @@ function memoKey(date,author){ return `memo_${date}_${author}`; }
 
 // ── 永続キャッシュ（localStorage）ユーティリティ ──
 // キー例: __cache__daily_2025-02-26  __cache__range_2025-01-16_2025-02-15
-const CACHE_PREFIX = '__cache__';
+const CACHE_PREFIX = LS_NS + '__cache__';
 const CACHE_TTL_DAILY = 3 * 60 * 60 * 1000;    // 日別（当日）: 3時間
 let _forceNoCache = false; // 再読込時にGAS側CacheServiceをスキップするフラグ
 const CACHE_TTL_DAILY_PREV = 12 * 60 * 60 * 1000; // 日別（前営業日）: 12時間
@@ -5151,7 +5163,7 @@ function renderCatBar(byAuthor, canvasId, emptyId) {
 //  共通描画: 担当別円グラフ
 // ═══════════════════════════════════════════
 // 担当者の表示順序
-const AUTHOR_ORDER = ['ヘルプ','秋永','吉永','山田','須藤','平山','小野','田村','谷'];
+const AUTHOR_ORDER = DEPARTMENT_CONFIG.defaultAuthors;
 function sortedAuthors(obj) {
   const keys = Object.keys(obj);
   const ordered = AUTHOR_ORDER.filter(a => keys.includes(a));
@@ -5691,7 +5703,7 @@ function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
 //  ・過去7日はキャッシュがない日のみ取得
 //  ・1日1回のみ実行（二重実行防止）
 // ═══════════════════════════════════════════
-const RECENT_REFRESH_KEY = '__recentRefreshed__';
+const RECENT_REFRESH_KEY = LS_NS + '__recentRefreshed__';
 const RECENT_REFRESH_DAYS = 7;
 
 async function refreshRecentCache() {
