@@ -746,7 +746,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 <!-- HEADER -->
 <header>
   <div class="hd-left">
-    <div><h1>日報アプリ</h1><div class="sub">HORIZON / 生産管理課</div></div>
+    <div><h1 id="brand-title">日報アプリ</h1><div class="sub" id="brand-sub">HORIZON / 生産管理課</div></div>
   </div>
   <div class="hd-right">
     <div class="date-nav">
@@ -873,7 +873,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 <div id="pdf-title-bar" style="display:none;align-items:center;justify-content:space-between;padding:4px 0 6px;border-bottom:2px solid #5D4037;margin-bottom:8px;">
   <div style="display:flex;align-items:baseline;gap:8px;">
     <span style="font-size:14px;font-weight:800;color:#5D4037;letter-spacing:.02em;">日報ダッシュボード</span>
-    <span style="font-size:10px;color:#6d6358;letter-spacing:.06em;">HORIZON / 生産管理課</span>
+    <span id="pdf-brand-sub" style="font-size:10px;color:#6d6358;letter-spacing:.06em;">HORIZON / 生産管理課</span>
   </div>
   <span id="pdf-range-label" style="font-size:10px;color:#3b322c;font-weight:700;"></span>
 </div>
@@ -1144,7 +1144,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     </div>
     <div class="modal-sec">
       <h4>バックアップ保存先</h4>
-      <a href="https://docs.google.com/spreadsheets/d/1LlQVpi8O7RMmugpVkOlXckiNGrSzE2isS73drWsgxYk/edit" target="_blank"
+      <a id="link-backup-sheet" href="https://docs.google.com/spreadsheets/d/1LlQVpi8O7RMmugpVkOlXckiNGrSzE2isS73drWsgxYk/edit" target="_blank"
          style="display:flex;align-items:center;gap:7px;padding:8px 10px;background:var(--g50);border:1px solid var(--g200);border-radius:8px;text-decoration:none;color:var(--g700);font-size:12px;font-weight:600;transition:.15s;"
          onmouseover="this.style.background='var(--primary-lt)';this.style.borderColor='var(--accent)'"
          onmouseout="this.style.background='var(--g50)';this.style.borderColor='var(--g200)'">
@@ -1157,13 +1157,13 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     </div>
     <div class="modal-sec">
       <h4>マスターデータ保存先</h4>
-      <a href="https://console.firebase.google.com/u/0/project/nippou-f191c/firestore/databases/-default-/data" target="_blank"
+      <a id="link-fb-console" href="https://console.firebase.google.com/u/0/project/nippou-f191c/firestore/databases/-default-/data" target="_blank"
          style="display:flex;align-items:center;gap:7px;padding:8px 10px;background:var(--g50);border:1px solid var(--g200);border-radius:8px;text-decoration:none;color:var(--g700);font-size:12px;font-weight:600;transition:.15s;"
          onmouseover="this.style.background='var(--primary-lt)';this.style.borderColor='var(--accent)'"
          onmouseout="this.style.background='var(--g50)';this.style.borderColor='var(--g200)'">
         <div>
           <div>Firebase</div>
-          <div style="font-size:10px;color:var(--g400);font-weight:400;margin-top:1px;">Cloud Firestore / nippou-f191c</div>
+          <div id="label-fb-project" style="font-size:10px;color:var(--g400);font-weight:400;margin-top:1px;">Cloud Firestore / nippou-f191c</div>
         </div>
         <span style="margin-left:auto;font-size:11px;color:var(--g400);">開く</span>
       </a>
@@ -1227,23 +1227,111 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 
 <script>
 // ═══════════════════════════════════════════
+//  DEPARTMENT CONFIG （部署ごとに変わる設定を一括集約）
+// ═══════════════════════════════════════════
+// 他部署へ横展開する際は、下記 DEFAULT を書き換えるか、
+// 本スクリプトより前に読み込む config.js の中で
+//   window.DEPARTMENT_CONFIG_OVERRIDE = { ... 上書きしたい項目のみ ... }
+// を定義して上書きする（index.html本体は共通のまま流用可能）。
+// ※ 部署ごとに別Firebaseプロジェクト・別公開URLを用意する前提。
+const DEPARTMENT_CONFIG = (function(){
+  const DEFAULT = {
+    deptId: 'np',                 // localStorageキー / マスタdoc id のプレフィックス
+    collection: 'dailyReports',   // Firestore コレクション名
+    branding: {
+      appTitle: '日報アプリ',
+      docTitle: '日報アプリ｜ホリゾン生産管理',
+      company:  'HORIZON',
+      dept:     '生産管理課'
+    },
+    gasUrl: 'https://script.google.com/a/macros/horizon.co.jp/s/AKfycbxx96D5Lz_I3B_L-Bia9WftcUP6Em-l6mTulefZBB6Xu9BEITm0DLroTwB1CHjLkkL6/exec',
+    firebase: {
+      apiKey: 'AIzaSyA-15zZIlEHpPY2ogwaY88ZH85m6kKYmjs',
+      authDomain: 'nippou-f191c.firebaseapp.com',
+      projectId: 'nippou-f191c',
+      storageBucket: 'nippou-f191c.firebasestorage.app',
+      messagingSenderId: '572692409927',
+      appId: '1:572692409927:web:598e7009b1dbe9e04a0b62',
+      measurementId: 'G-0YPCXED16F'
+    },
+    allowedDomains: ['horizon.co.jp', 'bp.horizon.co.jp'],
+    // 設定モーダル内の外部リンク（部署固有）。Firebaseコンソールは projectId から自動生成。
+    links: {
+      backupSheetUrl: 'https://docs.google.com/spreadsheets/d/1LlQVpi8O7RMmugpVkOlXckiNGrSzE2isS73drWsgxYk/edit'
+    },
+    // 勤務ルール（時刻は "HH:MM"）
+    rules: {
+      workStart:      '08:30',  // 始業
+      normalEnd:      '17:20',  // 定時（夕方休憩前）
+      otStart:        '17:30',  // 残業開始
+      roundStepMin:   15,       // 丸め単位（分）: これ未満は切り捨て、以降切り上げ
+      roundStepHours: 0.25,     // 丸め単位（時間）
+      lunch: {                  // 昼休憩（奇数月/偶数月で切替。固定なら両方同値に）
+        odd:  { start: '12:40', end: '13:30' },
+        even: { start: '12:20', end: '13:10' }
+      }
+    },
+    // 初期カテゴリ（新規Firebaseプロジェクトの種。以後は「管理」タブで編集可）
+    defaultCats: [
+      { cd:'K', label:'計画',       color:'#3b82f6', subs:[{cd:'K1',label:'新規計画'},{cd:'K2',label:'計画調整'},{cd:'K3',label:'進捗確認'},{cd:'K4',label:'部品進捗確認'}] },
+      { cd:'T', label:'手配',       color:'#22c55e', subs:[{cd:'T1',label:'計画手配'},{cd:'T2',label:'計画外手配'},{cd:'T3',label:'試作手配'}] },
+      { cd:'J', label:'受注',       color:'#ef4444', subs:[{cd:'J1',label:'受注確認/引当'},{cd:'J2',label:'OEM商品受注出荷'}] },
+      { cd:'B', label:'BOMメンテ', color:'#a855f7', subs:[{cd:'B1',label:'部品表メンテナンス'},{cd:'B2',label:'設計変更'},{cd:'B3',label:'原価集計'}] },
+      { cd:'S', label:'打合せ',     color:'#eab308', subs:[{cd:'S1',label:'打合せ'},{cd:'S2',label:'問い合わせ対応'}] },
+      { cd:'Z', label:'改善',       color:'#06b6d4', subs:[{cd:'Z1',label:'課内'},{cd:'Z2',label:'課外'},{cd:'Z3',label:'スタフェス対応'}] },
+      { cd:'O', label:'その他',     color:'#6b7280', subs:[{cd:'O1',label:'その他'}] },
+      { cd:'A', label:'アフター',   color:'#ec4899', subs:[{cd:'A1',label:'アフター改善'},{cd:'A2',label:'価格登録'},{cd:'A3',label:'在庫管理'},{cd:'A4',label:'受注対応'},{cd:'A5',label:'特注対応'}] }
+    ]
+  };
+  function isObj(v){ return v && typeof v === 'object' && !Array.isArray(v); }
+  function deepMerge(base, over){
+    if (!isObj(over)) return base;
+    const out = Object.assign({}, base);
+    Object.keys(over).forEach(k => {
+      out[k] = (isObj(out[k]) && isObj(over[k])) ? deepMerge(out[k], over[k]) : over[k];
+    });
+    return out;
+  }
+  try { return deepMerge(DEFAULT, window.DEPARTMENT_CONFIG_OVERRIDE || null); }
+  catch(e) { return DEFAULT; }
+})();
+
+// "HH:MM" → 分。不正値は0。
+function _hmToMin(hm){
+  if (typeof hm !== 'string') return 0;
+  const p = hm.split(':'); const h = Number(p[0]), m = Number(p[1]);
+  return (isNaN(h)?0:h)*60 + (isNaN(m)?0:m);
+}
+
+// 部署ブランディングをDEPARTMENT_CONFIGから反映（要素が無くても安全）
+function applyDepartmentBranding(){
+  try {
+    const b = DEPARTMENT_CONFIG.branding || {};
+    const sub = [b.company, b.dept].filter(Boolean).join(' / ');
+    if (b.docTitle) document.title = b.docTitle;
+    const t = document.getElementById('brand-title');   if (t && b.appTitle) t.textContent = b.appTitle;
+    const s = document.getElementById('brand-sub');      if (s && sub) s.textContent = sub;
+    const p = document.getElementById('pdf-brand-sub');  if (p && sub) p.textContent = sub;
+    // 設定モーダルの外部リンク（バックアップシート / Firebaseコンソール）
+    const pid = (DEPARTMENT_CONFIG.firebase && DEPARTMENT_CONFIG.firebase.projectId) || '';
+    const sheetUrl = DEPARTMENT_CONFIG.links && DEPARTMENT_CONFIG.links.backupSheetUrl;
+    const bs = document.getElementById('link-backup-sheet'); if (bs && sheetUrl) bs.href = sheetUrl;
+    const fc = document.getElementById('link-fb-console');
+    if (fc && pid) fc.href = `https://console.firebase.google.com/u/0/project/${pid}/firestore/databases/-default-/data`;
+    const lp = document.getElementById('label-fb-project'); if (lp && pid) lp.textContent = 'Cloud Firestore / ' + pid;
+  } catch(e) { /* 無視 */ }
+}
+
+// ═══════════════════════════════════════════
 //  MASTER DATA
 // ═══════════════════════════════════════════
-// ── デフォルト項目定義（変更しないこと。カスタム定義はlocalStorageに保存） ──
-const CATS_DEFAULT = [
-  { cd:'K', label:'計画',       color:'#3b82f6', subs:[{cd:'K1',label:'新規計画'},{cd:'K2',label:'計画調整'},{cd:'K3',label:'進捗確認'},{cd:'K4',label:'部品進捗確認'}] },
-  { cd:'T', label:'手配',       color:'#22c55e', subs:[{cd:'T1',label:'計画手配'},{cd:'T2',label:'計画外手配'},{cd:'T3',label:'試作手配'}] },
-  { cd:'J', label:'受注',       color:'#ef4444', subs:[{cd:'J1',label:'受注確認/引当'},{cd:'J2',label:'OEM商品受注出荷'}] },
-  { cd:'B', label:'BOMメンテ', color:'#a855f7', subs:[{cd:'B1',label:'部品表メンテナンス'},{cd:'B2',label:'設計変更'},{cd:'B3',label:'原価集計'}] },
-  { cd:'S', label:'打合せ',     color:'#eab308', subs:[{cd:'S1',label:'打合せ'},{cd:'S2',label:'問い合わせ対応'}] },
-  { cd:'Z', label:'改善',       color:'#06b6d4', subs:[{cd:'Z1',label:'課内'},{cd:'Z2',label:'課外'},{cd:'Z3',label:'スタフェス対応'}] },
-  { cd:'O', label:'その他',     color:'#6b7280', subs:[{cd:'O1',label:'その他'}] },
-  { cd:'A', label:'アフター',   color:'#ec4899', subs:[{cd:'A1',label:'アフター改善'},{cd:'A2',label:'価格登録'},{cd:'A3',label:'在庫管理'},{cd:'A4',label:'受注対応'},{cd:'A5',label:'特注対応'}] }
-];
+// ── デフォルト項目定義（DEPARTMENT_CONFIG.defaultCats が種。カスタム定義はlocalStorage/Firebaseに保存） ──
+const CATS_DEFAULT = DEPARTMENT_CONFIG.defaultCats;
 const CATS_STORAGE_KEY  = '__catsCustom__';
 const CATS_UPDATED_KEY  = '__catsUpdatedAt__'; // 最終GAS取得日時
-const MASTER_DOC_COLLECTION = 'dailyReports';
-const MASTER_DOC_ID = 'np_master_categories';
+const COLLECTION = DEPARTMENT_CONFIG.collection;
+const MASTER_DOC_COLLECTION = COLLECTION;
+const MASTER_DOC_ID = DEPARTMENT_CONFIG.deptId + '_master_categories';
 let _selectedAdminCatCd = '';
 
 // ── localStorageへの読み書き ──
@@ -1822,21 +1910,14 @@ function setTheme(theme){
 // ═══════════════════════════════════════════
 //  SETTINGS
 // ═══════════════════════════════════════════
-const GAS_URL_DEFAULT = 'https://script.google.com/a/macros/horizon.co.jp/s/AKfycbxx96D5Lz_I3B_L-Bia9WftcUP6Em-l6mTulefZBB6Xu9BEITm0DLroTwB1CHjLkkL6/exec';
-const firebaseConfig = {
-  apiKey: 'AIzaSyA-15zZIlEHpPY2ogwaY88ZH85m6kKYmjs',
-  authDomain: 'nippou-f191c.firebaseapp.com',
-  projectId: 'nippou-f191c',
-  storageBucket: 'nippou-f191c.firebasestorage.app',
-  messagingSenderId: '572692409927',
-  appId: '1:572692409927:web:598e7009b1dbe9e04a0b62',
-  measurementId: 'G-0YPCXED16F'
-};
-const FIREBASE_ALLOWED_DOMAINS = ['horizon.co.jp', 'bp.horizon.co.jp'];
+// ↓ 値は DEPARTMENT_CONFIG から供給（定数名は従来どおりで下流コードは無変更）
+const GAS_URL_DEFAULT = DEPARTMENT_CONFIG.gasUrl;
+const firebaseConfig = DEPARTMENT_CONFIG.firebase;
+const FIREBASE_ALLOWED_DOMAINS = DEPARTMENT_CONFIG.allowedDomains;
 const USE_FIREBASE = !!(window.firebase && firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf('YOUR_') === -1);
-const DATA_SOURCE_KEY = 'np_data_source';
-const DATA_SOURCE_RESET_KEY = 'np_data_source_reset_firebase_primary_20260614';
-const SHEET_SYNC_CURSOR_KEY = 'np_sheet_sync_cursor_v1';
+const DATA_SOURCE_KEY = DEPARTMENT_CONFIG.deptId + '_data_source';
+const DATA_SOURCE_RESET_KEY = DEPARTMENT_CONFIG.deptId + '_data_source_reset_firebase_primary_20260614';
+const SHEET_SYNC_CURSOR_KEY = DEPARTMENT_CONFIG.deptId + '_sheet_sync_cursor_v1';
 let fdb = null;
 let fauth = null;
 let firebaseUser = null;
@@ -2537,7 +2618,7 @@ async function checkFirebaseConnection() {
   setLoading(true);
   try {
     await ensureFirebaseReady();
-    await fdb.collection('dailyReports').limit(1).get();
+    await fdb.collection(COLLECTION).limit(1).get();
     if (res) res.textContent = `Firebase OK: ${firebaseUser ? firebaseUser.email : 'signed in'}`;
   } catch(e) {
     if (res) res.textContent = `Firebase check failed: ${e.message}`;
@@ -2563,7 +2644,7 @@ function normalizeRows(rows) {
 }
 
 function getDailyRef(date, author) {
-  return fdb.collection('dailyReports').doc(dailyDocId(date, author));
+  return fdb.collection(COLLECTION).doc(dailyDocId(date, author));
 }
 
 async function saveDayFirebase(date, author, rows) {
@@ -2624,7 +2705,7 @@ async function loadDayFirebase(date, author) {
 
 async function loadDashDataFirebase(date) {
   await ensureFirebaseReady();
-  const snap = await fdb.collection('dailyReports').where('date', '==', date).get();
+  const snap = await fdb.collection(COLLECTION).where('date', '==', date).get();
   const result = {};
   const leaves = {};
   snap.docs.forEach(doc => {
@@ -2640,7 +2721,7 @@ async function loadDashDataFirebase(date) {
 
 async function loadRangeDataFirebase(startDate, endDate, ck, ttl) {
   await ensureFirebaseReady();
-  const snap = await fdb.collection('dailyReports')
+  const snap = await fdb.collection(COLLECTION)
     .where('date', '>=', startDate)
     .where('date', '<=', endDate)
     .get();
@@ -2727,7 +2808,7 @@ async function syncDateRangeDiffToSheet() {
   try {
     await ensureFirebaseReady();
     const syncStartedAt = Date.now();
-    const snap = await fdb.collection('dailyReports')
+    const snap = await fdb.collection(COLLECTION)
       .where('date', '>=', startDate)
       .where('date', '<=', endDate)
       .get();
@@ -2824,7 +2905,7 @@ async function exportRangeToExcel() {
       ensureXlsxLib(),
       ensureFirebaseReady()
     ]);
-    const snap = await fdb.collection('dailyReports')
+    const snap = await fdb.collection(COLLECTION)
       .where('date', '>=', startDate)
       .where('date', '<=', endDate)
       .get();
@@ -3145,9 +3226,8 @@ async function saveLeaveTime(date, author, leaveTime) {
 function getLunchBreak(dateStr) {
   const d = dateStr ? new Date(dateStr + 'T00:00:00') : new Date();
   const month = d.getMonth() + 1;
-  return month % 2 === 1
-    ? { start: 12*60+40, end: 13*60+30 }  // 奇数月: 12:40〜13:30
-    : { start: 12*60+20, end: 13*60+10 }; // 偶数月: 12:20〜13:10
+  const w = (month % 2 === 1) ? DEPARTMENT_CONFIG.rules.lunch.odd : DEPARTMENT_CONFIG.rules.lunch.even;
+  return { start: _hmToMin(w.start), end: _hmToMin(w.end) };
 }
 
 const _calcFromLeaveCache = new Map();
@@ -3159,18 +3239,20 @@ function calcFromLeave(leaveHHMM, dateStr) {
   const [hh,mm] = leaveHHMM.split(':').map(Number);
   if (isNaN(hh)||isNaN(mm)) return null;
   const leaveMins = hh*60 + mm;
-  const startMins = 8*60 + 30;   // 8:30
-  const normalEnd = 17*60 + 20;  // 17:20（定時、夕方休憩前）
-  const otStart   = 17*60 + 30;  // 17:30（残業開始）
+  const R = DEPARTMENT_CONFIG.rules;
+  const stepMin = R.roundStepMin, stepH = R.roundStepHours;
+  const startMins = _hmToMin(R.workStart);   // 始業
+  const normalEnd = _hmToMin(R.normalEnd);   // 定時（夕方休憩前）
+  const otStart   = _hmToMin(R.otStart);     // 残業開始
 
   if (leaveMins <= startMins) { const r={normal:0, ot:0}; _calcFromLeaveCache.set(_ck,r); return r; }
 
   // ── 残業計算 ──
-  // 15分未満切り捨て、以降15分ごとに0.25h切り上げ
+  // 丸め単位未満は切り捨て、以降は切り上げ
   let ot = 0;
   if (leaveMins > otStart) {
     const otMins = leaveMins - otStart;
-    ot = otMins < 15 ? 0 : Math.ceil(otMins / 15) * 0.25;
+    ot = otMins < stepMin ? 0 : Math.ceil(otMins / stepMin) * stepH;
   }
 
   // ── 通常時間計算 ──
@@ -3185,8 +3267,8 @@ function calcFromLeave(leaveHHMM, dateStr) {
   }
 
   const workMins = Math.max(0, workEnd - startMins - lunchDeduct);
-  // 15分未満切り捨て、15分以上は0.25h単位切り上げ（バイアスなし）
-  let normal = workMins < 15 ? 0 : Math.ceil(workMins / 15) * 0.25;
+  // 丸め単位未満は切り捨て、以降は切り上げ（バイアスなし）
+  let normal = workMins < stepMin ? 0 : Math.ceil(workMins / stepMin) * stepH;
   normal = Math.max(0, normal);
 
   const _result = {normal, ot};
@@ -5706,6 +5788,7 @@ function updateStickyOffsets() {
 }
 
 (async function init(){
+  applyDepartmentBranding(); // 部署名・タイトルをDEPARTMENT_CONFIGから反映
   applyTheme(getTheme());   // ダーク/ライトのチャート色・トグル状態を初期化
   normalizeDataSourceForFirebasePrimary();
   await loadMasterFromFirebase(false);
