@@ -1252,6 +1252,9 @@ const DEPARTMENT_CONFIG = (function(){
     allowedDomains: ['horizon.co.jp', 'bp.horizon.co.jp'],
     // 担当者選択の初期リスト（部署固有）。新規ブラウザで表示される既定の担当者。
     defaultAuthors: ['ヘルプ','秋永','吉永','山田','須藤','平山','小野','田村','谷'],
+    // 上部ナビの外部アプリリンク（黒板/手順書/資料検索）を表示するか。
+    // これらは生産管理課専用の外部システムのため、他部署は config.js で false にして非表示化。
+    showAppLinks: true,
     // 設定モーダル内の外部リンク（部署固有）。Firebaseコンソールは projectId から自動生成。
     links: {
       backupSheetUrl: 'https://docs.google.com/spreadsheets/d/1LlQVpi8O7RMmugpVkOlXckiNGrSzE2isS73drWsgxYk/edit'
@@ -1321,6 +1324,10 @@ function applyDepartmentBranding(){
     const fc = document.getElementById('link-fb-console');
     if (fc && pid) fc.href = `https://console.firebase.google.com/u/0/project/${pid}/firestore/databases/-default-/data`;
     const lp = document.getElementById('label-fb-project'); if (lp && pid) lp.textContent = 'Cloud Firestore / ' + pid;
+    // 上部ナビの外部アプリリンク（黒板/手順書/資料検索）。部署設定で無効なら除去（生産管理課専用）。
+    if (DEPARTMENT_CONFIG.showAppLinks === false) {
+      document.querySelectorAll('.tabs .tab-link').forEach(el => el.remove());
+    }
   } catch(e) { /* 無視 */ }
 }
 
