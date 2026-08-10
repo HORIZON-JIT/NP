@@ -168,17 +168,12 @@ table.entry-tbl tr:hover td{background:#FAF7F1;}
 table.entry-tbl tr.row-focus td{background:rgba(37,99,235,.07);}
 [data-theme="dark"] table.entry-tbl tr:hover td{background:rgba(255,255,255,.04);}
 [data-theme="dark"] table.entry-tbl tr.row-focus td{background:rgba(255,255,255,.07);}
-.td-main{text-align:center;font-weight:700;font-size:12px;border-right:3px solid;padding:4px 6px!important;vertical-align:middle!important;}
+/* 大分類セルの色は各カテゴリの color（config.js / マスタ）由来。
+   buildTable が td へ --cat-color を設定し、枠線＆淡色背景に反映（部署・コード非依存）。
+   背景は color-mix で --surface と混色するためライト/ダーク両テーマに自動追従。 */
+.td-main{text-align:center;font-weight:700;font-size:12px;border-right:3px solid var(--cat-color,#6b7280);background:color-mix(in srgb, var(--cat-color,#6b7280) 8%, var(--surface));padding:4px 6px!important;vertical-align:middle!important;}
 .td-main .main-cd{display:block;font-size:16px;line-height:1.2;}
 .td-main .main-lbl{display:block;font-size:10px;margin-top:2px;}
-.cat-K{border-color:#3b82f6!important;background:#eff6ff;}
-.cat-T{border-color:#22c55e!important;background:#f0fdf4;}
-.cat-J{border-color:#ef4444!important;background:#fef2f2;}
-.cat-B{border-color:#a855f7!important;background:#faf5ff;}
-.cat-S{border-color:#eab308!important;background:#fefce8;}
-.cat-Z{border-color:#06b6d4!important;background:#ecfeff;}
-.cat-O{border-color:#6b7280!important;background:#faf9f7;}
-.cat-A{border-color:#ec4899!important;background:#fdf2f8;}
 .td-name{cursor:pointer;font-weight:500;}
 .td-name:hover{color:var(--primary);text-decoration:underline;}
 .td-cd{color:var(--g400);font-size:12px;text-align:center;}
@@ -687,10 +682,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 [data-theme="dark"] table.entry-tbl thead th{background:#232834;color:var(--g700);border-bottom-color:var(--g200);}
 [data-theme="dark"] tfoot td{background:#0A0A0A!important;color:var(--g800);}
 [data-theme="dark"] table.entry-tbl tr:hover td{background:#1F2530;}
-/* ── 大分類セルの淡色背景を暗トーンに ── */
-[data-theme="dark"] .cat-K,[data-theme="dark"] .cat-T,[data-theme="dark"] .cat-J,
-[data-theme="dark"] .cat-B,[data-theme="dark"] .cat-S,[data-theme="dark"] .cat-Z,
-[data-theme="dark"] .cat-O,[data-theme="dark"] .cat-A{background:#1F2530;}
+/* 大分類セルの淡色背景はダークテーマでも color-mix(--surface) が自動で暗トーン化するため個別指定不要 */
 /* ── 入力欄の状態色（淡色背景）を暗トーンに ── */
 [data-theme="dark"] .hours-wrap input{color:var(--g800);}
 [data-theme="dark"] .hours-wrap input.has-val{background:#232834;color:var(--primary);}
@@ -3754,7 +3746,8 @@ function buildTable() {
       const tr=document.createElement('tr');
       if (i===0) {
         const td=document.createElement('td');
-        td.className=`td-main cat-${cat.cd}`; td.rowSpan=cat.subs.length;
+        td.className='td-main'; td.rowSpan=cat.subs.length;
+        td.style.setProperty('--cat-color', cat.color || '#6b7280'); // 色は各カテゴリのcolor由来（部署非依存）
         td.innerHTML=`<span class="main-cd">${cat.cd}</span><span class="main-lbl">${cat.label}</span>`;
         tr.appendChild(td);
       }
