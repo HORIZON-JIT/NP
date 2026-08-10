@@ -4,20 +4,10 @@
 //  index.html は生産管理課と共通（単一ソース）。この config.js だけが
 //  法務知財部固有の値を上書きする。未記載の項目は生産管理課の既定値を継承。
 //
-//  ★★★ 立ち上げに必要な唯一の残作業 ★★★
-//   下記 firebase を「法務知財部専用の新規Firebaseプロジェクト」の設定に差し替える。
-//   （現在は 'YOUR_...' プレースホルダのため fail-closed = Firebaseに接続せず
-//     ローカルモードで動作。生産管理課のデータには一切触れない安全状態）
-//
-//  【Firebaseプロジェクト作成手順（概要）】
-//   1) https://console.firebase.google.com/ で新規プロジェクト作成
-//   2) Firestore Database を有効化（本番モード）
-//   3) Authentication → Sign-in method → Google を有効化
-//   4) Authentication → Settings → 承認済みドメインに horizon-jit.github.io を追加
-//   5) プロジェクト設定 → マイアプリ → ウェブアプリを追加 → 表示される
-//      firebaseConfig（apiKey等）を下の firebase ブロックに貼り付け
-//   6) Firestore のセキュリティルールは生産管理課の既存ルールを流用
-//      （@horizon.co.jp / @bp.horizon.co.jp を許可）
+//  Firebaseプロジェクト: nippou-legal（法務知財部専用。生産管理課 nippou-f191c とは別）。
+//  Firestore(asia-northeast1) + Google認証を有効化済み。承認済みドメインに
+//  horizon-jit.github.io を登録済み。セキュリティルールは @horizon.co.jp /
+//  @bp.horizon.co.jp のログインユーザーのみ read/write 許可。
 //
 //  ※ カテゴリ(defaultCats)は「新プロジェクトが空のときの初期の種」。
 //    起動後は「管理」タブでいつでも追加/編集/並べ替え/有効無効が可能。
@@ -37,15 +27,14 @@ window.DEPARTMENT_CONFIG_OVERRIDE = {
   // GASバックアップは未使用。空にして生産管理課のGASエンドポイント継承を防ぐ（重要）。
   gasUrl: '',
 
-  // ★ 法務知財部用の新Firebaseプロジェクトの設定に差し替える（必須・唯一の残作業）
-  //   'YOUR_' が残っている間は Firebase に接続しない（fail-closed / ローカルモード）。
+  // 法務知財部専用のFirebaseプロジェクト（nippou-legal）。生産管理課(nippou-f191c)とは別物。
   firebase: {
-    apiKey:            'YOUR_API_KEY',
-    authDomain:        'YOUR_PROJECT.firebaseapp.com',
-    projectId:         'YOUR_PROJECT',
-    storageBucket:     'YOUR_PROJECT.firebasestorage.app',
-    messagingSenderId: 'YOUR_SENDER_ID',
-    appId:             'YOUR_APP_ID'
+    apiKey:            'AIzaSyDLiYOfkKmPZ2rGFaUd1oTQek5XVK7hfMk',
+    authDomain:        'nippou-legal.firebaseapp.com',
+    projectId:         'nippou-legal',
+    storageBucket:     'nippou-legal.firebasestorage.app',
+    messagingSenderId: '802361483209',
+    appId:             '1:802361483209:web:e4c2bd66666e93d4d45218'
   },
 
   allowedDomains: ['horizon.co.jp', 'bp.horizon.co.jp'],
