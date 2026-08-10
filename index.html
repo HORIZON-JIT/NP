@@ -1438,6 +1438,17 @@ let _ALL_SUBS = [];
 let _INP_CACHE = {};
 rebuildSubMap();
 
+// 大分類コード→色/ラベルの対応表。ダッシュボード各グラフが参照。
+// 生産管理課固定ではなく現在の CATS（マスタ）から動的生成し、他部署でも正しく表示。
+let CAT_COLOR = {};
+let CAT_LABEL = {};
+function rebuildCatMaps() {
+  CAT_COLOR = {};
+  CAT_LABEL = {};
+  (CATS || []).forEach(c => { CAT_COLOR[c.cd] = c.color || '#6b7280'; CAT_LABEL[c.cd] = c.label || c.cd; });
+}
+rebuildCatMaps();
+
 function escHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
@@ -1456,6 +1467,7 @@ function applyMasterCats(cats, options = {}) {
   normalized.forEach(c => CATS.push(c));
   saveCatsToStorage(CATS);
   rebuildSubMap();
+  rebuildCatMaps();
   buildTable();
   renderUnitUI();
   updateLivePie();
@@ -4998,7 +5010,7 @@ function renderStackBar(byAuthor, canvasId, emptyId) {
   if (!authors.length) { canvas.style.display='none'; emptyEl.style.display='block'; return; }
   canvas.style.display='block'; emptyEl.style.display='none';
 
-  const mainCds = ['K','T','J','B','S','Z','O','A'];
+  const mainCds = CATS.map(c => c.cd); // 現在のマスタの大分類コード（部署非依存）
 
   const data = authors.map(a => {
     const rows = byAuthor[a] || [];
@@ -5006,8 +5018,8 @@ function renderStackBar(byAuthor, canvasId, emptyId) {
     mainCds.forEach(k => seg[k] = 0);
     rows.forEach(r => {
       const h = (r.hoursNormal||0) + (r.hoursOT||0);
-      const k = SUB_MAP[r.cdSub]?.mainCd || 'O';
-      if (seg[k] !== undefined) seg[k] += h; else seg['O'] += h;
+      const k = SUB_MAP[r.cdSub]?.mainCd;
+      if (k && seg[k] !== undefined) seg[k] += h; // マスタに無い孤立コードは加算しない(NaN防止)
     });
     const total = Object.values(seg).reduce((s,v) => s+v, 0);
     return { name: a, seg, total };
@@ -5195,8 +5207,7 @@ function renderPersonPies(byAuthor, gridId, leaveNormal=null, leaveOT=null) {
   });
 }
 
-const CAT_COLOR={'K':'#3b82f6','T':'#22c55e','J':'#ef4444','B':'#a855f7','S':'#eab308','Z':'#06b6d4','O':'#6b7280','A':'#ec4899'};
-const CAT_LABEL={'K':'計画','T':'手配','J':'受注','B':'BOM','S':'打合せ','Z':'改善','O':'その他','A':'アフター'};
+// CAT_COLOR / CAT_LABEL は上部(rebuildCatMaps)でCATSから動的生成（生産管理課固定を廃止）
 const PIE_SIZE=180; // 個人円グラフの描画サイズ(px)
 
 // ── Canvasチャート用テーマカラー（ライト/ダークで切替。applyTheme()で更新）──
