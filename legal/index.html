@@ -3009,6 +3009,23 @@ function withTimeout(promise, ms, message) {
   });
 }
 
+// 同時実行数を limit 件に制限して items を fn で処理し、入力順の結果配列を返す。
+// Firestore SDK(10.x)は多数のgetを一斉に投げると内部assertion(Unexpected state)を
+// 起こすことがあるため、年次の期別読込などはこれで少数ずつに絞る。
+async function mapPool(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const idx = next++;
+      results[idx] = await fn(items[idx], idx);
+    }
+  }
+  const n = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(Array.from({length:n}, worker));
+  return results;
+}
+
 function periodForDate(dateStr) {
   const [y,m,d] = dateStr.split('-').map(Number);
   if (d >= 16) {
@@ -4694,12 +4711,12 @@ async function renderYearlyDash(silent) {
     };
     let allData, prevAllData;
     try {
-      const [cur, prev] = await Promise.all([
-        Promise.all(fiscalPeriods.map(loadPeriod)),
-        Promise.all(prevFiscalPeriods.map(loadPeriod)),
-      ]);
-      allData = cur;
-      prevAllData = prev;
+      // 24期を一斉ではなく最大4並列で取得（Firestore SDKの同時実行過多による
+      // INTERNAL ASSERTION(Unexpected state)を回避しつつ、直列より高速）。
+      const allPeriods = fiscalPeriods.concat(prevFiscalPeriods);
+      const allResults = await mapPool(allPeriods, 4, loadPeriod);
+      allData     = allResults.slice(0, fiscalPeriods.length);
+      prevAllData = allResults.slice(fiscalPeriods.length);
     } catch(e) {
       _renderCache.yearly = null;
       document.getElementById('yearly-person-grid').innerHTML=
