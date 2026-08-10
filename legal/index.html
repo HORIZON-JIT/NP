@@ -1526,6 +1526,7 @@ async function loadMasterFromFirebase(force = false) {
       fdb.collection(MASTER_DOC_COLLECTION).doc(MASTER_DOC_ID).get(),
       10000, 'master read timeout'
     );
+    hideFirebaseLoginBar(); // 読み取り成功＝認証OKなのでログインバーを隠す
     if (!snap.exists) {
       await seedMasterToFirebase();
       setAdminStatus('Firebaseへ初期マスタを作成しました。');
@@ -1541,6 +1542,9 @@ async function loadMasterFromFirebase(force = false) {
     console.warn('Master load failed:', e.message);
     setAdminStatus('Firebaseマスタを読込できませんでした。キャッシュを使用中です。', true);
     renderAdminMasters();
+    // 認証/権限まわりの失敗が濃厚な場合はログインバーを表示（原因コードも提示）。
+    // タイムアウトやオフラインでも、ログインで解消することが多いので促す。
+    showFirebaseLoginBar('Firebaseに接続できませんでした（' + ((e && (e.code || e.message)) || 'error') + '）。会社のGoogleアカウント(@horizon.co.jp)でログインしてください。');
     return false;
   }
 }
@@ -2635,6 +2639,52 @@ function ensureFirebaseReady() {
     });
   });
   return firebaseReadyPromise;
+}
+
+// Firebaseの対話的ログイン。必ずユーザー操作(クリック等)から呼ぶこと。
+// 起動時の自動popupはブラウザにブロックされるため、gesture経由で実行する。
+async function firebaseInteractiveLogin() {
+  firebaseReadyPromise = null; // 前回の失敗/キャッシュを破棄して新規にpopupを出す
+  return ensureFirebaseReady();
+}
+
+// 画面上部に固定のログイン促進バーを表示（未認証で読込失敗したとき）。
+function showFirebaseLoginBar(detail) {
+  if (!firebaseConfigured()) return;
+  let bar = document.getElementById('fb-login-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'fb-login-bar';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#b45309;color:#fff;padding:8px 14px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.25);flex-wrap:wrap;';
+    const msg = document.createElement('span'); msg.id = 'fb-login-bar-msg';
+    const btn = document.createElement('button');
+    btn.textContent = 'Googleでログイン';
+    btn.style.cssText = 'background:#fff;color:#b45309;border:none;border-radius:6px;padding:6px 14px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;';
+    btn.onclick = async () => {
+      btn.disabled = true; btn.textContent = 'ログイン中...';
+      setLoading(true);
+      try {
+        await firebaseInteractiveLogin();
+        hideFirebaseLoginBar();
+        await loadMasterFromFirebase(true);
+        await loadDay_and_render();
+      } catch(e) {
+        const m = document.getElementById('fb-login-bar-msg');
+        if (m) m.textContent = 'ログイン失敗: ' + ((e && (e.code || e.message)) || e) + ' — 会社のGoogleアカウント(@horizon.co.jp)で再試行してください';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Googleでログイン'; setLoading(false);
+      }
+    };
+    bar.appendChild(msg); bar.appendChild(btn);
+    document.body.appendChild(bar);
+  }
+  const m = document.getElementById('fb-login-bar-msg');
+  if (m) m.textContent = detail || 'Firebaseに接続できません。Googleでログインしてください。';
+  bar.style.display = 'flex';
+}
+function hideFirebaseLoginBar() {
+  const bar = document.getElementById('fb-login-bar');
+  if (bar) bar.style.display = 'none';
 }
 
 async function checkFirebaseConnection() {
