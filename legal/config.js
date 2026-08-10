@@ -42,6 +42,9 @@ window.DEPARTMENT_CONFIG_OVERRIDE = {
   // 担当者選択の初期リスト。起動後は設定画面から各自追加も可能。
   defaultAuthors: ['中西'],
 
+  // 上部ナビの外部アプリリンク（黒板/手順書/資料検索）は生産管理課専用のため非表示。
+  showAppLinks: false,
+
   // 外部リンクは法務知財部側で未設定。生産管理課のバックアップシート継承を防ぐため空に。
   links: { backupSheetUrl: '' },
 
