@@ -1519,8 +1519,13 @@ async function loadMasterFromFirebase(force = false) {
   }
   setAdminStatus(force ? 'マスタを再読込中...' : '');
   try {
-    await ensureFirebaseReady();
-    const snap = await fdb.collection(MASTER_DOC_COLLECTION).doc(MASTER_DOC_ID).get();
+    // Firestoreが応答しない(SDKのUnexpected state等でget()がハング)場合でも
+    // 初期化を止めないようタイムアウトを付与。失敗時はcatchでキャッシュ/既定にフォールバック。
+    await withTimeout(ensureFirebaseReady(), 12000, 'firebase ready timeout');
+    const snap = await withTimeout(
+      fdb.collection(MASTER_DOC_COLLECTION).doc(MASTER_DOC_ID).get(),
+      10000, 'master read timeout'
+    );
     if (!snap.exists) {
       await seedMasterToFirebase();
       setAdminStatus('Firebaseへ初期マスタを作成しました。');
@@ -2578,7 +2583,11 @@ function initFirebase() {
   firebase.initializeApp(firebaseConfig);
   fdb = firebase.firestore();
   fauth = firebase.auth();
-  try { fdb.enablePersistence({synchronizeTabs:true}).catch(()=>{}); } catch(_) {}
+  // オフライン永続化。synchronizeTabs(マルチタブ同期)は Firestore SDK 10.x の
+  // 「INTERNAL ASSERTION FAILED: Unexpected state」を誘発しやすく、特に同一オリジンで
+  // 複数アプリ(/NP/ と /NP/legal/)を開くと競合するため無効化（単一タブ永続化のみ）。
+  // 読み込みはアプリ独自の localStorage キャッシュ(lsCache)でも補完される。
+  try { fdb.enablePersistence().catch(()=>{}); } catch(_) {}
   return true;
 }
 
