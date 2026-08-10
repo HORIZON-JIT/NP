@@ -4214,7 +4214,7 @@ async function loadDay_and_render() {
         onLeaveChange();
       }
     }
-    document.getElementById('daily-memo').value=await loadMemo(currentDate,author);
+    const _memoEl=document.getElementById('daily-memo'); if(_memoEl) _memoEl.value=await loadMemo(currentDate,author);
   } finally { setLoading(false); }
 }
 
@@ -4301,8 +4301,8 @@ function onLeaveChange() {
 }
 
 async function saveMemo() {
-  saveMemoLocal(currentDate,getAuthor()||'?',document.getElementById('daily-memo').value);
-  const el=document.getElementById('memo-saved'); el.style.display='inline';
+  const _memoEl=document.getElementById('daily-memo'); if(_memoEl) saveMemoLocal(currentDate,getAuthor()||'?',_memoEl.value);
+  const el=document.getElementById('memo-saved'); if(!el) return; el.style.display='inline';
   setTimeout(()=>{ el.style.display='none'; },2000);
 }
 
@@ -5912,7 +5912,8 @@ function updateStickyOffsets() {
   document.getElementById('settings-modal').addEventListener('click',function(e){
     if(e.target===this) closeModal('settings-modal');
   });
-  document.getElementById('daily-memo').addEventListener('input',function(){
+  const _memoEl=document.getElementById('daily-memo');
+  if(_memoEl) _memoEl.addEventListener('input',function(){
     saveMemoLocal(currentDate,getAuthor()||'?',this.value);
   });
 
