@@ -4682,15 +4682,21 @@ async function renderYearlyDash(silent) {
 
     // 当年＋前年の24期分を同時並列取得（旧: 当年12→前年12の直列）
     const prevFiscalPeriods = getFiscalPeriods(currentFiscalYear - 1);
+    // 各期の読込にタイムアウトを付与。Firestoreのget()等が万一停止しても
+    // ローディングが永久に残らないよう、停止/失敗した期は null（空）にフォールバック。
+    const loadPeriod = ({year, month}) => {
+      const {startDate, endDate} = getPeriodDates(year, month);
+      return withTimeout(
+        loadRangeData(startDate, endDate, year, month),
+        15000,
+        `range read timed out: ${startDate} - ${endDate}`
+      ).catch(() => null);
+    };
     let allData, prevAllData;
     try {
       const [cur, prev] = await Promise.all([
-        Promise.all(fiscalPeriods.map(({year,month}) =>
-          loadRangeData(getPeriodDates(year,month).startDate, getPeriodDates(year,month).endDate, year, month).catch(()=>null)
-        )),
-        Promise.all(prevFiscalPeriods.map(({year,month}) =>
-          loadRangeData(getPeriodDates(year,month).startDate, getPeriodDates(year,month).endDate, year, month).catch(()=>null)
-        )),
+        Promise.all(fiscalPeriods.map(loadPeriod)),
+        Promise.all(prevFiscalPeriods.map(loadPeriod)),
       ]);
       allData = cur;
       prevAllData = prev;
