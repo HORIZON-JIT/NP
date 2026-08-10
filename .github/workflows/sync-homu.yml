@@ -1,0 +1,41 @@
+name: Sync homu/index.html from root
+
+# 単一ソース維持: ルートの index.html を唯一の編集元とし、
+# 変更時に法務知財部サブフォルダ (homu/index.html) へ自動コピーする。
+# これにより共通コードの改修が両アプリへ確実に反映され、コピーの乖離を防ぐ。
+# 注意: homu/config.js（部署固有設定）は対象外。上書きしない。
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'index.html'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy root index.html into homu/
+        run: |
+          mkdir -p homu
+          cp index.html homu/index.html
+
+      - name: Commit if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- homu/index.html; then
+            echo "homu/index.html は最新。コミット不要。"
+          else
+            git add homu/index.html
+            git commit -m "chore: sync homu/index.html from root index.html"
+            git push
+          fi
