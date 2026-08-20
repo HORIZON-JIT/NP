@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>日報アプリ｜ホリゾン生産管理</title>
+<!-- 部署別設定(config.js)をFirebaseSDKと並行して先読み。<script src="config.js">到達時には
+     取得済みとなり、メインスクリプトの起動待ち(ワンテンポの遅延)を無くす。挙動は不変。 -->
+<link rel="preload" href="config.js" as="script">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
