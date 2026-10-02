@@ -919,17 +919,6 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </div>
       </div>
     </div>
-    <!-- 大分類別／中分類別 1日平均（最下部） -->
-    <div class="rank-row rank-row-2">
-      <div class="card rank-card">
-        <div class="card-hd"><h2>大分類別 1日の総工数</h2><span class="card-sub">全カテゴリ</span></div>
-        <div class="card-body"><div id="daily-avg-cat"></div></div>
-      </div>
-      <div class="card rank-card">
-        <div class="card-hd"><h2>中分類別 1日の総工数</h2><span class="card-sub">上位10件</span></div>
-        <div class="card-body"><div id="daily-avg-sub"></div></div>
-      </div>
-    </div>
   </div><!-- /dash-daily -->
 
   <!-- ─── 月次ビュー ─── -->
@@ -976,16 +965,15 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </div>
       </div>
     </div>
-    <!-- 大分類別／中分類別 1日平均（最下部） -->
-    <div class="rank-row rank-row-2">
-      <div class="card rank-card">
-        <div class="card-hd"><h2>大分類別 1日の総工数</h2><span class="card-sub">全カテゴリ</span></div>
-        <div class="card-body"><div id="monthly-avg-cat"></div></div>
-      </div>
-      <div class="card rank-card">
-        <div class="card-hd"><h2>中分類別 1日の総工数</h2><span class="card-sub">上位10件</span></div>
-        <div class="card-body"><div id="monthly-avg-sub"></div></div>
-      </div>
+    <!-- 日報 入力状況（未入力チェック）＋ Folio 併記 -->
+    <div class="card" style="margin-top:14px;">
+      <div class="card-hd"><h2>日報 入力状況</h2><span class="card-sub" id="entry-matrix-sub">赤=未入力（平日の過去日）／グレー=土日・休日</span></div>
+      <div class="card-body"><div id="entry-matrix" style="overflow-x:auto;"></div></div>
+    </div>
+    <!-- Folio 予実対比 -->
+    <div class="card" id="folio-compare-card" style="margin-top:14px;">
+      <div class="card-hd"><h2>Folio 予実対比</h2><span class="card-sub" id="folio-compare-sub">日報の入力時間 と Folioの実績工数（時間割に配置済みの完了タスク）</span></div>
+      <div class="card-body"><div id="folio-compare"></div></div>
     </div>
   </div><!-- /dash-monthly -->
 
@@ -1048,16 +1036,13 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </div>
       </div>
     </div>
-    <!-- 大分類別／中分類別 1日平均（最下部） -->
-    <div class="rank-row rank-row-2">
-      <div class="card rank-card">
-        <div class="card-hd"><h2>大分類別 1日の総工数</h2><span class="card-sub">全カテゴリ</span></div>
-        <div class="card-body"><div id="yearly-avg-cat"></div></div>
-      </div>
-      <div class="card rank-card">
-        <div class="card-hd"><h2>中分類別 1日の総工数</h2><span class="card-sub">上位10件</span></div>
-        <div class="card-body"><div id="yearly-avg-sub"></div></div>
-      </div>
+    <!-- 中分類別 工数推移 -->
+    <div class="card" style="margin-top:14px;">
+      <div class="card-hd"><h2>中分類別 工数推移</h2>
+        <span class="card-sub" style="display:flex;align-items:center;gap:8px;">月期ごとの作業時間（定時＋残業）
+          <select id="sub-trend-filter" class="period-sel" onchange="renderSubTrend()" style="min-width:110px;"></select>
+        </span></div>
+      <div class="card-body"><div id="sub-trend" style="overflow-x:auto;"></div></div>
     </div>
   </div><!-- /dash-yearly -->
 
@@ -4901,7 +4886,6 @@ async function renderDash(silent) {
     });
     renderPersonPies(filteredDaily,'daily-person-grid',leaveNormalD,leaveOTD);
     // ランキング
-    renderRankings(filteredDaily, 'daily', 1);
     // 棒グラフ（強化版）：ヘルプを除外
     const otData={};
     allAuthorsD.forEach(a=>{
@@ -4980,6 +4964,186 @@ async function refreshMonthly() {
   _renderCache.monthly = null;
   _forceNoCache = true;
   try { await renderMonthlyDash(); } finally { _forceNoCache = false; }
+}
+
+// ═══════════════════════════════════════════
+//  日報 入力状況（未入力チェック）／ Folio 予実対比 ／ 中分類別 工数推移
+// ═══════════════════════════════════════════
+let _entryCtx = null;
+let _subTrendCtx = null;
+const _folioRangeCache = new Map();   // key: start|end -> {t, promise}
+
+function loadFolioRange(start, end) {
+  const key = `${start}|${end}`;
+  const hit = _folioRangeCache.get(key);
+  if (hit && Date.now() - hit.t < 5 * 60 * 1000) return hit.promise;
+  const promise = _gasJsonpTag(taskImportUrl(), {action:'getRangeHours', start, end}).then(d => {
+    if (!d || !d.ok) throw new Error((d && d.error) || 'Folioデータを取得できませんでした');
+    return d.byDate || {};
+  });
+  _folioRangeCache.set(key, {t: Date.now(), promise});
+  promise.catch(() => _folioRangeCache.delete(key));
+  return promise;
+}
+
+function loadFolioRangeInto(ctx) {
+  if (!taskImportUrl()) { ctx.folioErr = 'Folio連携が未設定です'; renderFolioCompare(); return; }
+  // Folioは今日までしか実績が無いので終了日を今日で打ち切る
+  const end = ctx.endDate < todayStr() ? ctx.endDate : todayStr();
+  if (end < ctx.startDate) { ctx.folio = {}; renderEntryMatrix(); renderFolioCompare(); return; }
+  loadFolioRange(ctx.startDate, end).then(byDate => {
+    if (_entryCtx !== ctx) return;          // 期間が切り替わっていたら捨てる
+    ctx.folio = byDate; renderEntryMatrix(); renderFolioCompare();
+  }).catch(e => {
+    if (_entryCtx !== ctx) return;
+    ctx.folioErr = e.message; renderFolioCompare();
+  });
+}
+
+// アプリの担当者名（苗字）→ Folioの氏名（フルネーム）で始まるものを合算
+function _folioHoursFor(ctx, author, date) {
+  const m = ctx.folio && ctx.folio[date];
+  if (!m) return null;
+  let h = 0, hit = false;
+  Object.keys(m).forEach(full => { if (full.indexOf(author) === 0) { h += m[full]; hit = true; } });
+  return hit ? h : 0;
+}
+
+function _entryAuthors(leaveMap) {
+  const list = getAuthorList().filter(a => a && a !== 'ヘルプ');
+  Object.keys(leaveMap || {}).forEach(a => { if (a !== 'ヘルプ' && !list.includes(a)) list.push(a); });
+  return list;
+}
+
+function renderEntryMatrix() {
+  const el = document.getElementById('entry-matrix');
+  const ctx = _entryCtx;
+  if (!el || !ctx) return;
+  const {leaveMap, startDate, endDate} = ctx;
+  const authors = _entryAuthors(leaveMap);
+  const dates = eachDateInRange(startDate, endDate);
+  const today = todayStr();
+  const wd = ['日','月','火','水','木','金','土'];
+  // 平日でも全員未入力の過去日は休日とみなす（会社カレンダーを持たないため）
+  const anyEntry = d => authors.some(a => leaveMap[a] && leaveMap[a][d]);
+  const dayInfo = dates.map(d => {
+    const dow = new Date(d + 'T00:00:00').getDay();
+    const weekend = dow === 0 || dow === 6;
+    const future = d > today;
+    const holiday = !weekend && !future && d < today && !anyEntry(d);
+    return {d, dow, weekend, future, off: weekend || holiday, holiday};
+  });
+  let totalMissing = 0;
+  const C = {miss:'rgba(239,68,68,.16)', off:'var(--g100, #f1f1f1)', diff:'#f59e0b'};
+  const head = `<tr><th style="position:sticky;left:0;background:var(--surface);padding:4px 8px;text-align:left;font-size:11px;color:var(--g500);">担当</th>` +
+    dayInfo.map(x => `<th style="padding:2px 3px;font-size:10px;font-weight:600;color:${x.dow===0?'#ef4444':x.dow===6?'#3b82f6':'var(--g500)'};min-width:34px;">${Number(x.d.slice(8))}<br>${wd[x.dow]}</th>`).join('') +
+    `<th style="padding:4px 8px;font-size:11px;color:var(--g500);white-space:nowrap;">未入力</th></tr>`;
+  const body = authors.map(a => {
+    let miss = 0;
+    const cells = dayInfo.map(x => {
+      const t = leaveMap[a] && leaveMap[a][x.d];
+      const calc = t ? calcFromLeave(t, x.d) : null;
+      const h = calc ? calc.normal + calc.ot : null;
+      const fh = _folioHoursFor(ctx, a, x.d);
+      let bg = '', txt = '', title = `${x.d} ${a}`;
+      if (x.future) { /* 空欄 */ }
+      else if (h != null) { txt = h.toFixed(1); title += ` 日報 ${h.toFixed(2)}h`; }
+      else if (!x.off) { bg = C.miss; txt = '未'; miss++; title += ' 未入力'; }
+      if (x.off && h == null) bg = C.off;
+      const ftxt = (fh != null && !x.future && (fh > 0 || h != null)) ? `<div style="font-size:9px;color:var(--g400);">F${fh.toFixed(1)}</div>` : '';
+      if (fh != null) title += ` / Folio ${fh.toFixed(2)}h`;
+      const diff = (h != null && fh != null && Math.abs(h - fh) > 1) ? `box-shadow:inset 0 0 0 2px ${C.diff};` : '';
+      return `<td title="${escHtml(title)}" style="padding:2px 3px;text-align:center;font-size:11px;background:${bg};${diff}${txt==='未'?'color:#dc2626;font-weight:700;':''}">${txt}${ftxt}</td>`;
+    }).join('');
+    totalMissing += miss;
+    return `<tr><td style="position:sticky;left:0;background:var(--surface);padding:4px 8px;font-size:12px;font-weight:700;white-space:nowrap;">${escHtml(a)}</td>${cells}<td style="padding:4px 8px;text-align:center;font-size:12px;font-weight:700;color:${miss?'#dc2626':'var(--g400)'};">${miss ? miss + '日' : '—'}</td></tr>`;
+  }).join('');
+  el.innerHTML = authors.length
+    ? `<table style="border-collapse:separate;border-spacing:2px;width:max-content;min-width:100%;">${head}${body}</table>`
+    : '<p class="no-data-msg">担当者がいません</p>';
+  const sub = document.getElementById('entry-matrix-sub');
+  if (sub) sub.innerHTML = `未入力 <b style="color:${totalMissing?'#dc2626':'inherit'};">${totalMissing}件</b> ／ 赤=未入力（平日の過去日）・グレー=土日/休日` +
+    (ctx.folio ? '・F=Folio実績・黄枠=日報とFolioの差が1h超' : '');
+}
+
+function renderFolioCompare() {
+  const el = document.getElementById('folio-compare');
+  const card = document.getElementById('folio-compare-card');
+  const ctx = _entryCtx;
+  if (!el || !ctx) return;
+  if (card) card.style.display = taskImportUrl() ? '' : 'none';
+  if (ctx.folioErr) { el.innerHTML = `<p class="no-data-msg">Folioデータなし（${escHtml(ctx.folioErr)}）</p>`; return; }
+  if (!ctx.folio) { el.innerHTML = '<p class="no-data-msg">Folioのデータを読み込み中...</p>'; return; }
+  const today = todayStr();
+  const dates = eachDateInRange(ctx.startDate, ctx.endDate).filter(d => d <= today);
+  const rows = _entryAuthors(ctx.leaveMap).map(a => {
+    let n = 0, f = 0;
+    dates.forEach(d => {
+      const t = ctx.leaveMap[a] && ctx.leaveMap[a][d];
+      const c = t ? calcFromLeave(t, d) : null;
+      if (c) n += c.normal + c.ot;
+      f += _folioHoursFor(ctx, a, d) || 0;
+    });
+    return {a, n, f};
+  }).filter(r => r.n > 0 || r.f > 0);
+  if (!rows.length) { el.innerHTML = '<p class="no-data-msg">この期間のデータがありません</p>'; return; }
+  const max = Math.max(...rows.map(r => Math.max(r.n, r.f)), 1);
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <tr style="color:var(--g500);font-size:11px;text-align:left;border-bottom:1px solid var(--g200);">
+      <th style="padding:4px 6px;">担当</th><th style="padding:4px 6px;width:45%;">日報（上）／ Folio実績（下）</th>
+      <th style="padding:4px 6px;text-align:right;">日報</th><th style="padding:4px 6px;text-align:right;">Folio</th>
+      <th style="padding:4px 6px;text-align:right;">差</th><th style="padding:4px 6px;text-align:right;">Folio比率</th></tr>
+    ${rows.map(r => {
+      const diff = r.f - r.n, ratio = r.n > 0 ? Math.round(r.f / r.n * 100) : null;
+      return `<tr style="border-bottom:1px solid var(--g100, #eee);">
+        <td style="padding:6px;font-weight:700;white-space:nowrap;">${escHtml(r.a)}</td>
+        <td style="padding:6px;">
+          <div style="height:7px;border-radius:4px;background:var(--primary, #7b5b3a);width:${(r.n/max*100).toFixed(1)}%;margin-bottom:3px;"></div>
+          <div style="height:7px;border-radius:4px;background:#f59e0b;width:${(r.f/max*100).toFixed(1)}%;"></div></td>
+        <td style="padding:6px;text-align:right;">${r.n.toFixed(1)}h</td>
+        <td style="padding:6px;text-align:right;">${r.f.toFixed(1)}h</td>
+        <td style="padding:6px;text-align:right;color:${Math.abs(diff) > 8 ? '#dc2626' : 'inherit'};">${diff >= 0 ? '+' : ''}${diff.toFixed(1)}h</td>
+        <td style="padding:6px;text-align:right;">${ratio == null ? '—' : ratio + '%'}</td></tr>`;
+    }).join('')}
+  </table>
+  <div style="font-size:11px;color:var(--g400);margin-top:6px;">集計対象: ${escHtml(ctx.startDate)} 〜 ${escHtml(dates[dates.length-1] || ctx.startDate)}（今日まで）。Folio比率が低い担当は、Folioへの実績登録漏れの可能性があります。</div>`;
+}
+
+function renderSubTrend() {
+  const el = document.getElementById('sub-trend');
+  const sel = document.getElementById('sub-trend-filter');
+  const ctx = _subTrendCtx;
+  if (!el || !sel || !ctx) return;
+  const cur = sel.value || '';
+  sel.innerHTML = `<option value="">全ての大分類</option>` + CATS.map(c => `<option value="${escHtml(c.cd)}"${c.cd===cur?' selected':''}>${escHtml(c.cd)} ${escHtml(c.label)}</option>`).join('');
+  const totals = {};
+  ctx.periodSub.forEach(p => Object.keys(p).forEach(cd => { totals[cd] = (totals[cd] || 0) + p[cd]; }));
+  const subs = Object.keys(totals)
+    .filter(cd => totals[cd] > 0.01 && (!cur || (SUB_MAP[cd] ? SUB_MAP[cd].mainCd : cd.charAt(0)) === cur))
+    .sort((a, b) => totals[b] - totals[a]);
+  if (!subs.length) { el.innerHTML = '<p class="no-data-msg">この年度のデータがありません</p>'; return; }
+  const max = Math.max(...subs.map(cd => Math.max(...ctx.periodSub.map(p => p[cd] || 0))), 1);
+  const hexA = (hex, a) => {
+    const m = String(hex || '').match(/^#?([0-9a-f]{6})$/i);
+    if (!m) return `rgba(107,114,128,${a})`;
+    const n = parseInt(m[1], 16);
+    return `rgba(${n>>16},${(n>>8)&255},${n&255},${a.toFixed(2)})`;
+  };
+  const head = `<tr><th style="position:sticky;left:0;background:var(--surface);padding:4px 8px;text-align:left;font-size:11px;color:var(--g500);">中分類</th>` +
+    ctx.periods.map(p => `<th style="padding:4px 6px;font-size:11px;color:var(--g500);">${p.month}月期</th>`).join('') +
+    `<th style="padding:4px 8px;font-size:11px;color:var(--g500);">年度計</th></tr>`;
+  const body = subs.map(cd => {
+    const s = SUB_MAP[cd] || {};
+    const color = CAT_COLOR[s.mainCd] || '#6b7280';
+    const cells = ctx.periodSub.map(p => {
+      const v = p[cd] || 0;
+      return `<td style="padding:4px 6px;text-align:right;font-size:12px;background:${v ? hexA(color, 0.08 + 0.6 * v / max) : 'transparent'};">${v ? v.toFixed(1) : ''}</td>`;
+    }).join('');
+    return `<tr><td style="position:sticky;left:0;background:var(--surface);padding:4px 8px;font-size:12px;white-space:nowrap;">
+      <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${color};margin-right:5px;"></span>${escHtml(cd)} ${escHtml(s.label || '')}</td>${cells}
+      <td style="padding:4px 8px;text-align:right;font-size:12px;font-weight:700;">${totals[cd].toFixed(1)}</td></tr>`;
+  }).join('');
+  el.innerHTML = `<table style="border-collapse:separate;border-spacing:2px;width:max-content;min-width:100%;">${head}${body}</table>`;
 }
 
 async function renderMonthlyDash(silent) {
@@ -5067,8 +5231,6 @@ async function renderMonthlyDash(silent) {
       leaveOTM[a]=otByAuthor[a]||0;
     });
     renderPersonPies(filtered,'monthly-person-grid',leaveNormalM,leaveOTM);
-    // ランキング
-    renderRankings(filtered, 'monthly', days);
     // 全担当集計縦棒グラフ
     requestAnimationFrame(()=>renderCatBar(filtered,'monthly-cat-canvas','monthly-cat-empty'));
     // 残業棒グラフ（強化版）：ヘルプを除外
@@ -5078,6 +5240,11 @@ async function renderMonthlyDash(silent) {
       otData[a]=[{cdSub:'_ot',hoursNormal:normalByAuthor[a]||0,hoursOT:otByAuthor[a]||0}];
     });
     requestAnimationFrame(()=>renderOTBarEnhanced(otData,'monthly-ot-canvas','monthly-ot-empty',avgPerPerson,0));
+    // 日報 入力状況 ＋ Folio 予実（Folioは非同期で後から差し込む）
+    _entryCtx = {key: renderKey, leaveMap, startDate, endDate, folio: null, folioErr: null};
+    renderEntryMatrix();
+    renderFolioCompare();
+    loadFolioRangeInto(_entryCtx);
     _renderCache.monthly = renderKey;
   } finally { if (!silent) setLoading(false); }
 }
@@ -5202,8 +5369,10 @@ async function renderYearlyDash(silent) {
     let totalN=0, totalOT=0, activeMonths=0, yearTotalDays=0;
     const personSet = new Set();
 
+    const periodSub = fiscalPeriods.map(() => ({}));   // 中分類別 工数推移用: 期ごとの {cdSub: h}
     fiscalPeriods.forEach(({year,month}, idx) => {
       const d = allData[idx];
+      const pst = periodSub[idx];
       if (!d) { monthOT.push({year,month, totalOT:0, persons:0}); return; }
       const leaveMap = d._leaveMap||{};
       const authors  = Object.keys(d).filter(k=>k!=='_days'&&k!=='_leaveMap');
@@ -5240,11 +5409,13 @@ async function renderYearlyDash(silent) {
             if (!yearByAuthor[a][r.cdSub]) yearByAuthor[a][r.cdSub]={cdSub:r.cdSub,hoursNormal:0,hoursOT:0};
             yearByAuthor[a][r.cdSub].hoursNormal += r.hoursNormal * scale;
             yearByAuthor[a][r.cdSub].hoursOT     += r.hoursOT     * scale;
+            pst[r.cdSub] = (pst[r.cdSub] || 0) + (r.hoursNormal + r.hoursOT) * scale;
           });
         } else if (aN > 0) {
           // 作業ログなし・退勤ログのみ → その他として積算
           if (!yearByAuthor[a]['O1']) yearByAuthor[a]['O1']={cdSub:'O1',hoursNormal:0,hoursOT:0};
           yearByAuthor[a]['O1'].hoursNormal += aN;
+          pst['O1'] = (pst['O1'] || 0) + aN;
         }
 
         totalN  += aN;
@@ -5270,7 +5441,6 @@ async function renderYearlyDash(silent) {
     Object.entries(yearByAuthor).forEach(([a,mo])=>{ yearByAuthorFlat[a]=Object.values(mo); });
 
     // ランキング
-    renderRankings(yearByAuthorFlat, 'yearly', yearTotalDays||1);
 
     // ── 前年度データ集計（すでに並列取得済みの prevAllData を使う） ──
     let prevMonthOT = null;
@@ -5314,6 +5484,8 @@ async function renderYearlyDash(silent) {
     requestAnimationFrame(()=>renderCatBar(yearByAuthorFlat,'yearly-cat-canvas','yearly-cat-empty'));
     // 担当別積み上げ棒グラフ
     requestAnimationFrame(()=>renderStackBar(yearByAuthorFlat,'yearly-stack-canvas','yearly-stack-empty'));
+    _subTrendCtx = {periods: fiscalPeriods, periodSub};
+    renderSubTrend();
     // 担当別円グラフ（退勤ログ由来の通常・残業を渡す）
     // yearlyNormal/OTByAuthor: 年間の退勤ログ合計（ヘルプは作業ログ）
     const leaveNormalY={}, leaveOTY={};
@@ -5986,82 +6158,6 @@ function renderOTBar(byAuthor, canvasId, emptyId, avgOT=0) {
     const x=PL+(h/maxOT)*cW;
     if(x>=PL&&x<=PL+cW) ctx.fillText(h===0?'0h':`${h}h`,x,H-PB+12);
   });
-}
-
-// ═══════════════════════════════════════════
-//  ランキング描画
-// ═══════════════════════════════════════════
-/**
- * 大分類別／中分類別 1日の総工数（全員合算÷稼働日数）を描画
- * @param {Object} byAuthorRows  {author: [{cdSub,hoursNormal,...}]}
- * @param {string} prefix        'daily' | 'monthly' | 'yearly'
- * @param {number} days          稼働日数（1日平均の分母）
- */
-function renderRankings(byAuthorRows, prefix, days) {
-  const noData = '<p style="font-size:12px;color:var(--g400);text-align:center;padding:16px 0;">データなし</p>';
-
-  // ─ 大分類別 1日の総工数（全カテゴリ） ─
-  const allMainTotals = {};
-  Object.values(byAuthorRows).forEach(rows => rows.forEach(r => {
-    const h = (r.hoursNormal||0) + (r.hoursOT||0);
-    if (h <= 0) return;
-    const s = SUB_MAP[r.cdSub] || {};
-    const k = s.mainCd || 'O';
-    if (!allMainTotals[k]) allMainTotals[k] = 0;
-    allMainTotals[k] += h;
-  }));
-  const d = Math.max(1, days||1);
-  const avgCatEl = document.getElementById(prefix+'-avg-cat');
-  if (avgCatEl) {
-    const items = CATS
-      .map(c => ({cd: c.cd, label: c.label||c.cd, color: c.color||CAT_COLOR[c.cd]||CHT_FAINT, total: allMainTotals[c.cd]||0, avg: (allMainTotals[c.cd]||0)/d}))
-      .filter(x => x.total > 0)
-      .sort((a,b) => b.avg - a.avg);
-    if (!items.length) { avgCatEl.innerHTML = noData; }
-    else {
-      const maxAvg = items[0].avg;
-      avgCatEl.innerHTML = items.map(x => `
-        <div class="rank-item">
-          <div class="rank-top">
-            <span style="width:10px;height:10px;border-radius:3px;background:${x.color};flex-shrink:0;"></span>
-            <span class="rank-name">${esc(x.label)}</span>
-            <span class="rank-val">${x.avg.toFixed(2)}h</span>
-          </div>
-          <div class="rank-bar-bg"><div class="rank-bar-fg" style="width:${Math.round(x.avg/maxAvg*100)}%;background:${x.color};"></div></div>
-        </div>`).join('');
-    }
-  }
-
-  // ─ 中分類別 1日平均（上位10件） ─
-  const subTotals = {};
-  Object.values(byAuthorRows).forEach(rows => rows.forEach(r => {
-    const h = (r.hoursNormal||0) + (r.hoursOT||0);
-    if (h <= 0) return;
-    const s = SUB_MAP[r.cdSub] || {};
-    if (!subTotals[r.cdSub]) subTotals[r.cdSub] = {label: s.label||r.cdSub, color: CAT_COLOR[s.mainCd]||CHT_FAINT, h:0};
-    subTotals[r.cdSub].h += h;
-  }));
-  const avgSubEl = document.getElementById(prefix+'-avg-sub');
-  if (avgSubEl) {
-    const subItems = Object.values(subTotals)
-      .map(x => ({label: x.label, color: x.color, total: x.h, avg: x.h/d}))
-      .filter(x => x.avg > 0)
-      .sort((a,b) => b.avg - a.avg)
-      .slice(0, 10);
-    if (!subItems.length) { avgSubEl.innerHTML = noData; }
-    else {
-      const maxAvg = subItems[0].avg;
-      avgSubEl.innerHTML = subItems.map(x => `
-        <div class="rank-item">
-          <div class="rank-top">
-            <span style="width:10px;height:10px;border-radius:3px;background:${x.color};flex-shrink:0;"></span>
-            <span class="rank-name">${esc(x.label)}</span>
-            <span class="rank-val">${x.avg.toFixed(2)}h</span>
-          </div>
-          <div class="rank-bar-bg"><div class="rank-bar-fg" style="width:${Math.round(x.avg/maxAvg*100)}%;background:${x.color};"></div></div>
-        </div>`).join('');
-    }
-  }
 }
 
 // ═══════════════════════════════════════════
