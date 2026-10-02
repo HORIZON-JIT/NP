@@ -837,6 +837,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <button class="btn-clear no-print" onclick="clearInputs()">クリア</button>
         <span id="save-msg"></span>
       </div>
+      <button class="btn-clear no-print" id="btn-task-import" onclick="openTaskImport()" style="display:none;width:100%;margin-top:8px;">タスク実績から取込</button>
       <div class="side-leave no-print">
         <label class="leave-label" for="input-leave">退勤時刻</label>
         <input type="time" id="input-leave" class="leave-input" placeholder="--:--" step="60"
@@ -1096,6 +1097,17 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <div class="admin-list" id="admin-sub-list"></div>
     </section>
   </div>
+
+  <section class="admin-card" id="admin-task-section" style="margin-top:14px;">
+    <h2>タスク対応表（タスク管理アプリ → 日報）</h2>
+    <div class="admin-note" style="margin-bottom:10px;">「タスク実績から取込」で使う、タスクIDと日報の中分類の対応です。変更すると即Firebaseへ保存されます。</div>
+    <div class="admin-form sub">
+      <input id="admin-task-id" placeholder="タスクID（例: K29, α7）">
+      <select id="admin-task-sub"></select>
+      <button class="btn btn-primary btn-sm" onclick="addAdminTaskMap()">追加</button>
+    </div>
+    <div class="admin-list" id="admin-task-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;"></div>
+  </section>
 </div>
 
 </div><!-- /.container -->
@@ -1107,6 +1119,19 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <span>Version 1.0</span>
   </div>
 </footer>
+
+<!-- TASK IMPORT MODAL -->
+<div class="backdrop" id="task-import-modal">
+  <div class="modal" style="max-width:640px;">
+    <h3>タスク実績から取込</h3>
+    <div id="task-import-sub" style="font-size:12px;color:var(--g500);margin-bottom:10px;"></div>
+    <div id="task-import-body" style="font-size:12px;"></div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="closeModal('task-import-modal')">閉じる</button>
+      <button class="btn btn-primary" id="btn-task-import-apply" onclick="applyTaskImport()" disabled>入力欄に反映</button>
+    </div>
+  </div>
+</div>
 
 <!-- SETTINGS MODAL -->
 <div class="backdrop" id="settings-modal">
@@ -1281,10 +1306,27 @@ const DEPARTMENT_CONFIG = (function(){
       { cd:'J', label:'受注',       color:'#ef4444', subs:[{cd:'J1',label:'受注確認/引当'},{cd:'J2',label:'OEM商品受注出荷'}] },
       { cd:'B', label:'BOMメンテ', color:'#a855f7', subs:[{cd:'B1',label:'部品表メンテナンス'},{cd:'B2',label:'設計変更'},{cd:'B3',label:'原価集計'}] },
       { cd:'S', label:'打合せ',     color:'#eab308', subs:[{cd:'S1',label:'打合せ'},{cd:'S2',label:'問い合わせ対応'}] },
-      { cd:'Z', label:'改善',       color:'#06b6d4', subs:[{cd:'Z1',label:'課内'},{cd:'Z2',label:'課外'},{cd:'Z3',label:'スタフェス対応'}] },
+      { cd:'Z', label:'改善',       color:'#06b6d4', subs:[{cd:'Z1',label:'課内'},{cd:'Z2',label:'課外'},{cd:'Z3',label:'スタフェス対応'},{cd:'Z4',label:'教育・多能工'}] },
       { cd:'O', label:'その他',     color:'#6b7280', subs:[{cd:'O1',label:'その他'}] },
-      { cd:'A', label:'アフター',   color:'#ec4899', subs:[{cd:'A1',label:'アフター改善'},{cd:'A2',label:'価格登録'},{cd:'A3',label:'在庫管理'},{cd:'A4',label:'受注対応'},{cd:'A5',label:'特注対応'}] }
-    ]
+      { cd:'A', label:'アフター',   color:'#ec4899', subs:[{cd:'A1',label:'価格登録'},{cd:'A2',label:'在庫管理'},{cd:'A3',label:'オーダー管理'},{cd:'A4',label:'特殊仕様製作見積'},{cd:'A5',label:'ケアパック導入管理'},{cd:'A6',label:'アフタースポット対応'}] }
+    ],
+    // タスク管理アプリ(タスク実績シート)の読取用GAS WebアプリURL。空なら「タスク実績から取込」ボタンを出さない。
+    // GASのコードはリポジトリの gas/task-sheet-reader.gs。
+    taskSheetGasUrl: '',
+    // タスクID(タスク管理アプリ) → 日報の中分類CD の既定対応表。
+    // 「管理」タブで編集するとFirebaseマスタ(taskMap)に保存され、以後はそちらが優先。
+    taskMap: {
+      'B1':'B2','B2':'B1','B3':'B1','B4':'B3','B5':'B3','B6':'B1','B7':'T3',
+      'J1':'J2','J2':'J2','J3':'J2','J4':'J2','J5':'J1',
+      'K1':'K4','K2':'K2','K3':'K1','K4':'K1','K5':'K1','K6':'K1','K7':'K1','K8':'K1','K9':'K1','K10':'K1',
+      'K11':'K1','K12':'K1','K13':'K1','K14':'K1','K15':'K1','K16':'K1','K17':'K3','K18':'K4','K19':'J1','K20':'K3',
+      'K21':'K1','K22':'K1','K23':'K2','K24':'K3','K25':'K3','K26':'K2','K27':'K2','K28':'K2',
+      'O':'O1','O1':'O1','O2':'O1','O3':'O1','O4':'O1',
+      'S1':'S1','S2':'S1','S3':'S2',
+      'T1':'T1','T2':'T2','T3':'T1','T4':'T2','T5':'T2','T6':'T2','T7':'T3',
+      'Z1':'Z2','Z2':'Z1','Z3':'Z3','Z4':'Z4',
+      'α1':'A1','α2':'A2','α3':'A3','α4':'A4','α5':'A5','α6':'A6'
+    }
   };
   function isObj(v){ return v && typeof v === 'object' && !Array.isArray(v); }
   function deepMerge(base, over){
@@ -1445,6 +1487,29 @@ function rebuildSubMap() {
 }
 const SUB_MAP = {};
 let _ALL_SUBS = [];
+
+// ── タスク対応表（タスク管理アプリのタスクID → 日報の中分類CD）──
+// 既定値は DEPARTMENT_CONFIG.taskMap。Firebaseマスタ(taskMap)があればそちらを優先。
+const TASK_MAP_STORAGE_KEY = LS_NS + '__taskMap__';
+function normalizeTaskMap(map) {
+  const out = {};
+  Object.keys(map || {}).forEach(k => {
+    const key = String(k).trim(), v = String(map[k] || '').trim();
+    if (key && v) out[key] = v;
+  });
+  return out;
+}
+let TASK_MAP = (() => {
+  try {
+    const raw = localStorage.getItem(TASK_MAP_STORAGE_KEY);
+    if (raw) { const m = normalizeTaskMap(JSON.parse(raw)); if (Object.keys(m).length) return m; }
+  } catch(e) {}
+  return normalizeTaskMap(DEPARTMENT_CONFIG.taskMap);
+})();
+function applyTaskMap(map) {
+  TASK_MAP = normalizeTaskMap(map);
+  try { localStorage.setItem(TASK_MAP_STORAGE_KEY, JSON.stringify(TASK_MAP)); } catch(e) {}
+}
 let _INP_CACHE = {};
 rebuildSubMap();
 
@@ -1497,6 +1562,8 @@ async function saveMasterCatsToFirebase(cats) {
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedBy: firebaseUser ? firebaseUser.email : ''
   }, {merge:true});
+  // taskMap はmerge:trueだと削除したキーが残るため、update でフィールドごと置き換える
+  await fdb.collection(MASTER_DOC_COLLECTION).doc(MASTER_DOC_ID).update({taskMap: TASK_MAP});
   return true;
 }
 
@@ -1546,6 +1613,10 @@ async function loadMasterFromFirebase(force = false) {
     const data = snap.data() || {};
     const cats = Array.isArray(data.cats) ? data.cats : [];
     if (cats.length) applyMasterCats(cats);
+    if (data.taskMap && typeof data.taskMap === 'object' && Object.keys(data.taskMap).length) {
+      applyTaskMap(data.taskMap);
+      renderAdminTaskMap();
+    }
     setAdminStatus(force ? 'マスタを再読込しました。' : '');
     return true;
   } catch(e) {
@@ -1568,6 +1639,7 @@ async function writeMasterSub(mainCd, sub) {
 }
 
 function renderAdminMasters() {
+  renderAdminTaskMap();
   const catList = document.getElementById('admin-cat-list');
   const subList = document.getElementById('admin-sub-list');
   const subCat = document.getElementById('admin-sub-cat');
@@ -1741,6 +1813,63 @@ async function moveAdminCategory(cd, delta) {
   cats.forEach((c, idx) => c.order = idx);
   try { await saveMasterCatsToFirebase(cats); applyMasterCats(cats); setAdminStatus('大分類の並び順を更新しました。'); }
   catch(e) { alert('保存に失敗しました: ' + e.message); }
+}
+
+function _taskSubOptions(selected) {
+  const opts = [];
+  CATS.forEach(c => (c.subs || []).forEach(sb => {
+    const off = (c.active === false || sb.active === false) ? '（無効）' : '';
+    opts.push(`<option value="${escHtml(sb.cd)}"${sb.cd === selected ? ' selected' : ''}>${escHtml(sb.cd)} ${escHtml(sb.label)}${off}</option>`);
+  }));
+  if (selected && !SUB_MAP[selected]) opts.unshift(`<option value="${escHtml(selected)}" selected>${escHtml(selected)}（未登録）</option>`);
+  return opts.join('');
+}
+function _taskIdSortKey(id) {
+  const m = String(id).match(/^(.*?)(\d*)$/);
+  return [m[1], m[2] ? Number(m[2]) : -1];
+}
+function renderAdminTaskMap() {
+  const list = document.getElementById('admin-task-list');
+  const sel = document.getElementById('admin-task-sub');
+  if (!list || !sel) return;
+  const sec = document.getElementById('admin-task-section');
+  if (sec) sec.style.display = taskImportUrl() ? '' : 'none';
+  sel.innerHTML = _taskSubOptions(sel.value);
+  const ids = Object.keys(TASK_MAP).sort((a, b) => {
+    const [ap, an] = _taskIdSortKey(a), [bp, bn] = _taskIdSortKey(b);
+    return ap.localeCompare(bp, 'ja') || an - bn;
+  });
+  list.innerHTML = ids.length ? ids.map(id => `
+    <div class="admin-row" style="grid-template-columns:64px minmax(0,1fr) auto;padding:6px 8px;">
+      <div class="admin-title" style="font-family:monospace;">${escHtml(id)}</div>
+      <select onchange="setAdminTaskMap('${escHtml(id)}', this.value)" style="height:30px;border:1.5px solid var(--g200);border-radius:6px;background:var(--surface);color:var(--g800);font-family:inherit;font-size:12px;min-width:0;">${_taskSubOptions(TASK_MAP[id])}</select>
+      <button class="btn btn-danger btn-sm" onclick="deleteAdminTaskMap('${escHtml(id)}')">削除</button>
+    </div>`).join('') : '<div class="admin-empty">対応がありません。</div>';
+}
+async function _saveTaskMapNow(msg) {
+  applyTaskMap(TASK_MAP);
+  renderAdminTaskMap();
+  try { await seedMasterToFirebase(); setAdminStatus(msg); }
+  catch(e) { console.error(e); setAdminStatus('タスク対応表の保存に失敗しました。', true); alert('保存に失敗しました: ' + e.message); }
+}
+async function addAdminTaskMap() {
+  const idEl = document.getElementById('admin-task-id');
+  const id = idEl.value.trim();
+  const cd = document.getElementById('admin-task-sub').value;
+  if (!id || !cd) { alert('タスクIDと中分類を指定してください。'); return; }
+  if (TASK_MAP[id] && !confirm(`${id} は既に ${TASK_MAP[id]} に対応しています。${cd} に変更しますか？`)) return;
+  TASK_MAP[id] = cd;
+  idEl.value = '';
+  await _saveTaskMapNow(`タスク対応 ${id} → ${cd} を保存しました。`);
+}
+async function setAdminTaskMap(id, cd) {
+  TASK_MAP[id] = cd;
+  await _saveTaskMapNow(`タスク対応 ${id} → ${cd} を保存しました。`);
+}
+async function deleteAdminTaskMap(id) {
+  if (!confirm(`タスク対応 ${id} を削除しますか？`)) return;
+  delete TASK_MAP[id];
+  await _saveTaskMapNow(`タスク対応 ${id} を削除しました。`);
 }
 
 async function addAdminSubCategory() {
@@ -4242,6 +4371,124 @@ async function loadDay_and_render() {
   } finally { setLoading(false); }
 }
 
+// ═══════════════════════════════════════════
+//  タスク実績（タスク管理アプリ）から取込
+// ═══════════════════════════════════════════
+function taskImportUrl() { return DEPARTMENT_CONFIG.taskSheetGasUrl || ''; }
+function updateTaskImportButton() {
+  const btn = document.getElementById('btn-task-import');
+  if (btn) btn.style.display = taskImportUrl() ? '' : 'none';
+}
+
+// 開始時刻(HH:MM)と実績時間(h)から、残業開始(rules.otStart)以降を残業、それ以前を通常に振り分ける。
+// 開始時刻が不明なら全て通常。
+function splitTaskNormalOT(start, hours) {
+  const h = Math.max(0, Number(hours) || 0);
+  if (!start || !/^\d{1,2}:\d{2}$/.test(start)) return {normal:h, ot:0};
+  const s = _hmToMin(start), e = s + h * 60;
+  const otStart = _hmToMin(DEPARTMENT_CONFIG.rules.otStart);
+  const otMin = Math.max(0, e - Math.max(s, otStart));
+  const ot = otMin / 60;
+  return {normal: Math.max(0, h - ot), ot};
+}
+
+function _roundTaskHours(h) {
+  const step = DEPARTMENT_CONFIG.rules.roundStepHours || 0.25;
+  if (h <= 0) return 0;
+  return Math.max(step, Math.round(h / step) * step);
+}
+
+let _taskImportPlan = null;
+
+async function openTaskImport() {
+  const url = taskImportUrl();
+  const author = getAuthor();
+  if (!url) return;
+  if (!author) { alert('設定から担当者名を入力してください'); openSettings(); return; }
+  const date = currentDate;
+  _taskImportPlan = null;
+  const body = document.getElementById('task-import-body');
+  const applyBtn = document.getElementById('btn-task-import-apply');
+  document.getElementById('task-import-sub').textContent = `${date} ／ ${author}　（進捗ステータス「完了」かつ作業完了日がこの日のタスク）`;
+  body.innerHTML = '<div style="padding:16px 0;color:var(--g500);">読み込み中...</div>';
+  applyBtn.disabled = true;
+  document.getElementById('task-import-modal').classList.add('open');
+  let d;
+  try {
+    d = await gasJsonpRetry(url, {action:'getCompletedTasks', date, name:author});
+    if (!d || !d.ok) throw new Error((d && d.error) || 'GASがエラーを返しました');
+  } catch(e) {
+    body.innerHTML = `<div style="color:var(--danger);padding:12px 0;">取得に失敗しました: ${escHtml(e.message)}</div>`;
+    return;
+  }
+  const rows = Array.isArray(d.rows) ? d.rows : [];
+  const sums = {};   // cdSub -> {normal, ot}
+  const lines = [];
+  let warn = 0;
+  rows.sort((a, b) => String(a.start || '99:99').localeCompare(String(b.start || '99:99')));
+  rows.forEach(r => {
+    const cd = TASK_MAP[r.taskId];
+    const ok = cd && _ALL_SUBS.includes(cd);
+    // 開始日が完了日と違う(日跨ぎ)タスクは時刻で判定できないので全て通常扱い
+    const start = (r.startDate && r.startDate !== date) ? null : r.start;
+    const sp = splitTaskNormalOT(start, r.hours);
+    if (ok) {
+      sums[cd] = sums[cd] || {normal:0, ot:0};
+      sums[cd].normal += sp.normal; sums[cd].ot += sp.ot;
+    } else warn++;
+    const reason = !cd ? '対応表に未登録' : (!SUB_MAP[cd] ? `中分類 ${cd} がマスタに無い` : (!ok ? `中分類 ${cd} が無効` : ''));
+    lines.push(`<tr style="${ok ? '' : 'background:rgba(239,68,68,.08);'}">
+      <td style="padding:4px 6px;white-space:nowrap;">${escHtml(start || '-')}</td>
+      <td style="padding:4px 6px;">${escHtml(r.taskId)} ${escHtml(r.taskName || '')}${r.note ? `<div style="color:var(--g400);font-size:11px;">${escHtml(r.note)}</div>` : ''}</td>
+      <td style="padding:4px 6px;white-space:nowrap;">${ok ? escHtml(cd + ' ' + SUB_MAP[cd].label) : `<span style="color:var(--danger);">${escHtml(reason)}</span>`}</td>
+      <td style="padding:4px 6px;text-align:right;white-space:nowrap;">${sp.normal ? sp.normal.toFixed(2) : ''}</td>
+      <td style="padding:4px 6px;text-align:right;white-space:nowrap;color:var(--danger);">${sp.ot ? sp.ot.toFixed(2) : ''}</td>
+    </tr>`);
+  });
+  const plan = Object.keys(sums).map(cd => ({cdSub:cd, hoursNormal:_roundTaskHours(sums[cd].normal), hoursOT:_roundTaskHours(sums[cd].ot)}))
+    .filter(p => p.hoursNormal > 0 || p.hoursOT > 0);
+  if (!rows.length) {
+    body.innerHTML = '<div style="padding:16px 0;color:var(--g500);">この日の完了タスクはありません。</div>';
+    return;
+  }
+  const totN = plan.reduce((a, p) => a + p.hoursNormal, 0), totO = plan.reduce((a, p) => a + p.hoursOT, 0);
+  body.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="color:var(--g500);font-size:11px;text-align:left;border-bottom:1px solid var(--g200);">
+        <th style="padding:4px 6px;">開始</th><th style="padding:4px 6px;">タスク</th><th style="padding:4px 6px;">日報の中分類</th><th style="padding:4px 6px;text-align:right;">通常</th><th style="padding:4px 6px;text-align:right;">残業</th>
+      </tr></thead>
+      <tbody>${lines.join('')}</tbody>
+    </table>
+    <div style="margin-top:12px;padding:8px 10px;background:var(--g50);border:1px solid var(--g200);border-radius:8px;">
+      <b>反映内容</b>（中分類ごとに合計し ${DEPARTMENT_CONFIG.rules.roundStepHours}h 単位に丸め）：
+      ${plan.map(p => `${escHtml(p.cdSub)} ${escHtml(SUB_MAP[p.cdSub].label)} 通常${p.hoursNormal}${p.hoursOT ? ` / 残業${p.hoursOT}` : ''}`).join('、') || 'なし'}
+      <div style="margin-top:4px;">合計 通常 <b>${totN.toFixed(2)}h</b> ／ 残業 <b>${totO.toFixed(2)}h</b></div>
+      ${warn ? `<div style="margin-top:4px;color:var(--danger);">※ 反映できないタスクが ${warn} 件あります（「管理」タブのタスク対応表で設定できます）</div>` : ''}
+    </div>`;
+  _taskImportPlan = {date, author, plan};
+  applyBtn.disabled = !plan.length;
+}
+
+function applyTaskImport() {
+  const p = _taskImportPlan;
+  if (!p) return;
+  if (p.date !== currentDate || p.author !== getAuthor()) { alert('日付または担当者が変わったため、もう一度取込んでください。'); return; }
+  const hasInput = Object.values(_INP_CACHE).some(c => getH(c.h) || getH(c.ot));
+  if (hasInput && !confirm('入力済みの内容をタスク実績の内容で置き換えます。よろしいですか？')) return;
+  clearInputs(true);
+  p.plan.forEach(r => {
+    const c = _INP_CACHE[r.cdSub] || {};
+    const h = c.h || document.getElementById(`h_${r.cdSub}`), ot = c.ot || document.getElementById(`ot_${r.cdSub}`);
+    if (h && r.hoursNormal > 0) { setHV(h, r.hoursNormal); refreshCellStyle(h); }
+    if (ot && r.hoursOT > 0)    { setHV(ot, r.hoursOT);    refreshCellStyle(ot); }
+  });
+  updateTotals();
+  updateLivePie();
+  closeModal('task-import-modal');
+  const st = document.getElementById('data-status');
+  if (st) { st.textContent = 'タスク実績から取込済み（未保存）'; st.className = 'data-status'; }
+}
+
 let _submitRunning = false;
 async function submitDay() {
   if (_submitRunning) return;          // ★ 二重実行防止
@@ -5933,6 +6180,10 @@ function updateStickyOffsets() {
     }
   });
   updateModeUI();
+  updateTaskImportButton();
+  document.getElementById('task-import-modal').addEventListener('click',function(e){
+    if(e.target===this) closeModal('task-import-modal');
+  });
   document.getElementById('settings-modal').addEventListener('click',function(e){
     if(e.target===this) closeModal('settings-modal');
   });
