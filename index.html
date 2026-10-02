@@ -4368,7 +4368,7 @@ async function loadDay_and_render() {
       }
     }
     const _memoEl=document.getElementById('daily-memo'); if(_memoEl) _memoEl.value=await loadMemo(currentDate,author);
-  } finally { setLoading(false); }
+  } finally { setLoading(false); setTimeout(prefetchFolioTasks, 300); }
 }
 
 // ═══════════════════════════════════════════
@@ -4404,6 +4404,33 @@ function _roundTaskHours(h) {
 let _taskImportPlan = null;
 let _taskImportRows = [];
 
+// ── Folio(タスク実績)の取得：JSONP直通＋短期キャッシュ＋先読み ──
+// 既存GAS用のGET/JSONPレース(失敗時1秒待ち再試行)を通さず、実績のあるJSONPだけで取りに行く。
+const _folioCache = new Map();   // key: date|author -> {t, promise}
+const FOLIO_CACHE_MS = 2 * 60 * 1000;
+function fetchFolioTasks(date, author, force) {
+  const key = `${date}|${author}`;
+  const hit = _folioCache.get(key);
+  if (!force && hit && Date.now() - hit.t < FOLIO_CACHE_MS) return hit.promise;
+  const t0 = performance.now();
+  const call = () => _gasJsonpTag(taskImportUrl(), {action:'getCompletedTasks', date, name:author});
+  const promise = call()
+    .catch(() => new Promise(r => setTimeout(r, 300)).then(call))   // 1回だけ再試行
+    .then(d => {
+      if (!d || !d.ok) throw new Error((d && d.error) || 'GASがエラーを返しました');
+      d._clientMs = Math.round(performance.now() - t0);
+      return d;
+    });
+  _folioCache.set(key, {t: Date.now(), promise});
+  promise.catch(() => { if (_folioCache.get(key)?.promise === promise) _folioCache.delete(key); });
+  return promise;
+}
+// 入力画面で日付/担当者が決まったら裏で先読み（ボタン押下時に待たない＋GASのコールドスタート解消）
+function prefetchFolioTasks() {
+  if (!taskImportUrl() || !getAuthor()) return;
+  fetchFolioTasks(currentDate, getAuthor(), false).catch(() => {});
+}
+
 async function openTaskImport() {
   const url = taskImportUrl();
   const author = getAuthor();
@@ -4414,14 +4441,13 @@ async function openTaskImport() {
   _taskImportRows = [];
   const body = document.getElementById('task-import-body');
   const applyBtn = document.getElementById('btn-task-import-apply');
-  document.getElementById('task-import-sub').textContent = `${date} ／ ${author}　（進捗ステータス「完了」かつ作業完了日がこの日のタスク）`;
+  document.getElementById('task-import-sub').textContent = `${date} ／ ${author}　（この日に配置された「完了」タスク）`;
   body.innerHTML = '<div style="padding:16px 0;color:var(--g500);">読み込み中...</div>';
   applyBtn.disabled = true;
   document.getElementById('task-import-modal').classList.add('open');
   let d;
   try {
-    d = await gasJsonpRetry(url, {action:'getCompletedTasks', date, name:author});
-    if (!d || !d.ok) throw new Error((d && d.error) || 'GASがエラーを返しました');
+    d = await fetchFolioTasks(date, author, false);
   } catch(e) {
     body.innerHTML = `<div style="color:var(--danger);padding:12px 0;">取得に失敗しました: ${escHtml(e.message)}</div>`;
     return;
@@ -4429,6 +4455,8 @@ async function openTaskImport() {
   const rows = Array.isArray(d.rows) ? d.rows : [];
   if (!rows.length) {
     body.innerHTML = '<div style="padding:16px 0;color:var(--g500);">この日の完了タスクはありません。</div>';
+    _taskImportPlan = {date, author, plan:[]};
+    _showFolioTiming(d);
     return;
   }
   rows.sort((a, b) => String(a.start || '99:99').localeCompare(String(b.start || '99:99')));
@@ -4443,6 +4471,21 @@ async function openTaskImport() {
   });
   _taskImportPlan = {date, author, plan:[]};
   renderTaskImport();
+  _showFolioTiming(d);
+}
+
+function _showFolioTiming(d) {
+  const sub = document.getElementById('task-import-sub');
+  if (!sub || !d) return;
+  const gas = (d.ms != null) ? ` / GAS処理 ${(d.ms/1000).toFixed(1)}秒` : '';
+  sub.innerHTML = escHtml(sub.textContent.replace(/\s*［取得.*$/, '')) +
+    ` <span style="color:var(--g400);font-size:11px;">［取得 ${(d._clientMs/1000).toFixed(1)}秒${gas}］</span>` +
+    ` <a href="#" onclick="refreshTaskImport();return false;" style="font-size:11px;color:var(--primary);">最新に更新</a>`;
+}
+function refreshTaskImport() {
+  if (!_taskImportPlan) return;
+  _folioCache.delete(`${_taskImportPlan.date}|${_taskImportPlan.author}`);
+  openTaskImport();
 }
 
 function toggleTaskImportRow(i, on) {
