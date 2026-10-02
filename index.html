@@ -4413,7 +4413,9 @@ function fetchFolioTasks(date, author, force) {
   const hit = _folioCache.get(key);
   if (!force && hit && Date.now() - hit.t < FOLIO_CACHE_MS) return hit.promise;
   const t0 = performance.now();
-  const call = () => _gasJsonpTag(taskImportUrl(), {action:'getCompletedTasks', date, name:author});
+  const params = {action:'getCompletedTasks', date, name:author};
+  if (force) params.nocache = '1';   // 「最新に更新」はGAS側キャッシュも使わずシートを読み直す
+  const call = () => _gasJsonpTag(taskImportUrl(), params);
   const promise = call()
     .catch(() => new Promise(r => setTimeout(r, 300)).then(call))   // 1回だけ再試行
     .then(d => {
@@ -4431,7 +4433,7 @@ function prefetchFolioTasks() {
   fetchFolioTasks(currentDate, getAuthor(), false).catch(() => {});
 }
 
-async function openTaskImport() {
+async function openTaskImport(force) {
   const url = taskImportUrl();
   const author = getAuthor();
   if (!url) return;
@@ -4447,7 +4449,7 @@ async function openTaskImport() {
   document.getElementById('task-import-modal').classList.add('open');
   let d;
   try {
-    d = await fetchFolioTasks(date, author, false);
+    d = await fetchFolioTasks(date, author, !!force);
   } catch(e) {
     body.innerHTML = `<div style="color:var(--danger);padding:12px 0;">取得に失敗しました: ${escHtml(e.message)}</div>`;
     return;
@@ -4477,15 +4479,15 @@ async function openTaskImport() {
 function _showFolioTiming(d) {
   const sub = document.getElementById('task-import-sub');
   if (!sub || !d) return;
-  const gas = (d.ms != null) ? ` / GAS処理 ${(d.ms/1000).toFixed(1)}秒` : '';
+  const src = d.cached ? '（キャッシュ）' : (d.t ? `（シート読込 ${((d.t.open + d.t.read)/1000).toFixed(1)}秒）` : '');
+  const gas = (d.ms != null) ? ` / GAS処理 ${(d.ms/1000).toFixed(1)}秒${src}` : '';
   sub.innerHTML = escHtml(sub.textContent.replace(/\s*［取得.*$/, '')) +
     ` <span style="color:var(--g400);font-size:11px;">［取得 ${(d._clientMs/1000).toFixed(1)}秒${gas}］</span>` +
     ` <a href="#" onclick="refreshTaskImport();return false;" style="font-size:11px;color:var(--primary);">最新に更新</a>`;
 }
 function refreshTaskImport() {
   if (!_taskImportPlan) return;
-  _folioCache.delete(`${_taskImportPlan.date}|${_taskImportPlan.author}`);
-  openTaskImport();
+  openTaskImport(true);
 }
 
 function toggleTaskImportRow(i, on) {
