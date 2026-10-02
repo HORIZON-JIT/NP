@@ -1199,7 +1199,6 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <div class="card" style="margin-bottom:14px;">
       <div class="card-hd"><h2>管理者サマリー</h2><span class="card-sub" id="mgr-sub">残業は退勤時刻から算出（17:30以降）</span></div>
       <div class="card-body">
-        <div id="mgr-alerts" class="dx-chips"></div>
         <div id="mgr-table" style="overflow-x:auto;"></div>
       </div>
     </div>
@@ -5545,7 +5544,7 @@ async function loadMgrExtras(ctx) {
 function renderMgrSummary() {
   const ctx = _mgrCtx, ec = _entryCtx;
   const tbl = document.getElementById('mgr-table'), al = document.getElementById('mgr-alerts');
-  if (!ctx || !tbl || !al) return;
+  if (!ctx || !tbl) return;
   const R = DEPARTMENT_CONFIG.rules;
   const warn = R.otMonthWarn || 36, limit = R.otMonthLimit || 45, yLimit = R.otYearLimit || 360, maxOver = R.otOverMonthsMax || 6;
   const missing = (ec && ec.missing) || {};
@@ -5580,8 +5579,7 @@ function renderMgrSummary() {
   });
   const order = ['crit', 'warn', 'info'];
   alerts.sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0]));
-  al.className = 'dx-chips';
-  al.innerHTML = alerts.length
+  if (al) al.innerHTML = alerts.length
     ? alerts.map(([lv, t]) => `<span class="dx-chip is-${lv}">${t}</span>`).join('')
     : '<span class="dx-chip is-ok">対応が必要なアラートはありません</span>';
   const otCell = (v, lv) => `<span class="${lv ? 't-' + lv : ''}">${v.toFixed(1)}h</span>`;
