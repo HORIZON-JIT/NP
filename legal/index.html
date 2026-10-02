@@ -1058,6 +1058,20 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </span></div>
       <div class="card-body"><div id="sub-trend" style="overflow-x:auto;"></div></div>
     </div>
+    <!-- 業務の属人化マップ -->
+    <div class="card" style="margin-top:14px;">
+      <div class="card-hd"><h2>業務の属人化マップ</h2><span class="card-sub" id="skill-map-sub">中分類×担当の年度作業時間（定時＋残業）</span></div>
+      <div class="card-body"><div id="skill-map" style="overflow-x:auto;"></div></div>
+    </div>
+    <!-- タスク別 標準工数と実績（Folio） -->
+    <div class="card" id="task-stats-card" style="margin-top:14px;">
+      <div class="card-hd"><h2>タスク別 標準工数と実績（Folio）</h2>
+        <span class="card-sub" style="display:flex;align-items:center;gap:8px;"><span id="task-stats-sub">実績工数が入力された完了タスク</span>
+          <select id="task-stats-days" class="period-sel" onchange="loadTaskStats(true)">
+            <option value="30">直近30日</option><option value="90" selected>直近90日</option><option value="120">直近120日</option>
+          </select></span></div>
+      <div class="card-body"><div id="task-stats" style="overflow-x:auto;"></div></div>
+    </div>
   </div><!-- /dash-yearly -->
 
 </div><!-- /view-dash -->
@@ -5263,6 +5277,102 @@ function renderMgrSummary() {
   } else if (d) d.textContent = '';
 }
 
+// ── 業務の属人化マップ（年次）──
+function renderSkillMap(byAuthorRows) {
+  const el = document.getElementById('skill-map');
+  if (!el) return;
+  const authors = Object.keys(byAuthorRows).filter(a => a !== 'ヘルプ');
+  const m = {};   // cdSub -> {author: h}
+  authors.forEach(a => (byAuthorRows[a] || []).forEach(r => {
+    const h = (r.hoursNormal || 0) + (r.hoursOT || 0);
+    if (h <= 0.01) return;
+    (m[r.cdSub] = m[r.cdSub] || {})[a] = ((m[r.cdSub] || {})[a] || 0) + h;
+  }));
+  const subs = Object.keys(m).map(cd => {
+    const tot = Object.values(m[cd]).reduce((t, v) => t + v, 0);
+    const shares = authors.map(a => ({a, h: m[cd][a] || 0})).sort((x, y) => y.h - x.h);
+    const top = shares[0];
+    const people = shares.filter(x => x.h / tot >= 0.1).length;   // シェア10%以上を「担える人」とみなす
+    const share = top.h / tot;
+    const lv = (people <= 1 && tot >= 20) ? 'red' : (share >= 0.8 && tot >= 20) ? 'amber' : '';
+    return {cd, tot, top, people, share, lv};
+  }).filter(x => x.tot >= 1).sort((x, y) => (x.lv === 'red' ? 0 : x.lv === 'amber' ? 1 : 2) - (y.lv === 'red' ? 0 : y.lv === 'amber' ? 1 : 2) || y.tot - x.tot);
+  if (!subs.length) { el.innerHTML = '<p class="no-data-msg">この年度のデータがありません</p>'; return; }
+  const ordA = authors.sort((x, y) => getAuthorList().indexOf(x) - getAuthorList().indexOf(y));
+  const nRed = subs.filter(x => x.lv === 'red').length, nAmb = subs.filter(x => x.lv === 'amber').length;
+  const sub = document.getElementById('skill-map-sub');
+  if (sub) sub.innerHTML = `赤=1人しか担えない業務 <b style="color:#dc2626;">${nRed}件</b>・黄=1人に8割以上集中 <b style="color:#d97706;">${nAmb}件</b>（年度20h以上の業務）／セルの濃さ=その業務内のシェア`;
+  el.innerHTML = `<table style="border-collapse:separate;border-spacing:2px;width:max-content;min-width:100%;font-size:12px;">
+    <tr><th style="position:sticky;left:0;background:var(--surface);padding:4px 8px;text-align:left;font-size:11px;color:var(--g500);">中分類</th>
+      ${ordA.map(a => `<th style="padding:4px 6px;font-size:11px;color:var(--g500);">${escHtml(a)}</th>`).join('')}
+      <th style="padding:4px 8px;font-size:11px;color:var(--g500);">合計</th><th style="padding:4px 8px;font-size:11px;color:var(--g500);">担える人数</th>
+      <th style="padding:4px 8px;font-size:11px;color:var(--g500);text-align:left;">主担当</th></tr>
+    ${subs.map(x => {
+      const s2 = SUB_MAP[x.cd] || {};
+      const color = CAT_COLOR[s2.mainCd] || '#6b7280';
+      const tag = x.lv === 'red' ? '<span style="margin-left:6px;font-size:10px;font-weight:800;color:#dc2626;border:1px solid #dc2626;border-radius:4px;padding:0 4px;">属人化</span>'
+        : x.lv === 'amber' ? '<span style="margin-left:6px;font-size:10px;font-weight:800;color:#d97706;border:1px solid #d97706;border-radius:4px;padding:0 4px;">集中</span>' : '';
+      return `<tr><td style="position:sticky;left:0;background:var(--surface);padding:4px 8px;white-space:nowrap;">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${color};margin-right:5px;"></span>${escHtml(x.cd)} ${escHtml(s2.label || '')}${tag}</td>
+        ${ordA.map(a => { const h = m[x.cd][a] || 0, sh = h / x.tot;
+          return `<td title="${escHtml(a)} ${h.toFixed(1)}h（${Math.round(sh*100)}%）" style="padding:4px 6px;text-align:right;background:${h ? `rgba(59,130,246,${(0.06 + 0.55 * sh).toFixed(2)})` : 'transparent'};">${h >= 0.05 ? h.toFixed(1) : ''}</td>`; }).join('')}
+        <td style="padding:4px 8px;text-align:right;font-weight:700;">${x.tot.toFixed(1)}</td>
+        <td style="padding:4px 8px;text-align:center;font-weight:700;color:${x.people <= 1 ? '#dc2626' : 'inherit'};">${x.people}人</td>
+        <td style="padding:4px 8px;white-space:nowrap;">${escHtml(x.top.a)}（${Math.round(x.share * 100)}%）</td></tr>`;
+    }).join('')}</table>`;
+}
+
+// ── タスク別 標準工数と実績（年次・Folio）──
+const _taskStatsCache = new Map();
+async function loadTaskStats(force) {
+  const el = document.getElementById('task-stats'), card = document.getElementById('task-stats-card');
+  if (!el) return;
+  if (!taskImportUrl()) { if (card) card.style.display = 'none'; return; }
+  const days = Number((document.getElementById('task-stats-days') || {}).value || 90);
+  let hit = _taskStatsCache.get(days);
+  if (force || !hit || Date.now() - hit.t > 10 * 60 * 1000) {
+    hit = {t: Date.now(), promise: _gasJsonpTag(taskImportUrl(), {action:'getTaskStats', days}).then(d => {
+      if (!d || !d.ok) throw new Error((d && d.error) || '取得に失敗しました');
+      return d;
+    })};
+    _taskStatsCache.set(days, hit);
+  }
+  el.innerHTML = '<p class="no-data-msg">Folioのデータを読み込み中...</p>';
+  try { renderTaskStats(await hit.promise); }
+  catch(e) { _taskStatsCache.delete(days); el.innerHTML = `<p class="no-data-msg">Folioデータなし（${escHtml(e.message)}）</p>`; }
+}
+
+function renderTaskStats(d) {
+  const el = document.getElementById('task-stats');
+  if (!el) return;
+  const rows = (d.tasks || []).map(t => {
+    const base = t.std != null && t.std > 0 ? t.std : (t.planAvg || null);
+    const ratio = base ? t.actAvg / base : null;
+    const excess = base ? (t.actAvg - base) * t.n : null;
+    return {...t, base, ratio, excess};
+  }).sort((x, y) => (y.n >= 3) - (x.n >= 3) || Math.abs(y.excess || 0) - Math.abs(x.excess || 0));
+  const sub = document.getElementById('task-stats-sub');
+  if (sub) sub.textContent = `${d.start}〜${d.end}／実績工数が入力された完了タスク・3件以上を上位に／赤=実績が標準の1.3倍超・青=0.7倍未満`;
+  if (!rows.length) { el.innerHTML = '<p class="no-data-msg">実績工数が入力された完了タスクがありません</p>'; return; }
+  const th = (t, al) => `<th style="padding:5px 8px;font-size:11px;color:var(--g500);white-space:nowrap;text-align:${al || 'right'};">${t}</th>`;
+  const fmt = h => h == null ? '—' : (h >= 1 ? h.toFixed(2) + 'h' : Math.round(h * 60) + '分');
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <tr style="border-bottom:1px solid var(--g200);">${th('タスク', 'left')}${th('件数')}${th('標準工数')}${th('予定平均')}${th('実績平均')}${th('実績/標準')}${th('標準との差×件数')}${th('総実績')}</tr>
+    ${rows.map(r => {
+      const c = r.ratio == null ? 'inherit' : r.ratio > 1.3 ? '#dc2626' : r.ratio < 0.7 ? '#2563eb' : 'inherit';
+      return `<tr style="border-bottom:1px solid var(--g100, #eee);${r.n < 3 ? 'opacity:.6;' : ''}">
+        <td style="padding:5px 8px;">${escHtml(r.taskId)} ${escHtml(r.name || '')}</td>
+        <td style="padding:5px 8px;text-align:right;">${r.n}</td>
+        <td style="padding:5px 8px;text-align:right;">${fmt(r.std)}</td>
+        <td style="padding:5px 8px;text-align:right;">${fmt(r.planAvg)}</td>
+        <td style="padding:5px 8px;text-align:right;font-weight:700;">${fmt(r.actAvg)}</td>
+        <td style="padding:5px 8px;text-align:right;font-weight:800;color:${c};">${r.ratio == null ? '—' : Math.round(r.ratio * 100) + '%'}</td>
+        <td style="padding:5px 8px;text-align:right;color:${c};">${r.excess == null ? '—' : (r.excess > 0 ? '+' : '') + r.excess.toFixed(1) + 'h'}</td>
+        <td style="padding:5px 8px;text-align:right;">${r.actSum.toFixed(1)}h</td></tr>`;
+    }).join('')}</table>
+    <div style="font-size:11px;color:var(--g400);margin-top:6px;">標準工数が未設定のタスクは予定平均と比較。標準との差が大きいタスクは、標準工数の見直しか、作業手順の改善を検討してください。</div>`;
+}
+
 // ── 36協定チェック（年次）──
 function render36Check(periods, personMonth) {
   const el = document.getElementById('yearly-36');
@@ -5684,6 +5794,8 @@ async function renderYearlyDash(silent) {
     requestAnimationFrame(()=>renderStackBar(yearByAuthorFlat,'yearly-stack-canvas','yearly-stack-empty'));
     _subTrendCtx = {periods: fiscalPeriods, periodSub};
     render36Check(fiscalPeriods, personMonth);
+    renderSkillMap(yearByAuthorFlat);
+    loadTaskStats(false);
     // KPI: 前年同期比（当年度でデータのある期と同じ期だけ比較）
     {
       const diffEl = document.getElementById('ys-ot-diff');
