@@ -4381,14 +4381,17 @@ function updateTaskImportButton() {
 }
 
 // 開始時刻(HH:MM)と実績時間(h)から、残業開始(rules.otStart)以降を残業、それ以前を通常に振り分ける。
-// 開始時刻が不明なら全て通常。
-function splitTaskNormalOT(start, hours) {
+// 昼休みをまたぐタスクは、その分だけ終了時刻を後ろへずらして判定する。開始時刻が不明なら全て通常。
+function splitTaskNormalOT(start, hours, date) {
   const h = Math.max(0, Number(hours) || 0);
   if (!start || !/^\d{1,2}:\d{2}$/.test(start)) return {normal:h, ot:0};
-  const s = _hmToMin(start), e = s + h * 60;
+  const s = _hmToMin(start);
+  let e = s + h * 60;
+  const lunch = getLunchBreak(date || currentDate);
+  if (s < lunch.start && e > lunch.start) e += (lunch.end - lunch.start);
+  else if (s >= lunch.start && s < lunch.end) e += (lunch.end - s);   // 昼休み中に開始→休憩明けから作業
   const otStart = _hmToMin(DEPARTMENT_CONFIG.rules.otStart);
-  const otMin = Math.max(0, e - Math.max(s, otStart));
-  const ot = otMin / 60;
+  const ot = Math.min(h, Math.max(0, e - Math.max(s, otStart)) / 60);
   return {normal: Math.max(0, h - ot), ot};
 }
 
@@ -4436,7 +4439,7 @@ async function openTaskImport() {
     const start = (r.startDate && r.startDate !== date) ? null : r.start;
     const reason = !cd ? '対応表に未登録' : (!SUB_MAP[cd] ? `中分類 ${cd} がマスタに無い` : (!ok ? `中分類 ${cd} が無効` : ''));
     // 時間割(Folio)に配置済み＝開始時刻ありのタスクだけ既定で取込む。未配置は手動でチェック。
-    return {r, cd, ok, reason, start, placed: !!r.start, sp: splitTaskNormalOT(start, r.hours), checked: ok && !!r.start};
+    return {r, cd, ok, reason, start, placed: !!r.start, sp: splitTaskNormalOT(start, r.hours, date), checked: ok && !!r.start};
   });
   _taskImportPlan = {date, author, plan:[]};
   renderTaskImport();
