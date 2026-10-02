@@ -58,43 +58,71 @@ function doGet(e) {
 }
 
 function getCompletedTasks_(date, name, email) {
+  var t0 = Date.now();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) throw new Error('date は YYYY-MM-DD で指定してください');
   name = String(name || '').trim();
   email = String(email || '').trim().toLowerCase();
   if (!name && !email) throw new Error('name または email を指定してください');
 
-  var sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sh = ss.getSheetByName(SHEET_NAME);
   if (!sh) throw new Error('シート「' + SHEET_NAME + '」が見つかりません');
+  var tz = ss.getSpreadsheetTimeZone();
   var last = sh.getLastRow();
-  if (last < 2) return {ok: true, rows: []};
-  // 表示値で読む（時間値 "1:30:00" や日時を文字列として安全に解析するため）
-  var values = sh.getRange(2, 1, last - 1, COL.start).getDisplayValues();
+  if (last < 2) return {ok: true, rows: [], ms: Date.now() - t0};
+  var n = last - 1;
 
-  var rows = [];
-  for (var i = 0; i < values.length; i++) {
-    var r = values[i];
-    if (String(r[COL.status - 1]).trim() !== '完了') continue;
-    var startRaw = String(r[COL.start - 1] || '');
-    var doneDate = normDate_(r[COL.doneDate - 1]);
-    var workDate = normDate_(startRaw) || doneDate;
-    if (workDate !== date) continue;
-    var rEmail = String(r[COL.email - 1]).trim().toLowerCase();
-    var rName = String(r[COL.name - 1]).trim();
-    var hit = (email && rEmail === email) || (name && rName.indexOf(name) === 0);
-    if (!hit) continue;
-    var hours = durToHours_(r[COL.actual - 1]);
-    if (hours == null) hours = durToHours_(r[COL.est - 1]) || 0;
-    rows.push({
-      taskId: String(r[COL.taskId - 1]).trim(),
-      taskName: String(r[COL.taskName - 1]).trim(),
-      hours: Math.round(hours * 10000) / 10000,
-      start: normTime_(startRaw),
-      startDate: normDate_(startRaw),
-      doneDate: doneDate,
-      note: String(r[COL.note - 1] || '').trim()
-    });
+  // 高速化: 全列の表示値(getDisplayValues)は遅いので、判定に使う列だけ getValues で読む。
+  // 時間値(工数/実績工数)は Date 変換の誤差を避けるため、該当行だけ表示値で読む。
+  var c0 = COL.email;                                  // D列から
+  var vals = sh.getRange(2, c0, n, COL.start - c0 + 1).getValues();
+  var idx = function (col) { return col - c0; };
+
+  var hitRows = [];
+  for (var i = 0; i < n; i++) {
+    var r = vals[i];
+    if (String(r[idx(COL.status)]).trim() !== '完了') continue;
+    var rName = String(r[idx(COL.name)]).trim();
+    var rEmail = String(r[idx(COL.email)]).trim().toLowerCase();
+    if (!((email && rEmail === email) || (name && rName.indexOf(name) === 0))) continue;
+    var startD = toYmd_(r[idx(COL.start)], tz);
+    var doneD = toYmd_(r[idx(COL.doneDate)], tz);
+    if ((startD || doneD) !== date) continue;
+    hitRows.push({i: i, startD: startD, doneD: doneD});
   }
-  return {ok: true, rows: rows};
+
+  var rows = hitRows.map(function (h) {
+    var r = vals[h.i];
+    // 該当行の J〜O 列だけ表示値で読む（件数が少ないので速い）
+    var disp = sh.getRange(h.i + 2, COL.est, 1, COL.actual - COL.est + 1).getDisplayValues()[0];
+    var hours = durToHours_(disp[COL.actual - COL.est]);
+    if (hours == null) hours = durToHours_(disp[0]) || 0;
+    return {
+      taskId: String(r[idx(COL.taskId)]).trim(),
+      taskName: String(r[idx(COL.taskName)]).trim(),
+      hours: Math.round(hours * 10000) / 10000,
+      start: toHm_(r[idx(COL.start)], tz),
+      startDate: h.startD,
+      doneDate: h.doneD,
+      note: String(r[idx(COL.note)] || '').trim()
+    };
+  });
+  return {ok: true, rows: rows, ms: Date.now() - t0};
+}
+
+// セル値(Date または文字列) → "YYYY-MM-DD"
+function toYmd_(v, tz) {
+  if (v instanceof Date) return Utilities.formatDate(v, tz, 'yyyy-MM-dd');
+  return normDate_(v);
+}
+
+// セル値(Date または文字列) → "HH:MM"（時刻なし/00:00 は null）
+function toHm_(v, tz) {
+  if (v instanceof Date) {
+    var hm = Utilities.formatDate(v, tz, 'HH:mm');
+    return hm === '00:00' ? null : hm;
+  }
+  return normTime_(v);
 }
 
 // "2026/10/1" "2026-10-01 9:00:00" → "2026-10-01"
