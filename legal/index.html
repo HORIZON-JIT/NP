@@ -837,7 +837,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <button class="btn-clear no-print" onclick="clearInputs()">クリア</button>
         <span id="save-msg"></span>
       </div>
-      <button class="btn-clear no-print" id="btn-task-import" onclick="openTaskImport()" style="display:none;width:100%;margin-top:8px;">タスク実績から取込</button>
+      <button class="btn-clear no-print" id="btn-task-import" onclick="openTaskImport()" style="display:none;width:100%;margin-top:8px;">Folioから取込</button>
       <div class="side-leave no-print">
         <label class="leave-label" for="input-leave">退勤時刻</label>
         <input type="time" id="input-leave" class="leave-input" placeholder="--:--" step="60"
@@ -1100,7 +1100,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 
   <section class="admin-card" id="admin-task-section" style="margin-top:14px;">
     <h2>タスク対応表（タスク管理アプリ → 日報）</h2>
-    <div class="admin-note" style="margin-bottom:10px;">「タスク実績から取込」で使う、タスクIDと日報の中分類の対応です。変更すると即Firebaseへ保存されます。</div>
+    <div class="admin-note" style="margin-bottom:10px;">「Folioから取込」で使う、タスクIDと日報の中分類の対応です。変更すると即Firebaseへ保存されます。</div>
     <div class="admin-form sub">
       <input id="admin-task-id" placeholder="タスクID（例: K29, α7）">
       <select id="admin-task-sub"></select>
@@ -1123,7 +1123,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 <!-- TASK IMPORT MODAL -->
 <div class="backdrop" id="task-import-modal">
   <div class="modal" style="max-width:640px;">
-    <h3>タスク実績から取込</h3>
+    <h3>Folioから取込</h3>
     <div id="task-import-sub" style="font-size:12px;color:var(--g500);margin-bottom:10px;"></div>
     <div id="task-import-body" style="font-size:12px;"></div>
     <div class="modal-btns">
@@ -1310,7 +1310,7 @@ const DEPARTMENT_CONFIG = (function(){
       { cd:'O', label:'その他',     color:'#6b7280', subs:[{cd:'O1',label:'その他'}] },
       { cd:'A', label:'アフター',   color:'#ec4899', subs:[{cd:'A1',label:'価格登録'},{cd:'A2',label:'在庫管理'},{cd:'A3',label:'オーダー管理'},{cd:'A4',label:'特殊仕様製作見積'},{cd:'A5',label:'ケアパック導入管理'},{cd:'A6',label:'アフタースポット対応'}] }
     ],
-    // タスク管理アプリ(タスク実績シート)の読取用GAS WebアプリURL。空なら「タスク実績から取込」ボタンを出さない。
+    // タスク管理アプリ(タスク実績シート)の読取用GAS WebアプリURL。空なら「Folioから取込」ボタンを出さない。
     // GASのコードはリポジトリの gas/task-sheet-reader.gs。
     taskSheetGasUrl: '',
     // タスクID(タスク管理アプリ) → 日報の中分類CD の既定対応表。
@@ -4514,7 +4514,7 @@ function applyTaskImport() {
   updateLivePie();
   closeModal('task-import-modal');
   const st = document.getElementById('data-status');
-  if (st) { st.textContent = 'タスク実績から取込済み（未保存）'; st.className = 'data-status'; }
+  if (st) { st.textContent = 'Folioから取込済み（未保存）'; st.className = 'data-status'; }
 }
 
 let _submitRunning = false;
