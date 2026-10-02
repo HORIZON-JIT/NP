@@ -5569,7 +5569,7 @@ function renderMgrSummary() {
     const curLv = lvl(c.ot), pjLv = pj != null ? lvl(pj) : '';
     const A = `<b>${escHtml(a)}</b>`;
     if (curLv === 'crit') alerts.push(['crit', `${A} 今期残業 ${c.ot.toFixed(1)}h（上限${limit}h超）`]);
-    else if (pjLv === 'crit') alerts.push(['crit', `${A} 期末見込 ${pj.toFixed(1)}h（上限${limit}h超の見込み）`]);
+    else if (pjLv === 'crit') alerts.push(['crit', `${A} 月末見込 ${pj.toFixed(1)}h（上限${limit}h超の見込み）`]);
     else if (curLv === 'warn' || pjLv === 'warn') alerts.push(['warn', `${A} 残業 ${c.ot.toFixed(1)}h${pj != null ? `（見込 ${pj.toFixed(1)}h）` : ''}／警告ライン${warn}h`]);
     if (fyOT != null && fyOT >= yLimit * 0.8) alerts.push([fyOT >= yLimit ? 'crit' : 'warn', `${A} 年度累計残業 ${fyOT.toFixed(1)}h／${yLimit}h`]);
     if (over != null && over >= maxOver - 2) alerts.push([over >= maxOver ? 'crit' : 'warn', `${A} 月${limit}h超が年度${over}回（上限${maxOver}回）`]);
@@ -5590,7 +5590,7 @@ function renderMgrSummary() {
       <span class="tk" style="left:${(warn / max * 100).toFixed(1)}%"></span><span class="tk lim" style="left:${(limit / max * 100).toFixed(1)}%"></span></div>`;
   };
   tbl.innerHTML = rows.length ? `<div class="dx-scroll"><table class="dx-table">
-    <thead><tr><th>担当</th><th class="num">通常</th><th class="num">残業</th>${proj ? '<th class="num">期末見込</th>' : ''}
+    <thead><tr><th>担当</th><th class="num">通常</th><th class="num">残業</th>${proj ? '<th class="num">月末見込</th>' : ''}
       <th class="num">前月期</th><th class="num">増減</th><th style="min-width:150px;">月${limit}hに対する残業${proj ? '（見込）' : ''}</th>
       <th class="num">年度累計 / ${yLimit}h</th><th class="num">${limit}h超</th><th class="num">未入力</th>${ratio ? '<th class="num">Folio比率</th>' : ''}</tr></thead>
     <tbody>${rows.map(r => {
@@ -5612,7 +5612,7 @@ function renderMgrSummary() {
     : '<p class="dx-empty">この期間のデータがありません</p>';
   dxGrow(tbl);
   const sub = document.getElementById('mgr-sub');
-  if (sub) sub.textContent = `残業は退勤時刻から算出（${R.otStart}以降）` + (proj ? `・期末見込は稼働日 ${ec.workElapsed}/${ec.workTotal}日から按分` : '');
+  if (sub) sub.textContent = `残業は退勤時刻から算出（${R.otStart}以降）` + (proj ? `・月末見込は締め日（15日）までの稼働日 ${ec.workElapsed}/${ec.workTotal}日から按分` : '');
   // KPI: 前月期比
   const d = document.getElementById('ms-ot-diff');
   if (d && ctx.prev) {
