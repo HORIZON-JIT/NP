@@ -12,7 +12,13 @@
  *   4. 発行された URL（.../exec）を日報アプリの taskSheetGasUrl に設定
  *
  * リクエスト: GET ?action=getCompletedTasks&date=YYYY-MM-DD&name=苗字[&email=...][&callback=fn]
- * 応答: {ok:true, rows:[{taskId, taskName, hours, start:"HH:MM"|null, startDate:"YYYY-MM-DD"|null, note}]}
+ * 応答: {ok:true, rows:[{taskId, taskName, hours, start:"HH:MM"|null, startDate:"YYYY-MM-DD"|null, doneDate, note}]}
+ *
+ * 作業日の判定: 開始予定日時(R)の日付。空なら作業完了日(P)。
+ *   Folio(チーム時間割)はR列の日付でタスクを配置し、Folioで完了にしても作業完了日が入らない場合があるため。
+ *
+ * コード更新時は「デプロイ」→「デプロイを管理」→ 既存デプロイを編集 → バージョン「新バージョン」で
+ * 更新すること（新しいデプロイを作るとURLが変わる）。
  */
 
 var SPREADSHEET_ID = '1IHxotYypyQkGyskunDMrN2i_v_GU2brQvGlZeAS0UgM';
@@ -68,20 +74,23 @@ function getCompletedTasks_(date, name, email) {
   for (var i = 0; i < values.length; i++) {
     var r = values[i];
     if (String(r[COL.status - 1]).trim() !== '完了') continue;
-    if (normDate_(r[COL.doneDate - 1]) !== date) continue;
+    var startRaw = String(r[COL.start - 1] || '');
+    var doneDate = normDate_(r[COL.doneDate - 1]);
+    var workDate = normDate_(startRaw) || doneDate;
+    if (workDate !== date) continue;
     var rEmail = String(r[COL.email - 1]).trim().toLowerCase();
     var rName = String(r[COL.name - 1]).trim();
     var hit = (email && rEmail === email) || (name && rName.indexOf(name) === 0);
     if (!hit) continue;
     var hours = durToHours_(r[COL.actual - 1]);
     if (hours == null) hours = durToHours_(r[COL.est - 1]) || 0;
-    var startRaw = String(r[COL.start - 1] || '');
     rows.push({
       taskId: String(r[COL.taskId - 1]).trim(),
       taskName: String(r[COL.taskName - 1]).trim(),
       hours: Math.round(hours * 10000) / 10000,
       start: normTime_(startRaw),
       startDate: normDate_(startRaw),
+      doneDate: doneDate,
       note: String(r[COL.note - 1] || '').trim()
     });
   }
