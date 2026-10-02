@@ -33,6 +33,8 @@
  *   → {ok, byDate:{date:{氏名:時間}}, cached}  … 時間割に配置済み(開始時刻あり)の完了タスクの実績合計
  * ダッシュボード用: ?action=getTaskStats&days=90（最大120日）
  *   → {ok, tasks:[{taskId, name, n, std, planAvg, actAvg, actSum}]}  … タスク別の標準工数と実績
+ * 個人ページ用: ?action=getPersonTasks&name=苗字&start=&end=（最大62日）
+ *   → {ok, tasks:[{taskId, name, n, hours, unplaced}]}  … その人の完了タスクをタスク別に集計
  */
 
 var SPREADSHEET_ID = '1IHxotYypyQkGyskunDMrN2i_v_GU2brQvGlZeAS0UgM';
@@ -68,6 +70,7 @@ function doGet(e) {
     else if (action === 'getCompletedTasks') result = getCompletedTasks_(p.date, p.name, p.email, p.nocache === '1', p.diag === '1');
     else if (action === 'getRangeHours') result = getRangeHours_(p.start, p.end);
     else if (action === 'getTaskStats') result = getTaskStats_(Number(p.days) || 90);
+    else if (action === 'getPersonTasks') result = getPersonTasks_(p.name, p.start, p.end);
     else if (action === 'setTaskCd') result = setTaskCds_(singleMap_(p.taskId, p.cd), true);
     else if (action === 'setTaskCds') result = setTaskCds_(JSON.parse(p.map || '{}'), false);
     else result = {ok: false, error: 'unknown action: ' + action};
@@ -255,6 +258,46 @@ function readTaskStd_(ss) {
     out[id] = {std: stds[i] ? durToHours_(stds[i][0]) : null, name: nms[i] ? String(nms[i][0]).trim() : ''};
   }
   return out;
+}
+
+// 個人の完了タスクをタスク別に集計（期間内）
+function getPersonTasks_(name, start, end) {
+  var t0 = Date.now();
+  name = String(name || '').trim();
+  if (!name) throw new Error('name を指定してください');
+  var r = getRangeLists_(start, end);
+  var agg = {};
+  r.dates.forEach(function (d) {
+    r.lists[d].forEach(function (x) {
+      if (x.n.indexOf(name) !== 0) return;
+      var a = agg[x.id] || (agg[x.id] = {taskId: x.id, name: x.nm, n: 0, hours: 0, unplaced: 0});
+      a.n++; a.hours = Math.round((a.hours + x.h) * 10000) / 10000;
+      if (!x.s) a.unplaced++;
+    });
+  });
+  var tasks = Object.keys(agg).map(function (k) { return agg[k]; }).sort(function (x, y) { return y.hours - x.hours; });
+  return {ok: true, tasks: tasks, cached: r.cached, ms: Date.now() - t0};
+}
+
+// 期間内の日付別リスト（キャッシュ優先。足りなければ作り直す）
+function getRangeLists_(start, end) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start || '') || !/^\d{4}-\d{2}-\d{2}$/.test(end || '') || start > end)
+    throw new Error('start/end は YYYY-MM-DD で指定してください');
+  var dates = [];
+  for (var d = start; d <= end; d = shiftYmd_(d, 1)) {
+    dates.push(d);
+    if (dates.length > 62) throw new Error('期間は62日以内で指定してください');
+  }
+  var got = CacheService.getScriptCache().getAll(dates.map(function (x) { return 'd:' + x; }));
+  var lists = {}, cached = true;
+  if (dates.every(function (x) { return got['d:' + x] != null; })) {
+    dates.forEach(function (x) { lists[x] = JSON.parse(got['d:' + x]); });
+  } else {
+    cached = false;
+    var idx = buildIndex_(null);
+    dates.forEach(function (x) { lists[x] = idx.byDate[x] || []; });
+  }
+  return {dates: dates, lists: lists, cached: cached};
 }
 
 // タスク別の標準工数と実績（直近 days 日、実績工数が入っている完了タスクのみ）
