@@ -1,5 +1,5 @@
 /**
- * タスク管理アプリ「タスク実績」読取用 Web アプリ（日報アプリの「タスク実績から取込」用）
+ * タスク管理アプリ「タスク実績」読取用 Web アプリ（日報アプリの「Folioから取込」用）
  *
  * 設置方法:
  *   1. https://script.google.com/ で「新しいプロジェクト」を作成
@@ -10,15 +10,20 @@
  *        次のユーザーとして実行: 自分
  *        アクセスできるユーザー: horizon.co.jp 内の全員（組織内）
  *   4. 発行された URL（.../exec）を日報アプリの taskSheetGasUrl に設定
+ *   5. エディタで関数 setupTrigger を1回実行（5分おきにキャッシュを作り直すトリガーを作成）
  *
- * リクエスト: GET ?action=getCompletedTasks&date=YYYY-MM-DD&name=苗字[&email=...][&callback=fn]
- * 応答: {ok:true, rows:[{taskId, taskName, hours, start:"HH:MM"|null, startDate:"YYYY-MM-DD"|null, doneDate, note}]}
+ * コード更新時は「デプロイ」→「デプロイを管理」→ 既存デプロイを編集 → バージョン「新バージョン」で
+ * 更新すること（新しいデプロイを作るとURLが変わる）。
+ *
+ * リクエスト: GET ?action=getCompletedTasks&date=YYYY-MM-DD&name=苗字[&email=...][&nocache=1][&diag=1][&callback=fn]
+ * 応答: {ok:true, rows:[{taskId, taskName, hours, start:"HH:MM"|null, startDate, doneDate, note}],
+ *        ms, cached, builtAt, t:{open, read, build}}
  *
  * 作業日の判定: 開始予定日時(R)の日付。空なら作業完了日(P)。
  *   Folio(チーム時間割)はR列の日付でタスクを配置し、Folioで完了にしても作業完了日が入らない場合があるため。
  *
- * コード更新時は「デプロイ」→「デプロイを管理」→ 既存デプロイを編集 → バージョン「新バージョン」で
- * 更新すること（新しいデプロイを作るとURLが変わる）。
+ * 高速化: ブックを開いて全行を読むのに数秒かかるため、「完了」行を作業日ごとにまとめて
+ *   CacheService に保存し、通常はキャッシュから返す（5分おきのトリガーで作り直し）。
  */
 
 var SPREADSHEET_ID = '1IHxotYypyQkGyskunDMrN2i_v_GU2brQvGlZeAS0UgM';
@@ -38,13 +43,17 @@ var COL = {
   start:   18   // R 開始予定日時
 };
 
+var CACHE_DAYS_BACK = 120;   // キャッシュ対象: 今日の120日前〜
+var CACHE_DAYS_AHEAD = 14;   //               〜14日後
+var CACHE_TTL = 21600;       // 6時間（CacheServiceの上限）
+
 function doGet(e) {
   var p = (e && e.parameter) || {};
   var result;
   try {
     var action = p.action || 'getCompletedTasks';
     if (action === 'test') result = {ok: true};
-    else if (action === 'getCompletedTasks') result = getCompletedTasks_(p.date, p.name, p.email);
+    else if (action === 'getCompletedTasks') result = getCompletedTasks_(p.date, p.name, p.email, p.nocache === '1', p.diag === '1');
     else result = {ok: false, error: 'unknown action: ' + action};
   } catch (err) {
     result = {ok: false, error: String(err && err.message || err)};
@@ -57,72 +66,153 @@ function doGet(e) {
   return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
 }
 
-function getCompletedTasks_(date, name, email) {
+function getCompletedTasks_(date, name, email, nocache, diag) {
   var t0 = Date.now();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) throw new Error('date は YYYY-MM-DD で指定してください');
   name = String(name || '').trim();
   email = String(email || '').trim().toLowerCase();
   if (!name && !email) throw new Error('name または email を指定してください');
 
+  var cache = CacheService.getScriptCache();
+  var list = null, cached = false, builtAt = null, t = null, diagInfo = null;
+  if (!nocache && !diag) {
+    var got = cache.getAll(['meta', 'd:' + date]);
+    if (got['meta'] && got['d:' + date] != null) {
+      list = JSON.parse(got['d:' + date]);
+      builtAt = JSON.parse(got['meta']).builtAt;
+      cached = true;
+    }
+  }
+  if (!list) {
+    var idx = buildIndex_(diag ? {name: name, email: email} : null);
+    t = idx.t; builtAt = idx.builtAt; diagInfo = idx.diag;
+    list = idx.byDate[date] || [];
+  }
+
+  var rows = list.filter(function (x) {
+    return (email && x.e === email) || (name && x.n.indexOf(name) === 0);
+  }).map(function (x) {
+    return {taskId: x.id, taskName: x.nm, hours: x.h, start: x.s, startDate: x.sd, doneDate: x.dd, note: x.note};
+  });
+  var res = {ok: true, rows: rows, ms: Date.now() - t0, cached: cached, builtAt: builtAt};
+  if (t) res.t = t;
+  if (diagInfo) res.diag = diagInfo;
+  return res;
+}
+
+// シートを読み、「完了」行を作業日ごとにまとめてキャッシュへ保存する。
+function buildIndex_(diagFor) {
+  var t0 = Date.now();
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sh = ss.getSheetByName(SHEET_NAME);
   if (!sh) throw new Error('シート「' + SHEET_NAME + '」が見つかりません');
   var tz = ss.getSpreadsheetTimeZone();
+  var t1 = Date.now();
+
+  var byDate = {};
   var last = sh.getLastRow();
-  if (last < 2) return {ok: true, rows: [], ms: Date.now() - t0};
-  var n = last - 1;
+  var n = Math.max(0, last - 1);
+  var vals = [], estDisp = [], actDisp = [];
+  if (n > 0) {
+    var c0 = COL.email;
+    vals = sh.getRange(2, c0, n, COL.start - c0 + 1).getValues();
+    // 時間値は表示値("1:30:00")で読む（Date換算の誤差回避）。必要な2列だけ。
+    estDisp = sh.getRange(2, COL.est, n, 1).getDisplayValues();
+    actDisp = sh.getRange(2, COL.actual, n, 1).getDisplayValues();
+  }
+  var t2 = Date.now();
 
-  // 高速化: 全列の表示値(getDisplayValues)は遅いので、判定に使う列だけ getValues で読む。
-  // 時間値(工数/実績工数)は Date 変換の誤差を避けるため、該当行だけ表示値で読む。
-  var c0 = COL.email;                                  // D列から
-  var vals = sh.getRange(2, c0, n, COL.start - c0 + 1).getValues();
-  var idx = function (col) { return col - c0; };
+  var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var lo = shiftYmd_(today, -CACHE_DAYS_BACK), hi = shiftYmd_(today, CACHE_DAYS_AHEAD);
+  var diag = diagFor ? [] : null;
+  var ix = function (col) { return col - COL.email; };
 
-  var hitRows = [];
   for (var i = 0; i < n; i++) {
     var r = vals[i];
-    if (String(r[idx(COL.status)]).trim() !== '完了') continue;
-    var rName = String(r[idx(COL.name)]).trim();
-    var rEmail = String(r[idx(COL.email)]).trim().toLowerCase();
-    if (!((email && rEmail === email) || (name && rName.indexOf(name) === 0))) continue;
-    var startD = toYmd_(r[idx(COL.start)], tz);
-    var doneD = toYmd_(r[idx(COL.doneDate)], tz);
-    if ((startD || doneD) !== date) continue;
-    hitRows.push({i: i, startD: startD, doneD: doneD});
+    var rName = String(r[ix(COL.name)]).trim();
+    var rEmail = String(r[ix(COL.email)]).trim().toLowerCase();
+    var startV = r[ix(COL.start)], doneV = r[ix(COL.doneDate)];
+    var sd = toYmd_(startV, tz), dd = toYmd_(doneV, tz);
+    var status = String(r[ix(COL.status)]).trim();
+    if (diag && diag.length < 3 &&
+        ((diagFor.email && rEmail === diagFor.email) || (diagFor.name && rName.indexOf(diagFor.name) === 0)) &&
+        (startV !== '' || doneV !== '')) {
+      diag.push({row: i + 2, status: status,
+                 startType: Object.prototype.toString.call(startV), startRaw: String(startV), startYmd: sd, startHm: toHm_(startV, tz),
+                 doneType: Object.prototype.toString.call(doneV), doneRaw: String(doneV), doneYmd: dd});
+    }
+    if (status !== '完了') continue;
+    var wd = sd || dd;
+    if (!wd) continue;
+    var hours = durToHours_(actDisp[i] && actDisp[i][0]);
+    if (hours == null) hours = durToHours_(estDisp[i] && estDisp[i][0]) || 0;
+    (byDate[wd] = byDate[wd] || []).push({
+      e: rEmail, n: rName,
+      id: String(r[ix(COL.taskId)]).trim(),
+      nm: String(r[ix(COL.taskName)]).trim(),
+      h: Math.round(hours * 10000) / 10000,
+      s: toHm_(startV, tz), sd: sd, dd: dd,
+      note: String(r[ix(COL.note)] || '').trim()
+    });
   }
 
-  var rows = hitRows.map(function (h) {
-    var r = vals[h.i];
-    // 該当行の J〜O 列だけ表示値で読む（件数が少ないので速い）
-    var disp = sh.getRange(h.i + 2, COL.est, 1, COL.actual - COL.est + 1).getDisplayValues()[0];
-    var hours = durToHours_(disp[COL.actual - COL.est]);
-    if (hours == null) hours = durToHours_(disp[0]) || 0;
-    return {
-      taskId: String(r[idx(COL.taskId)]).trim(),
-      taskName: String(r[idx(COL.taskName)]).trim(),
-      hours: Math.round(hours * 10000) / 10000,
-      start: toHm_(r[idx(COL.start)], tz),
-      startDate: h.startD,
-      doneDate: h.doneD,
-      note: String(r[idx(COL.note)] || '').trim()
-    };
+  // キャッシュへ保存（範囲内の日付はデータが無くても [] を入れて「キャッシュ済み」を表す）
+  var builtAt = new Date().toISOString();
+  var put = {};
+  for (var d = lo; d <= hi; d = shiftYmd_(d, 1)) put['d:' + d] = JSON.stringify(byDate[d] || []);
+  try {
+    var keys = Object.keys(put), cache = CacheService.getScriptCache();
+    for (var k = 0; k < keys.length; k += 50) {
+      var chunk = {};
+      keys.slice(k, k + 50).forEach(function (key) { chunk[key] = put[key]; });
+      cache.putAll(chunk, CACHE_TTL);
+    }
+    cache.put('meta', JSON.stringify({builtAt: builtAt}), CACHE_TTL);
+  } catch (err) {
+    // 1キー100KB超などでキャッシュできなくても、今回の応答は返す
+  }
+  var t3 = Date.now();
+  return {byDate: byDate, builtAt: builtAt, diag: diag, t: {open: t1 - t0, read: t2 - t1, build: t3 - t2}};
+}
+
+// 時間主導トリガー用: キャッシュを作り直す
+function warmCache() {
+  buildIndex_(null);
+}
+
+// エディタから1回だけ実行: 5分おきに warmCache を動かすトリガーを作成（重複は作らない）
+function setupTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (tr) {
+    if (tr.getHandlerFunction() === 'warmCache') ScriptApp.deleteTrigger(tr);
   });
-  return {ok: true, rows: rows, ms: Date.now() - t0};
+  ScriptApp.newTrigger('warmCache').timeBased().everyMinutes(5).create();
+  warmCache();
+}
+
+function isDate_(v) {
+  return Object.prototype.toString.call(v) === '[object Date]' && !isNaN(v.getTime());
 }
 
 // セル値(Date または文字列) → "YYYY-MM-DD"
 function toYmd_(v, tz) {
-  if (v instanceof Date) return Utilities.formatDate(v, tz, 'yyyy-MM-dd');
+  if (isDate_(v)) return Utilities.formatDate(v, tz, 'yyyy-MM-dd');
   return normDate_(v);
 }
 
 // セル値(Date または文字列) → "HH:MM"（時刻なし/00:00 は null）
 function toHm_(v, tz) {
-  if (v instanceof Date) {
+  if (isDate_(v)) {
     var hm = Utilities.formatDate(v, tz, 'HH:mm');
     return hm === '00:00' ? null : hm;
   }
   return normTime_(v);
+}
+
+// "YYYY-MM-DD" を days 日ずらす
+function shiftYmd_(ymd, days) {
+  var p = ymd.split('-');
+  var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + days));
+  return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2);
 }
 
 // "2026/10/1" "2026-10-01 9:00:00" → "2026-10-01"
