@@ -28,6 +28,9 @@
  * 日報中分類: タスクマスタの「日報中分類CD」列を正とし、各行に cdSub として付ける。
  *   ?action=setTaskCd&taskId=K29&cd=K1          … 1件書き込み（列が無ければ末尾に追加）
  *   ?action=setTaskCds&map={"K29":"K1",...}     … 一括書き込み（空欄のタスクだけ。既存値は上書きしない）
+ *
+ * ダッシュボード用: ?action=getRangeHours&start=YYYY-MM-DD&end=YYYY-MM-DD（最大62日）
+ *   → {ok, byDate:{date:{氏名:時間}}, cached}  … 時間割に配置済み(開始時刻あり)の完了タスクの実績合計
  */
 
 var SPREADSHEET_ID = '1IHxotYypyQkGyskunDMrN2i_v_GU2brQvGlZeAS0UgM';
@@ -61,6 +64,7 @@ function doGet(e) {
     var action = p.action || 'getCompletedTasks';
     if (action === 'test') result = {ok: true};
     else if (action === 'getCompletedTasks') result = getCompletedTasks_(p.date, p.name, p.email, p.nocache === '1', p.diag === '1');
+    else if (action === 'getRangeHours') result = getRangeHours_(p.start, p.end);
     else if (action === 'setTaskCd') result = setTaskCds_(singleMap_(p.taskId, p.cd), true);
     else if (action === 'setTaskCds') result = setTaskCds_(JSON.parse(p.map || '{}'), false);
     else result = {ok: false, error: 'unknown action: ' + action};
@@ -108,6 +112,38 @@ function getCompletedTasks_(date, name, email, nocache, diag) {
   if (t) res.t = t;
   if (diagInfo) res.diag = diagInfo;
   return res;
+}
+
+// 期間内の日付×氏名ごとの実績時間（時間割に配置済みの完了タスク）
+function getRangeHours_(start, end) {
+  var t0 = Date.now();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start || '') || !/^\d{4}-\d{2}-\d{2}$/.test(end || '') || start > end)
+    throw new Error('start/end は YYYY-MM-DD で指定してください');
+  var dates = [];
+  for (var d = start; d <= end; d = shiftYmd_(d, 1)) {
+    dates.push(d);
+    if (dates.length > 62) throw new Error('期間は62日以内で指定してください');
+  }
+  var keys = dates.map(function (x) { return 'd:' + x; });
+  var got = CacheService.getScriptCache().getAll(keys);
+  var lists = {}, cached = true;
+  if (keys.every(function (k) { return got[k] != null; })) {
+    dates.forEach(function (x) { lists[x] = JSON.parse(got['d:' + x]); });
+  } else {
+    cached = false;
+    var idx = buildIndex_(null);
+    dates.forEach(function (x) { lists[x] = idx.byDate[x] || []; });
+  }
+  var byDate = {};
+  dates.forEach(function (x) {
+    var m = {};
+    lists[x].forEach(function (r) {
+      if (!r.s) return;                          // 時間割に未配置は除外（Folioの実績表示に合わせる）
+      m[r.n] = Math.round(((m[r.n] || 0) + r.h) * 10000) / 10000;
+    });
+    byDate[x] = m;
+  });
+  return {ok: true, byDate: byDate, cached: cached, ms: Date.now() - t0};
 }
 
 // シートを読み、「完了」行を作業日ごとにまとめてキャッシュへ保存する。
