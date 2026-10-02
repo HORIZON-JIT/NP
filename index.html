@@ -344,6 +344,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .dash-stats-7{grid-template-columns:repeat(6,1fr);}
 .card-sub{font-size:11px;color:var(--g400);}
 /* ランキング3カラム */
+.d-stat .sd{font-size:11px;color:var(--g500);margin-top:3px;font-weight:700;}
 .rank-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px;}
 .rank-row-2{grid-template-columns:repeat(2,1fr);}
 .rank-item{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-bottom:1px solid var(--g100);}
@@ -938,9 +939,17 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <div class="dash-stats">
       <div class="d-stat"><div class="sv"    id="ms-persons">—</div><div class="sl">記録者数</div></div>
       <div class="d-stat"><div class="sv"    id="ms-normal">—</div><div class="sl">通常時間計</div></div>
-      <div class="d-stat"><div class="sv ot" id="ms-ot">—</div><div class="sl">残業時間計</div></div>
+      <div class="d-stat"><div class="sv ot" id="ms-ot">—</div><div class="sl">残業時間計</div><div class="sd" id="ms-ot-diff"></div></div>
       <div class="d-stat"><div class="sv avg" id="ms-ot-avg-person">—</div><div class="sl">残業平均/人</div></div>
       <div class="d-stat"><div class="sv"    id="ms-days">—</div><div class="sl">集計日数</div></div>
+    </div>
+    <!-- 管理者サマリー（アラート＋担当別 残業・稼働一覧） -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-hd"><h2>管理者サマリー</h2><span class="card-sub" id="mgr-sub">残業は退勤時刻から算出（17:30以降）</span></div>
+      <div class="card-body">
+        <div id="mgr-alerts" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
+        <div id="mgr-table" style="overflow-x:auto;"></div>
+      </div>
     </div>
     <!-- メイングラフ2カラム -->
     <div class="dash-layout">
@@ -993,10 +1002,15 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <div class="dash-stats dash-stats-7">
       <div class="d-stat"><div class="sv"    id="ys-persons">—</div><div class="sl">記録者数</div></div>
       <div class="d-stat"><div class="sv"    id="ys-normal">—</div><div class="sl">通常時間計</div></div>
-      <div class="d-stat"><div class="sv ot" id="ys-ot">—</div><div class="sl">残業時間計</div></div>
+      <div class="d-stat"><div class="sv ot" id="ys-ot">—</div><div class="sl">残業時間計</div><div class="sd" id="ys-ot-diff"></div></div>
       <div class="d-stat"><div class="sv avg" id="ys-ot-avg-person">—</div><div class="sl">残業月平均（個人）</div></div>
       <div class="d-stat"><div class="sv avg" id="ys-ot-avg-total">—</div><div class="sl">残業月平均（全員）</div></div>
       <div class="d-stat"><div class="sv"    id="ys-months">—</div><div class="sl">集計月数</div></div>
+    </div>
+    <!-- 36協定チェック（担当別 年度残業） -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-hd"><h2>36協定チェック（担当別 年度残業）</h2><span class="card-sub" id="yearly-36-sub">年360h・月45h超は年6回まで／赤=45h超・黄=36h以上</span></div>
+      <div class="card-body"><div id="yearly-36" style="overflow-x:auto;"></div></div>
     </div>
     <!-- 上段：残業推移グラフ（全幅）2枚縦並び -->
     <div class="card" style="margin-bottom:14px;">
@@ -1283,6 +1297,11 @@ const DEPARTMENT_CONFIG = (function(){
       otStart:        '17:30',  // 残業開始
       roundStepMin:   15,       // 丸め単位（分）: これ未満は切り捨て、以降切り上げ
       roundStepHours: 0.25,     // 丸め単位（時間）
+      // 残業の管理基準（36協定）。ダッシュボードの管理者サマリー/36協定チェックで使用
+      otMonthWarn:    36,       // 月の残業 警告ライン(h)
+      otMonthLimit:   45,       // 月の残業 上限(h)
+      otYearLimit:    360,      // 年度の残業 上限(h)
+      otOverMonthsMax: 6,       // 月45h超が許される回数/年度
       lunch: {                  // 昼休憩（奇数月/偶数月で切替。固定なら両方同値に）
         odd:  { start: '12:40', end: '13:30' },
         even: { start: '12:20', end: '13:10' }
@@ -5034,6 +5053,7 @@ function renderEntryMatrix() {
     return {d, dow, weekend, future, off: weekend || holiday, holiday};
   });
   let totalMissing = 0;
+  const missingBy = {};
   const C = {miss:'rgba(239,68,68,.16)', off:'var(--g100, #f1f1f1)', diff:'#f59e0b'};
   const head = `<tr><th style="position:sticky;left:0;background:var(--surface);padding:4px 8px;text-align:left;font-size:11px;color:var(--g500);">担当</th>` +
     dayInfo.map(x => `<th style="padding:2px 3px;font-size:10px;font-weight:600;color:${x.dow===0?'#ef4444':x.dow===6?'#3b82f6':'var(--g500)'};min-width:34px;">${Number(x.d.slice(8))}<br>${wd[x.dow]}</th>`).join('') +
@@ -5056,11 +5076,18 @@ function renderEntryMatrix() {
       return `<td title="${escHtml(title)}" style="padding:2px 3px;text-align:center;font-size:11px;background:${bg};${diff}${txt==='未'?'color:#dc2626;font-weight:700;':''}">${txt}${ftxt}</td>`;
     }).join('');
     totalMissing += miss;
+    missingBy[a] = miss;
     return `<tr><td style="position:sticky;left:0;background:var(--surface);padding:4px 8px;font-size:12px;font-weight:700;white-space:nowrap;">${escHtml(a)}</td>${cells}<td style="padding:4px 8px;text-align:center;font-size:12px;font-weight:700;color:${miss?'#dc2626':'var(--g400)'};">${miss ? miss + '日' : '—'}</td></tr>`;
   }).join('');
   el.innerHTML = authors.length
     ? `<table style="border-collapse:separate;border-spacing:2px;width:max-content;min-width:100%;">${head}${body}</table>`
     : '<p class="no-data-msg">担当者がいません</p>';
+  // 管理者サマリー用: 未入力日数と、稼働日（経過/期間全体）
+  ctx.missing = missingBy;
+  ctx.workElapsed = dayInfo.filter(x => !x.off && !x.future && (x.d < today || anyEntry(x.d))).length;
+  ctx.workTotal = ctx.workElapsed + dayInfo.filter(x => !x.weekend && (x.future || (x.d === today && !anyEntry(x.d)))).length;
+  ctx.inProgress = startDate <= today && today <= endDate;
+  renderMgrSummary();
   const sub = document.getElementById('entry-matrix-sub');
   if (sub) sub.innerHTML = `未入力 <b style="color:${totalMissing?'#dc2626':'inherit'};">${totalMissing}件</b> ／ 赤=未入力（平日の過去日）・グレー=土日/休日` +
     (ctx.folio ? '・F=Folio実績・黄枠=日報とFolioの差が1h超' : '');
@@ -5086,6 +5113,9 @@ function renderFolioCompare() {
     });
     return {a, n, f};
   }).filter(r => r.n > 0 || r.f > 0);
+  ctx.folioRatio = {};
+  rows.forEach(r => { if (r.n > 0) ctx.folioRatio[r.a] = r.f / r.n; });
+  renderMgrSummary();
   if (!rows.length) { el.innerHTML = '<p class="no-data-msg">この期間のデータがありません</p>'; return; }
   const max = Math.max(...rows.map(r => Math.max(r.n, r.f)), 1);
   el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
@@ -5107,6 +5137,166 @@ function renderFolioCompare() {
     }).join('')}
   </table>
   <div style="font-size:11px;color:var(--g400);margin-top:6px;">集計対象: ${escHtml(ctx.startDate)} 〜 ${escHtml(dates[dates.length-1] || ctx.startDate)}（今日まで）。Folio比率が低い担当は、Folioへの実績登録漏れの可能性があります。</div>`;
+}
+
+// ── 管理者サマリー（月次）──
+let _mgrCtx = null;
+
+// loadRangeData の結果から、担当別の通常/残業（退勤時刻ベース。ヘルプ除外）
+function _otByAuthor(d) {
+  const out = {};
+  if (!d) return out;
+  const lm = d._leaveMap || {};
+  Object.keys(lm).forEach(a => {
+    if (a === 'ヘルプ') return;
+    let n = 0, ot = 0;
+    Object.entries(lm[a] || {}).forEach(([date, t]) => { const c = calcFromLeave(t, date); if (c) { n += c.normal; ot += c.ot; } });
+    out[a] = {n, ot};
+  });
+  return out;
+}
+
+function _fiscalYearOf(period) { return period.month >= 10 ? period.year : period.year - 1; }
+
+async function loadMgrExtras(ctx) {
+  const p = ctx.period;
+  const prevP = p.month === 1 ? {year: p.year - 1, month: 12} : {year: p.year, month: p.month - 1};
+  const fyPeriods = getFiscalPeriods(_fiscalYearOf(p));
+  const fyIdx = fyPeriods.findIndex(x => x.year === p.year && x.month === p.month);
+  const load = ({year, month}) => {
+    const {startDate, endDate} = getPeriodDates(year, month);
+    return withTimeout(loadRangeData(startDate, endDate, year, month), 15000, 'timeout').catch(() => null);
+  };
+  try {
+    const prev = await load(prevP);
+    if (_mgrCtx !== ctx) return;
+    ctx.prev = _otByAuthor(prev);
+    renderMgrSummary();
+    // 年度の期初〜当期（当期は表示中のデータを使う）
+    const before = fyIdx > 0 ? await mapPool(fyPeriods.slice(0, fyIdx), 4, load) : [];
+    if (_mgrCtx !== ctx) return;
+    ctx.fyPeriods = fyPeriods; ctx.fyIdx = fyIdx;
+    ctx.fy = before.map(_otByAuthor).concat([ctx.cur]);
+    renderMgrSummary();
+  } catch(e) { console.warn('[管理者サマリー] 追加データの読込に失敗:', e.message); }
+}
+
+function renderMgrSummary() {
+  const ctx = _mgrCtx, ec = _entryCtx;
+  const tbl = document.getElementById('mgr-table'), al = document.getElementById('mgr-alerts');
+  if (!ctx || !tbl || !al) return;
+  const R = DEPARTMENT_CONFIG.rules;
+  const warn = R.otMonthWarn || 36, limit = R.otMonthLimit || 45, yLimit = R.otYearLimit || 360, maxOver = R.otOverMonthsMax || 6;
+  const missing = (ec && ec.missing) || {};
+  const ratio = (ec && ec.folioRatio) || null;
+  const proj = (ec && ec.inProgress && ec.workElapsed > 0 && ec.workTotal > ec.workElapsed) ? ec.workTotal / ec.workElapsed : null;
+  // 期間内に一度も日報が無い担当は一覧から外し、アラート1件にまとめる（日報を使っていない人で埋まらないように）
+  const allA = _entryAuthors(ec ? ec.leaveMap : {});
+  const noEntry = allA.filter(a => !ctx.cur[a] && missing[a]);
+  const authors = allA.filter(a => ctx.cur[a] || (ctx.prev && ctx.prev[a]));
+  const alerts = [];
+  if (noEntry.length) alerts.push(['info', `この期間に日報の入力がない担当: ${noEntry.join('、')}`]);
+  const rows = authors.map(a => {
+    const c = ctx.cur[a] || {n: 0, ot: 0};
+    const pv = ctx.prev ? (ctx.prev[a] || {n: 0, ot: 0}) : null;
+    const pj = proj ? c.ot * proj : null;
+    let fyOT = null, over = null;
+    if (ctx.fy) {
+      fyOT = ctx.fy.reduce((t, m) => t + ((m[a] || {}).ot || 0), 0);
+      over = ctx.fy.filter(m => ((m[a] || {}).ot || 0) > limit).length;
+    }
+    const lvl = v => v > limit ? 'red' : (v >= warn ? 'amber' : '');
+    const curLv = lvl(c.ot), pjLv = pj != null ? lvl(pj) : '';
+    if (curLv === 'red') alerts.push(['red', `${a}: 今期残業 ${c.ot.toFixed(1)}h（上限${limit}h超）`]);
+    else if (pjLv === 'red') alerts.push(['red', `${a}: 期末見込 ${pj.toFixed(1)}h（上限${limit}h超の見込み）`]);
+    else if (curLv === 'amber' || pjLv === 'amber') alerts.push(['amber', `${a}: 残業 ${c.ot.toFixed(1)}h${pj != null ? `（見込 ${pj.toFixed(1)}h）` : ''}・警告ライン${warn}h`]);
+    if (fyOT != null && fyOT >= yLimit * 0.8) alerts.push([fyOT >= yLimit ? 'red' : 'amber', `${a}: 年度累計残業 ${fyOT.toFixed(1)}h／${yLimit}h`]);
+    if (over != null && over >= maxOver - 2) alerts.push([over >= maxOver ? 'red' : 'amber', `${a}: 月${limit}h超が年度${over}回（上限${maxOver}回）`]);
+    if ((missing[a] || 0) >= 3) alerts.push(['amber', `${a}: 日報未入力 ${missing[a]}日`]);
+    if (ratio && ratio[a] != null && ratio[a] < 0.7 && c.n + c.ot > 16) alerts.push(['info', `${a}: Folio登録率 ${Math.round(ratio[a] * 100)}%（登録漏れの可能性）`]);
+    return {a, c, pv, pj, fyOT, over, curLv, pjLv};
+  });
+  const col = {red: '#dc2626', amber: '#d97706', info: '#2563eb'};
+  const bg = {red: 'rgba(239,68,68,.12)', amber: 'rgba(245,158,11,.14)', info: 'rgba(59,130,246,.10)'};
+  alerts.sort((x, y) => ['red', 'amber', 'info'].indexOf(x[0]) - ['red', 'amber', 'info'].indexOf(y[0]));
+  al.innerHTML = alerts.length
+    ? alerts.map(([lv, t]) => `<span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:${bg[lv]};color:${col[lv]};">${lv === 'red' ? '⚠ ' : ''}${escHtml(t)}</span>`).join('')
+    : '<span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(34,197,94,.12);color:#16a34a;">✓ アラートはありません</span>';
+  const otCell = (v, lv) => `<span style="color:${lv ? col[lv] : 'inherit'};font-weight:${lv ? 800 : 400};">${v.toFixed(1)}h</span>`;
+  const bar = (v, max, marks) => {
+    const w = Math.min(100, v / max * 100);
+    const c2 = v > limit ? '#ef4444' : (v >= warn ? '#f59e0b' : '#22c55e');
+    return `<div style="position:relative;height:8px;background:var(--g100, #eee);border-radius:4px;min-width:110px;">
+      <div style="position:absolute;left:0;top:0;bottom:0;width:${w}%;background:${c2};border-radius:4px;"></div>
+      ${marks.map(m => `<div style="position:absolute;top:-2px;bottom:-2px;left:${m / max * 100}%;width:1px;background:var(--g500);"></div>`).join('')}</div>`;
+  };
+  const th = t => `<th style="padding:5px 8px;font-size:11px;color:var(--g500);white-space:nowrap;text-align:right;">${t}</th>`;
+  tbl.innerHTML = rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <tr style="border-bottom:1px solid var(--g200);"><th style="padding:5px 8px;font-size:11px;color:var(--g500);text-align:left;">担当</th>
+      ${th('通常')}${th('残業')}${proj ? th('期末見込') : ''}${th('前月期')}${th('増減')}
+      <th style="padding:5px 8px;font-size:11px;color:var(--g500);text-align:left;">月${limit}hに対する残業${proj ? '（見込）' : ''}</th>
+      ${th(`年度累計/${yLimit}h`)}${th(`${limit}h超`)}${th('未入力')}${ratio ? th('Folio比率') : ''}</tr>
+    ${rows.map(r => {
+      const diff = r.pv ? r.c.ot - r.pv.ot : null;
+      const v = r.pj != null ? r.pj : r.c.ot;
+      return `<tr style="border-bottom:1px solid var(--g100, #eee);">
+        <td style="padding:6px 8px;font-weight:700;white-space:nowrap;">${escHtml(r.a)}</td>
+        <td style="padding:6px 8px;text-align:right;">${r.c.n.toFixed(1)}h</td>
+        <td style="padding:6px 8px;text-align:right;">${otCell(r.c.ot, r.curLv)}</td>
+        ${proj ? `<td style="padding:6px 8px;text-align:right;">${otCell(r.pj, r.pjLv)}</td>` : ''}
+        <td style="padding:6px 8px;text-align:right;color:var(--g500);">${r.pv ? r.pv.ot.toFixed(1) + 'h' : '…'}</td>
+        <td style="padding:6px 8px;text-align:right;color:${diff == null ? 'var(--g400)' : diff > 0 ? '#dc2626' : '#16a34a'};">${diff == null ? '…' : (diff > 0 ? '+' : '') + diff.toFixed(1) + 'h'}</td>
+        <td style="padding:6px 8px;">${bar(v, Math.max(limit * 1.2, v), [warn, limit])}</td>
+        <td style="padding:6px 8px;text-align:right;">${r.fyOT == null ? '…' : `<span style="color:${r.fyOT >= yLimit ? col.red : r.fyOT >= yLimit * 0.8 ? col.amber : 'inherit'};">${r.fyOT.toFixed(1)}h</span>`}</td>
+        <td style="padding:6px 8px;text-align:right;">${r.over == null ? '…' : `<span style="color:${r.over >= maxOver ? col.red : r.over >= maxOver - 2 ? col.amber : 'inherit'};">${r.over}回</span>`}</td>
+        <td style="padding:6px 8px;text-align:right;color:${(missing[r.a] || 0) ? '#dc2626' : 'var(--g400)'};">${missing[r.a] ? missing[r.a] + '日' : '—'}</td>
+        ${ratio ? `<td style="padding:6px 8px;text-align:right;">${ratio[r.a] == null ? '—' : Math.round(ratio[r.a] * 100) + '%'}</td>` : ''}</tr>`;
+    }).join('')}</table>` : '<p class="no-data-msg">この期間のデータがありません</p>';
+  const sub = document.getElementById('mgr-sub');
+  if (sub) sub.textContent = `残業は退勤時刻から算出（${R.otStart}以降）／警告${warn}h・上限${limit}h（目盛線）` + (proj ? `／期末見込=稼働日 ${ec.workElapsed}/${ec.workTotal}日から按分` : '');
+  // KPI: 前月期比
+  const d = document.getElementById('ms-ot-diff');
+  if (d && ctx.prev) {
+    const curT = Object.values(ctx.cur).reduce((t, x) => t + x.ot, 0), prevT = Object.values(ctx.prev).reduce((t, x) => t + x.ot, 0);
+    const df = curT - prevT;
+    d.innerHTML = `前月期比 <span style="color:${df > 0 ? '#dc2626' : '#16a34a'};">${df > 0 ? '+' : ''}${df.toFixed(1)}h</span>`;
+  } else if (d) d.textContent = '';
+}
+
+// ── 36協定チェック（年次）──
+function render36Check(periods, personMonth) {
+  const el = document.getElementById('yearly-36');
+  if (!el) return;
+  const R = DEPARTMENT_CONFIG.rules;
+  const warn = R.otMonthWarn || 36, limit = R.otMonthLimit || 45, yLimit = R.otYearLimit || 360, maxOver = R.otOverMonthsMax || 6;
+  const authors = Object.keys(personMonth).filter(a => personMonth[a].some(v => v > 0))
+    .sort((a, b) => personMonth[b].reduce((t, v) => t + v, 0) - personMonth[a].reduce((t, v) => t + v, 0));
+  if (!authors.length) { el.innerHTML = '<p class="no-data-msg">この年度の残業データがありません</p>'; return; }
+  const cellBg = v => v > limit ? 'rgba(239,68,68,.22)' : v >= warn ? 'rgba(245,158,11,.22)' : 'transparent';
+  el.innerHTML = `<table style="border-collapse:separate;border-spacing:2px;width:max-content;min-width:100%;font-size:12px;">
+    <tr><th style="position:sticky;left:0;background:var(--surface);padding:4px 8px;text-align:left;font-size:11px;color:var(--g500);">担当</th>
+      <th style="padding:4px 8px;font-size:11px;color:var(--g500);text-align:left;">年度累計 / ${yLimit}h</th>
+      <th style="padding:4px 6px;font-size:11px;color:var(--g500);">${limit}h超</th>
+      <th style="padding:4px 6px;font-size:11px;color:var(--g500);">最大月</th>
+      <th style="padding:4px 6px;font-size:11px;color:var(--g500);">月平均</th>
+      ${periods.map(p => `<th style="padding:4px 6px;font-size:11px;color:var(--g500);">${p.month}月期</th>`).join('')}</tr>
+    ${authors.map(a => {
+      const vs = personMonth[a];
+      const tot = vs.reduce((t, v) => t + v, 0);
+      const act = vs.filter(v => v > 0).length || 1;
+      const over = vs.filter(v => v > limit).length;
+      const mx = Math.max(...vs);
+      const w = Math.min(100, tot / yLimit * 100);
+      const c = tot >= yLimit ? '#ef4444' : tot >= yLimit * 0.8 ? '#f59e0b' : '#22c55e';
+      return `<tr><td style="position:sticky;left:0;background:var(--surface);padding:4px 8px;font-weight:700;white-space:nowrap;">${escHtml(a)}</td>
+        <td style="padding:4px 8px;min-width:170px;"><div style="display:flex;align-items:center;gap:6px;">
+          <div style="flex:1;height:8px;background:var(--g100, #eee);border-radius:4px;position:relative;"><div style="position:absolute;inset:0 auto 0 0;width:${w}%;background:${c};border-radius:4px;"></div></div>
+          <span style="white-space:nowrap;font-weight:700;">${tot.toFixed(1)}h</span></div></td>
+        <td style="padding:4px 6px;text-align:center;font-weight:700;color:${over >= maxOver ? '#dc2626' : over >= maxOver - 2 ? '#d97706' : 'inherit'};">${over}/${maxOver}</td>
+        <td style="padding:4px 6px;text-align:right;">${mx.toFixed(1)}h</td>
+        <td style="padding:4px 6px;text-align:right;">${(tot / act).toFixed(1)}h</td>
+        ${vs.map(v => `<td style="padding:4px 6px;text-align:right;background:${cellBg(v)};">${v ? v.toFixed(1) : ''}</td>`).join('')}</tr>`;
+    }).join('')}</table>`;
 }
 
 function renderSubTrend() {
@@ -5242,9 +5432,12 @@ async function renderMonthlyDash(silent) {
     requestAnimationFrame(()=>renderOTBarEnhanced(otData,'monthly-ot-canvas','monthly-ot-empty',avgPerPerson,0));
     // 日報 入力状況 ＋ Folio 予実（Folioは非同期で後から差し込む）
     _entryCtx = {key: renderKey, leaveMap, startDate, endDate, folio: null, folioErr: null};
+    _mgrCtx = {key: renderKey, startDate, endDate, period: {...currentPeriod},
+               cur: _otByAuthor(byAuthor), prev: null, fy: null, fyPeriods: null, fyIdx: -1};
     renderEntryMatrix();
     renderFolioCompare();
     loadFolioRangeInto(_entryCtx);
+    loadMgrExtras(_mgrCtx);
     _renderCache.monthly = renderKey;
   } finally { if (!silent) setLoading(false); }
 }
@@ -5369,7 +5562,8 @@ async function renderYearlyDash(silent) {
     let totalN=0, totalOT=0, activeMonths=0, yearTotalDays=0;
     const personSet = new Set();
 
-    const periodSub = fiscalPeriods.map(() => ({}));   // 中分類別 工数推移用: 期ごとの {cdSub: h}
+    const periodSub = fiscalPeriods.map(() => ({}));
+    const personMonth = {};   // 36協定チェック用: {担当: [期ごとの残業h ×12]}   // 中分類別 工数推移用: 期ごとの {cdSub: h}
     fiscalPeriods.forEach(({year,month}, idx) => {
       const d = allData[idx];
       const pst = periodSub[idx];
@@ -5422,6 +5616,10 @@ async function renderYearlyDash(silent) {
         totalOT += aOT;
         mN  += aN;
         mOT += aOT;
+        if (a !== 'ヘルプ') {
+          if (!personMonth[a]) personMonth[a] = fiscalPeriods.map(() => 0);
+          personMonth[a][idx] += aOT;
+        }
       });
       monthOT.push({year,month, totalOT:mOT, persons:allAuthors.size});
     });
@@ -5485,6 +5683,23 @@ async function renderYearlyDash(silent) {
     // 担当別積み上げ棒グラフ
     requestAnimationFrame(()=>renderStackBar(yearByAuthorFlat,'yearly-stack-canvas','yearly-stack-empty'));
     _subTrendCtx = {periods: fiscalPeriods, periodSub};
+    render36Check(fiscalPeriods, personMonth);
+    // KPI: 前年同期比（当年度でデータのある期と同じ期だけ比較）
+    {
+      const diffEl = document.getElementById('ys-ot-diff');
+      let prevOT = 0, curOT = 0, n = 0;
+      fiscalPeriods.forEach((_, i) => {
+        const c = allData[i], pv = prevAllData[i];
+        if (!c || !Object.keys(c._leaveMap || {}).length) return;
+        n++;
+        curOT += Object.values(_otByAuthor(c)).reduce((t, x) => t + x.ot, 0);
+        prevOT += Object.values(_otByAuthor(pv)).reduce((t, x) => t + x.ot, 0);
+      });
+      if (diffEl) {
+        const df = curOT - prevOT;
+        diffEl.innerHTML = n && prevOT > 0 ? `前年同期比 <span style="color:${df > 0 ? '#dc2626' : '#16a34a'};">${df > 0 ? '+' : ''}${df.toFixed(1)}h</span>` : '';
+      }
+    }
     renderSubTrend();
     // 担当別円グラフ（退勤ログ由来の通常・残業を渡す）
     // yearlyNormal/OTByAuthor: 年間の退勤ログ合計（ヘルプは作業ログ）
