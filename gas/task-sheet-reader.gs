@@ -24,10 +24,17 @@
  *
  * 高速化: ブックを開いて全行を読むのに数秒かかるため、「完了」行を作業日ごとにまとめて
  *   CacheService に保存し、通常はキャッシュから返す（5分おきのトリガーで作り直し）。
+ *
+ * 日報中分類: タスクマスタの「日報中分類CD」列を正とし、各行に cdSub として付ける。
+ *   ?action=setTaskCd&taskId=K29&cd=K1          … 1件書き込み（列が無ければ末尾に追加）
+ *   ?action=setTaskCds&map={"K29":"K1",...}     … 一括書き込み（空欄のタスクだけ。既存値は上書きしない）
  */
 
 var SPREADSHEET_ID = '1IHxotYypyQkGyskunDMrN2i_v_GU2brQvGlZeAS0UgM';
 var SHEET_NAME = 'タスク実績';
+var MASTER_SHEET = 'タスクマスタ';
+var MASTER_ID_HEADER = 'タスクID';
+var MASTER_CD_HEADER = '日報中分類CD';   // タスクID→日報の中分類CD（日報アプリ取込用。正はこの列）
 
 // 列番号（1始まり）: タスク実績シートの見出しに合わせる
 var COL = {
@@ -54,6 +61,8 @@ function doGet(e) {
     var action = p.action || 'getCompletedTasks';
     if (action === 'test') result = {ok: true};
     else if (action === 'getCompletedTasks') result = getCompletedTasks_(p.date, p.name, p.email, p.nocache === '1', p.diag === '1');
+    else if (action === 'setTaskCd') result = setTaskCds_(singleMap_(p.taskId, p.cd), true);
+    else if (action === 'setTaskCds') result = setTaskCds_(JSON.parse(p.map || '{}'), false);
     else result = {ok: false, error: 'unknown action: ' + action};
   } catch (err) {
     result = {ok: false, error: String(err && err.message || err)};
@@ -89,10 +98,11 @@ function getCompletedTasks_(date, name, email, nocache, diag) {
     list = idx.byDate[date] || [];
   }
 
+  var tm = getTaskMap_();
   var rows = list.filter(function (x) {
     return (email && x.e === email) || (name && x.n.indexOf(name) === 0);
   }).map(function (x) {
-    return {taskId: x.id, taskName: x.nm, hours: x.h, start: x.s, startDate: x.sd, doneDate: x.dd, note: x.note};
+    return {taskId: x.id, taskName: x.nm, cdSub: tm[x.id] || null, hours: x.h, start: x.s, startDate: x.sd, doneDate: x.dd, note: x.note};
   });
   var res = {ok: true, rows: rows, ms: Date.now() - t0, cached: cached, builtAt: builtAt};
   if (t) res.t = t;
@@ -167,12 +177,96 @@ function buildIndex_(diagFor) {
       keys.slice(k, k + 50).forEach(function (key) { chunk[key] = put[key]; });
       cache.putAll(chunk, CACHE_TTL);
     }
+    cache.put('tm', JSON.stringify(readTaskMap_(ss)), CACHE_TTL);
     cache.put('meta', JSON.stringify({builtAt: builtAt}), CACHE_TTL);
   } catch (err) {
     // 1キー100KB超などでキャッシュできなくても、今回の応答は返す
   }
   var t3 = Date.now();
   return {byDate: byDate, builtAt: builtAt, diag: diag, t: {open: t1 - t0, read: t2 - t1, build: t3 - t2}};
+}
+
+// ── タスクマスタ「日報中分類CD」列 ──
+function masterCols_(sh) {
+  var lastCol = Math.max(1, sh.getLastColumn());
+  var head = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (v) { return String(v).trim(); });
+  return {idCol: head.indexOf(MASTER_ID_HEADER) + 1, cdCol: head.indexOf(MASTER_CD_HEADER) + 1, lastCol: lastCol};
+}
+
+function readTaskMap_(ss) {
+  var sh = ss.getSheetByName(MASTER_SHEET);
+  if (!sh) return {};
+  var c = masterCols_(sh);
+  var n = sh.getLastRow() - 1;
+  if (!c.idCol || !c.cdCol || n < 1) return {};
+  var ids = sh.getRange(2, c.idCol, n, 1).getValues(), cds = sh.getRange(2, c.cdCol, n, 1).getValues();
+  var map = {};
+  for (var i = 0; i < n; i++) {
+    var id = String(ids[i][0]).trim(), cd = String(cds[i][0]).trim();
+    if (id && cd) map[id] = cd;
+  }
+  return map;
+}
+
+// キャッシュ優先でタスクマスタの対応表を返す
+function getTaskMap_() {
+  var cache = CacheService.getScriptCache();
+  var raw = cache.get('tm');
+  if (raw) return JSON.parse(raw);
+  var map = readTaskMap_(SpreadsheetApp.openById(SPREADSHEET_ID));
+  cache.put('tm', JSON.stringify(map), CACHE_TTL);
+  return map;
+}
+
+function singleMap_(taskId, cd) {
+  var m = {};
+  m[String(taskId || '').trim()] = String(cd || '').trim();
+  return m;
+}
+
+// 対応を書き込む。overwrite=false なら空欄のタスクだけ書く。
+function setTaskCds_(map, overwrite) {
+  var keys = Object.keys(map || {});
+  if (!keys.length) throw new Error('taskId と cd を指定してください');
+  keys.forEach(function (k) {
+    if (!k) throw new Error('taskId が空です');
+    if (!/^[A-Za-z0-9α-ω]{1,6}$/.test(String(map[k]))) throw new Error('cd の形式が不正です: ' + map[k]);
+  });
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sh = ss.getSheetByName(MASTER_SHEET);
+    if (!sh) throw new Error('シート「' + MASTER_SHEET + '」が見つかりません');
+    var c = masterCols_(sh);
+    if (!c.idCol) throw new Error('タスクマスタに「' + MASTER_ID_HEADER + '」列がありません');
+    if (!c.cdCol) {                                   // 列が無ければ末尾に見出し付きで追加
+      c.cdCol = c.lastCol + 1;
+      if (c.cdCol > sh.getMaxColumns()) sh.insertColumnAfter(sh.getMaxColumns());
+      sh.getRange(1, c.cdCol).setValue(MASTER_CD_HEADER);
+    }
+    var n = sh.getLastRow() - 1;
+    var ids = n > 0 ? sh.getRange(2, c.idCol, n, 1).getValues() : [];
+    var cdRange = n > 0 ? sh.getRange(2, c.cdCol, n, 1) : null;
+    var cds = cdRange ? cdRange.getValues() : [];
+    var rowOf = {};
+    for (var i = 0; i < n; i++) { var id = String(ids[i][0]).trim(); if (id && !(id in rowOf)) rowOf[id] = i; }
+    var written = [], skippedExisting = [], notFound = [];
+    keys.forEach(function (k) {
+      if (!(k in rowOf)) { notFound.push(k); return; }
+      var cur = String(cds[rowOf[k]][0]).trim();
+      if (cur && !overwrite) { skippedExisting.push(k); return; }
+      cds[rowOf[k]][0] = String(map[k]).trim();
+      written.push(k);
+    });
+    if (overwrite && notFound.length) throw new Error('タスクマスタに存在しないタスクIDです: ' + notFound.join(', '));
+    if (written.length) cdRange.setValues(cds);
+    var tm = readTaskMap_(ss);
+    CacheService.getScriptCache().put('tm', JSON.stringify(tm), CACHE_TTL);
+    return {ok: true, written: written.length, skippedExisting: skippedExisting.length, notFound: notFound};
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // 時間主導トリガー用: キャッシュを作り直す
