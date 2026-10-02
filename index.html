@@ -510,91 +510,93 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .btn-pdf:hover{background:linear-gradient(135deg,#b91c1c,#991b1b);transform:translateY(-1px);box-shadow:0 4px 10px rgba(220,38,38,.4);}
 .btn-pdf:active{transform:translateY(0);}
 @page{
-  size: A4 portrait;
-  margin: 6mm 6mm 6mm 6mm;
+  size: A4 landscape;
+  margin: 8mm 8mm 9mm 8mm;
 }
+/* ══ PDF出力（印刷）════════════════════════════════════════════
+   A4横・紙幅(約1060px)で描き直してから印刷する（exportPdf が .pdf-mode を付与）。
+   文字は 本文10px / 表9.5px / 見出し12px / KPI値18px の4段で統一。 */
+.pdf-mode #view-dash{width:1060px;}
+.pdf-mode #view-dash *,.pdf-mode #view-dash *::before{animation:none!important;transition:none!important;}
 @media print{
-  /* ── 非表示 ── */
-  header,.tabs,.submit-footer,.no-print,
-  .period-controls,.dash-subtabs,
-  #view-input,.tab-content:not(.active){ display:none!important; }
-  #dash-daily[style*="none"],
-  #dash-monthly[style*="none"],
-  #dash-yearly[style*="none"]{ display:none!important; }
+  header,.tabs,.submit-footer,.no-print,.dx-head,
+  .period-controls,.dash-subtabs,.app-footer,
+  #view-input,#view-admin,.tab-content:not(.active){ display:none!important; }
+  #dash-daily[style*="none"],#dash-monthly[style*="none"],
+  #dash-yearly[style*="none"],#dash-person[style*="none"]{ display:none!important; }
+  #view-dash select{ display:none!important; }
 
-  /* ── ページ基本（テーマに依らず白基調を強制）── */
   *{ box-sizing:border-box; }
   html,body{ width:100%; margin:0; padding:0; background:#fff!important; }
-  body{ -webkit-print-color-adjust:exact; print-color-adjust:exact; color:#241e19!important; }
-  .card,.d-stat,.person-card{ background:#fff!important; }
+  body{ -webkit-print-color-adjust:exact; print-color-adjust:exact; color:#16130F!important; font-size:10px; }
+  .container{ max-width:none; padding:0!important; margin:0; }
+  #view-dash{ width:100%!important; overflow:visible; }
 
-  /* ── コンテナ ── */
-  .container{ max-width:100%; padding:0; margin:0; }
-  #view-dash{ width:100%; overflow:visible; }
+  /* KPI */
+  #view-dash .dash-stats,#view-dash .dash-stats-7{ display:grid!important; grid-template-columns:repeat(auto-fit,minmax(120px,1fr))!important; gap:6px!important; margin-bottom:8px!important; }
+  #view-dash .d-stat{ padding:7px 10px!important; border-radius:8px!important; box-shadow:none!important; border:1px solid #e5ddd0!important; background:#fff!important; break-inside:avoid; }
+  #view-dash .d-stat .sl{ font-size:8.5px!important; margin-bottom:2px!important; }
+  #view-dash .d-stat .sv{ font-size:18px!important; }
+  #view-dash .d-stat .sd{ font-size:8.5px!important; margin-top:3px!important; }
 
-  /* ── 統計カード ── */
-  .dash-stats{ grid-template-columns:repeat(5,1fr)!important; gap:3px!important; margin-bottom:4px!important; }
-  .dash-stats-7{ grid-template-columns:repeat(6,1fr)!important; }
-  .d-stat{ padding:4px 3px!important; border-radius:3px!important; }
-  .d-stat .sv{ font-size:12px!important; }
-  .d-stat .sl{ font-size:7px!important; margin-top:1px!important; }
-  .d-stat::before{ height:2px!important; }
+  /* カード */
+  #view-dash .card{ box-shadow:none!important; border:1px solid #e5ddd0!important; border-radius:8px!important; margin-bottom:8px!important; background:#fff!important; break-inside:auto; }
+  #view-dash .card-hd{ padding:7px 10px 2px!important; break-after:avoid; }
+  #view-dash .card-hd h2{ font-size:12px!important; }
+  #view-dash .card-sub{ font-size:8.5px!important; }
+  #view-dash .card-body{ padding:5px 10px 8px!important; }
+  /* 2列グリッドは行ごと改ページできず空白が出るため、印刷では縦積み＋カード内で横並びに */
+  #view-dash .dash-layout{ display:block!important; }
+  #view-dash .dash-col{ display:grid!important; grid-template-columns:1fr 1fr!important; gap:8px!important; margin-bottom:8px!important; }
+  #view-dash .dash-col > .card{ margin-bottom:0!important; }
+  #dash-yearly .dash-layout > .card:last-child{ display:grid!important; grid-template-columns:1fr 1fr!important; gap:8px!important; }
+  #view-dash .dash-layout > .card,#view-dash .dash-col > .card,#view-dash .d-stat,#view-dash .person-card{ break-inside:avoid; }
 
-  /* ── カード共通 ── */
-  .card{ box-shadow:none!important; border:1px solid #ddd!important;
-         break-inside:avoid; margin-bottom:4px!important; border-radius:3px!important; }
-  .card-hd{ padding:3px 7px!important; }
-  .card-hd h2{ font-size:9px!important; }
-  .card-sub{ font-size:7px!important; }
-  .card-body{ padding:4px 7px!important; }
+  /* 表 */
+  .dx-scroll{ overflow:visible!important; }
+  .dx-table{ font-size:9.5px!important; }
+  .dx-table th{ font-size:8px!important; padding:3px 5px!important; }
+  .dx-table td{ padding:3.5px 5px!important; }
+  .dx-table tr{ break-inside:avoid; }
+  .dx-table .sticky,.dx-mx td.nm{ position:static!important; }
+  .dx-meter{ min-width:60px!important; height:5px!important; }
+  .dx-meter-row .v{ min-width:36px!important; }
+  .dx-chips{ gap:4px!important; margin-bottom:6px!important; }
+  .dx-chip{ font-size:9px!important; padding:2px 8px 2px 4px!important; }
+  .dx-chip::before{ width:11px!important; height:11px!important; font-size:8px!important; }
+  .dx-tag{ font-size:7.5px!important; padding:0 5px!important; }
+  .dx-legend,.dx-note{ font-size:8px!important; margin-top:5px!important; }
+  .dx-hbar{ font-size:9.5px!important; grid-template-columns:minmax(0,130px) minmax(0,1fr) auto!important; gap:8px!important; }
+  .dx-hbars{ gap:5px!important; }
+  .dx-hbar .tr{ height:6px!important; }
 
-  /* ── 2カラムレイアウト ── */
-  .dash-layout{ grid-template-columns:1fr 1fr!important; gap:4px!important; margin-bottom:4px!important; }
-  .dash-col{ gap:4px!important; }
+  /* 入力状況マトリクス（31日分を横1行に収める） */
+  .dx-mx{ border-spacing:1.5px!important; min-width:0!important; width:100%!important; }
+  .dx-mx th{ font-size:7.5px!important; min-width:0!important; padding:0 0 3px!important; }
+  .dx-mx td{ height:22px!important; min-width:0!important; font-size:8.5px!important; border-radius:3px!important; }
+  .dx-mx td .f{ font-size:6.5px!important; }
+  .dx-mx td.nm{ font-size:9.5px!important; padding-right:5px!important; }
+  .dx-mx td.cnt{ font-size:9px!important; padding-left:4px!important; }
+  .dx-mx td.tcol{ outline-width:1px!important; }
 
-  /* ── canvas（日別・月次） ── */
-  canvas{ max-height:120px!important; width:100%!important; }
+  /* 担当別 円グラフ */
+  #view-dash .person-grid{ grid-template-columns:repeat(6,1fr)!important; gap:6px!important; }
+  #view-dash .person-card{ padding:6px!important; border-radius:6px!important; }
+  #view-dash .person-card h3{ font-size:10px!important; margin-bottom:3px!important; }
+  .p-badges{ min-height:0!important; margin-bottom:3px!important; }
+  .b-work,.b-ot,.b-ok{ font-size:7.5px!important; padding:1px 5px!important; }
+  .person-card canvas{ width:110px!important; height:110px!important; margin:0 auto!important; display:block!important; }
+  .mini-legend .ml-row{ font-size:7.5px!important; margin-bottom:0!important; }
 
-  /* ── ランキング ── */
-  .rank-row{ grid-template-columns:1fr 1fr!important; gap:5px!important; margin-bottom:5px!important; break-inside:avoid; }
-  .rank-item{ padding:3px 0!important; gap:3px!important; break-inside:avoid; }
-  .rank-num{ width:18px!important; height:18px!important; font-size:10px!important; }
-  .rank-bar-bg{ height:5px!important; }
-  .rank-name{ font-size:9px!important; }
-  .rank-val{ font-size:9px!important; }
+  /* グラフ: 縦横比を保ったまま高さに上限（紙幅で描き直した canvas を縮小） */
+  #view-dash .card-body > canvas{ width:auto!important; height:auto!important; max-width:100%!important; max-height:200px!important; display:block; margin:0 auto; }
+  #dash-yearly .pdf-pair canvas{ max-height:165px!important; }
+  #dash-yearly .dash-layout canvas{ max-height:185px!important; }
 
-  /* ── パーソングリッド ── */
-  .person-grid{ grid-template-columns:repeat(4,1fr)!important; gap:5px!important; }
-  .person-card{ padding:6px 5px!important; break-inside:avoid; }
-  .person-card h3{ font-size:9px!important; margin-bottom:3px!important; }
-  .p-badges{ min-height:0!important; margin-bottom:4px!important; }
-  .b-work,.b-ot,.b-ok{ font-size:8px!important; padding:1px 5px!important; }
-  /* 個人円グラフは正方形を維持（width:100%で楕円化するのを防ぐ）*/
-  .person-card canvas{ width:115px!important; height:115px!important; max-height:none!important; margin:0 auto!important; display:block!important; }
-  .mini-legend .ml-row{ font-size:8px!important; margin-bottom:1px!important; }
-  .person-name{ font-size:8px!important; }
-  .person-hours{ font-size:10px!important; }
+  /* 年次: 残業推移2枚は exportPdf が横並びラッパーで包む */
+  .pdf-pair{ display:grid!important; grid-template-columns:1fr 1fr!important; gap:8px!important; }
+  .pdf-pair > .card{ margin-bottom:8px!important; }
 
-  /* ═══ 年次専用：要素が多いため追加縮小 ═══ */
-  /* 残業推移2枚を横並びに変更（縦→横で高さ節約） */
-  #dash-yearly .card[style*="margin-bottom:14px"],
-  #dash-yearly .card[style*="margin-bottom: 14px"]{
-    margin-bottom:4px!important;
-  }
-  /* 年次の残業推移2枚を横並び2カラムに */
-  #dash-yearly > .card:nth-of-type(1),
-  #dash-yearly > .card:nth-of-type(2){
-    display:inline-block!important;
-    width:calc(50% - 3px)!important;
-    vertical-align:top!important;
-  }
-  /* 年次canvasはさらに小さく */
-  #dash-yearly canvas{ max-height:75px!important; }
-  /* 年次の内側カード（大分類・積み上げ）の間隔 */
-  #dash-yearly .dash-layout > .card:last-child{ gap:3px!important; }
-  #dash-yearly .dash-layout > .card:last-child > div{ margin-bottom:3px!important; }
-
-  /* ── PDFタイトルヘッダーを印刷時に表示 ── */
   #pdf-title-bar{ display:flex!important; }
 }
 @media(max-width:1100px){
@@ -5078,65 +5080,59 @@ async function exportPdf(tab) {
     monthly: document.getElementById('period-range'),
     yearly:  document.getElementById('yearly-range'),
   };
-  const rangeText  = (dateEl[tab] ? dateEl[tab].textContent.trim() : '');
+  let rangeText  = (dateEl[tab] ? dateEl[tab].textContent.trim() : '');
+  if (tab === 'daily') rangeText = currentDate.replace(/-/g, '/');
   const rangeLabel = document.getElementById('pdf-range-label');
   if (rangeLabel) rangeLabel.textContent = `【${titles[tab]}】${rangeText}`;
 
   const original = document.title;
   document.title = `日報ダッシュボード_${titles[tab]}_${rangeText}`;
 
-  // ── ダークモード時は印刷用に一時的にライトテーマへ（canvas色を白基調で焼き直す）──
+  const html = document.documentElement;
   const savedTheme = getTheme();
-  const restoreTheme = savedTheme === 'dark';
   async function renderActive() {
-    if (tab === 'daily') await renderDash();
-    else if (tab === 'yearly') await renderYearlyDash();
-    else await renderMonthlyDash();
-    // canvasのrequestAnimationFrame描画完了を待つ
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-  }
-  if (restoreTheme) {
-    applyTheme('light');  // localStorageは変更しない（一時適用）
     _renderCache.daily = _renderCache.monthly = _renderCache.yearly = null;
-    try { await renderActive(); } catch(_){}
+    if (tab === 'daily') await renderDash(true);
+    else if (tab === 'yearly') await renderYearlyDash(true);
+    else await renderMonthlyDash(true);
+    // canvas描画(rAF)と、後から届くデータ(前月期・年度累計・Folio等)の反映を待つ
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await new Promise(r => setTimeout(r, 900));
   }
 
-  // ── 年次：残業推移2枚カードを横並びラッパーで包む ──
-  let yearlyWrapper = null;
-  let card1 = null, card2 = null, card1Next = null;
+  // ── 印刷モード: ライトテーマ＋紙幅(A4横)で描き直す（canvasは描画時の幅で固定されるため）──
+  setLoading(true);
+  html.classList.add('pdf-mode');
+  if (savedTheme === 'dark') applyTheme('light');   // localStorageは変更しない（一時適用）
+  try { await renderActive(); } catch(_) {}
+
+  // ── 年次：残業推移の2枚を横並びにする ──
+  let pair = null, c1 = null, c2 = null;
   if (tab === 'yearly') {
-    const yearly = document.getElementById('dash-yearly');
-    // 全幅カード（残業推移2枚）= yearly直下の最初の2つの .card
-    const topCards = Array.from(yearly.children).filter(el => el.classList.contains('card'));
-    if (topCards.length >= 2) {
-      card1 = topCards[0];
-      card2 = topCards[1];
-      card1Next = card1.nextSibling;
-      yearlyWrapper = document.createElement('div');
-      yearlyWrapper.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:4px;';
-      yearly.insertBefore(yearlyWrapper, card1);
-      yearlyWrapper.appendChild(card1);
-      yearlyWrapper.appendChild(card2);
+    c1 = (document.getElementById('yearly-ot-canvas') || {}).closest?.('.card');
+    c2 = (document.getElementById('yearly-ot-person-canvas') || {}).closest?.('.card');
+    if (c1 && c2 && c1.parentNode === c2.parentNode) {
+      pair = document.createElement('div');
+      pair.className = 'pdf-pair';
+      c1.parentNode.insertBefore(pair, c1);
+      pair.appendChild(c1); pair.appendChild(c2);
     }
   }
+  setLoading(false);
 
-  window.print();
-
-  // ── 年次：DOM復元 ──
-  if (yearlyWrapper && card1 && card2) {
-    const yearly = document.getElementById('dash-yearly');
-    yearly.insertBefore(card1, yearlyWrapper);
-    yearly.insertBefore(card2, yearlyWrapper);
-    yearly.removeChild(yearlyWrapper);
-  }
-
-  document.title = original;
-
-  // ── テーマ復元（ダークに戻して再描画）──
-  if (restoreTheme) {
-    applyTheme(savedTheme);
-    _renderCache.daily = _renderCache.monthly = _renderCache.yearly = null;
-    try { await renderActive(); } catch(_){}
+  try {
+    window.print();
+  } finally {
+    // ── 復元 ──
+    if (pair && c1 && c2) {
+      pair.parentNode.insertBefore(c1, pair);
+      pair.parentNode.insertBefore(c2, pair);
+      pair.remove();
+    }
+    document.title = original;
+    html.classList.remove('pdf-mode');
+    if (savedTheme === 'dark') applyTheme(savedTheme);
+    try { await renderActive(); } catch(_) {}
   }
 }
 
@@ -5302,7 +5298,7 @@ async function refreshMonthly() {
 // ═══════════════════════════════════════════
 //  ダッシュボード デザイン補助（バーの伸長アニメ・KPI単位・タブ見出し）
 // ═══════════════════════════════════════════
-const _dxReduce = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const _dxReduce = () => document.documentElement.classList.contains('pdf-mode') || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 // data-w(%) を持つバー要素を、次フレームで幅へ反映して伸ばす
 function dxGrow(root) {
   if (!root) return;
