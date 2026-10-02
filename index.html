@@ -5498,6 +5498,7 @@ async function renderPersonDetail() {
   // 全員が未入力の平日は休日とみなす（月次の入力状況と同じ判定）
   const lmAll = (ctx.data[i] && ctx.data[i]._leaveMap) || {};
   const anyEntry = d => Object.keys(lmAll).some(a2 => lmAll[a2] && lmAll[a2][d]);
+  const hasFolio = !!taskImportUrl();   // Folio連携のない部署（法務知財部など）はFolio列を出さない
   const draw = folio => {
     let miss = 0;
     const rows = eachDateInRange(startDate, endDate).map(d => {
@@ -5515,12 +5516,12 @@ async function renderPersonDetail() {
         <td style="padding:4px 6px;text-align:right;">${t ? escHtml(t) : (missing ? '<span style="color:#dc2626;font-weight:700;">未入力</span>' : '')}</td>
         <td style="padding:4px 6px;text-align:right;">${c ? c.normal.toFixed(2) : ''}</td>
         <td style="padding:4px 6px;text-align:right;color:${c && c.ot ? '#dc2626' : 'inherit'};font-weight:${c && c.ot ? 700 : 400};">${c && c.ot ? c.ot.toFixed(2) : ''}</td>
-        <td style="padding:4px 6px;text-align:right;${diff ? 'color:#d97706;font-weight:700;' : 'color:var(--g500);'}">${fh != null ? fh.toFixed(2) : ''}</td></tr>`;
+        ${hasFolio ? `<td style="padding:4px 6px;text-align:right;${diff ? 'color:#d97706;font-weight:700;' : 'color:var(--g500);'}">${fh != null ? fh.toFixed(2) : ''}</td>` : ''}</tr>`;
     }).join('');
     document.getElementById('person-days').innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
-      <tr style="color:var(--g500);font-size:11px;border-bottom:1px solid var(--g200);"><th style="padding:4px 6px;text-align:left;">日付</th><th style="padding:4px 6px;text-align:right;">退勤</th><th style="padding:4px 6px;text-align:right;">通常</th><th style="padding:4px 6px;text-align:right;">残業</th><th style="padding:4px 6px;text-align:right;">Folio実績</th></tr>
+      <tr style="color:var(--g500);font-size:11px;border-bottom:1px solid var(--g200);"><th style="padding:4px 6px;text-align:left;">日付</th><th style="padding:4px 6px;text-align:right;">退勤</th><th style="padding:4px 6px;text-align:right;">通常</th><th style="padding:4px 6px;text-align:right;">残業</th>${hasFolio ? '<th style="padding:4px 6px;text-align:right;">Folio実績</th>' : ''}</tr>
       ${rows}</table>
-      <div style="font-size:11px;color:var(--g400);margin-top:6px;">未入力 ${miss}日（平日の過去日。全員未入力の日は休日として除外）／残業は${R.otStart}以降／Folio実績が日報と1h超違う日は橙色</div>`;
+      <div style="font-size:11px;color:var(--g400);margin-top:6px;">未入力 ${miss}日（平日の過去日。全員未入力の日は休日として除外）／残業は${R.otStart}以降${hasFolio ? '／Folio実績が日報と1h超違う日は橙色' : ''}</div>`;
   };
   draw(null);
   const tasksEl = document.getElementById('person-tasks'), card = document.getElementById('person-tasks-card');
