@@ -31,6 +31,8 @@
  *
  * ダッシュボード用: ?action=getRangeHours&start=YYYY-MM-DD&end=YYYY-MM-DD（最大62日）
  *   → {ok, byDate:{date:{氏名:時間}}, cached}  … 時間割に配置済み(開始時刻あり)の完了タスクの実績合計
+ * ダッシュボード用: ?action=getTaskStats&days=90（最大120日）
+ *   → {ok, tasks:[{taskId, name, n, std, planAvg, actAvg, actSum}]}  … タスク別の標準工数と実績
  */
 
 var SPREADSHEET_ID = '1IHxotYypyQkGyskunDMrN2i_v_GU2brQvGlZeAS0UgM';
@@ -65,6 +67,7 @@ function doGet(e) {
     if (action === 'test') result = {ok: true};
     else if (action === 'getCompletedTasks') result = getCompletedTasks_(p.date, p.name, p.email, p.nocache === '1', p.diag === '1');
     else if (action === 'getRangeHours') result = getRangeHours_(p.start, p.end);
+    else if (action === 'getTaskStats') result = getTaskStats_(Number(p.days) || 90);
     else if (action === 'setTaskCd') result = setTaskCds_(singleMap_(p.taskId, p.cd), true);
     else if (action === 'setTaskCds') result = setTaskCds_(JSON.parse(p.map || '{}'), false);
     else result = {ok: false, error: 'unknown action: ' + action};
@@ -190,13 +193,16 @@ function buildIndex_(diagFor) {
     if (status !== '完了') continue;
     var wd = sd || dd;
     if (!wd) continue;
-    var hours = durToHours_(actDisp[i] && actDisp[i][0]);
-    if (hours == null) hours = durToHours_(estDisp[i] && estDisp[i][0]) || 0;
+    var actual = durToHours_(actDisp[i] && actDisp[i][0]);
+    var plan = durToHours_(estDisp[i] && estDisp[i][0]);
+    var hours = actual != null ? actual : (plan || 0);
     (byDate[wd] = byDate[wd] || []).push({
       e: rEmail, n: rName,
       id: String(r[ix(COL.taskId)]).trim(),
       nm: String(r[ix(COL.taskName)]).trim(),
       h: Math.round(hours * 10000) / 10000,
+      p: plan == null ? null : Math.round(plan * 10000) / 10000,   // 予定工数(J)
+      ac: actual != null,                                            // 実績工数(O)が入力済みか
       s: toHm_(startV, tz), sd: sd, dd: dd,
       note: String(r[ix(COL.note)] || '').trim()
     });
@@ -214,6 +220,7 @@ function buildIndex_(diagFor) {
       cache.putAll(chunk, CACHE_TTL);
     }
     cache.put('tm', JSON.stringify(readTaskMap_(ss)), CACHE_TTL);
+    cache.put('ts', JSON.stringify(readTaskStd_(ss)), CACHE_TTL);
     cache.put('meta', JSON.stringify({builtAt: builtAt}), CACHE_TTL);
   } catch (err) {
     // 1キー100KB超などでキャッシュできなくても、今回の応答は返す
@@ -227,6 +234,73 @@ function masterCols_(sh) {
   var lastCol = Math.max(1, sh.getLastColumn());
   var head = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (v) { return String(v).trim(); });
   return {idCol: head.indexOf(MASTER_ID_HEADER) + 1, cdCol: head.indexOf(MASTER_CD_HEADER) + 1, lastCol: lastCol};
+}
+
+// タスクマスタの標準工数・タスク名 {taskId: {std:h, name}}
+function readTaskStd_(ss) {
+  var sh = ss.getSheetByName(MASTER_SHEET);
+  if (!sh) return {};
+  var lastCol = Math.max(1, sh.getLastColumn());
+  var head = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (v) { return String(v).trim(); });
+  var idCol = head.indexOf(MASTER_ID_HEADER) + 1, nmCol = head.indexOf('タスク名') + 1, stdCol = head.indexOf('標準工数') + 1;
+  var n = sh.getLastRow() - 1;
+  if (!idCol || n < 1) return {};
+  var ids = sh.getRange(2, idCol, n, 1).getValues();
+  var nms = nmCol ? sh.getRange(2, nmCol, n, 1).getValues() : [];
+  var stds = stdCol ? sh.getRange(2, stdCol, n, 1).getDisplayValues() : [];
+  var out = {};
+  for (var i = 0; i < n; i++) {
+    var id = String(ids[i][0]).trim();
+    if (!id) continue;
+    out[id] = {std: stds[i] ? durToHours_(stds[i][0]) : null, name: nms[i] ? String(nms[i][0]).trim() : ''};
+  }
+  return out;
+}
+
+// タスク別の標準工数と実績（直近 days 日、実績工数が入っている完了タスクのみ）
+function getTaskStats_(days) {
+  var t0 = Date.now();
+  days = Math.max(1, Math.min(CACHE_DAYS_BACK, Math.floor(days)));
+  var tz = Session.getScriptTimeZone();
+  var end = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var dates = [];
+  for (var k = days - 1; k >= 0; k--) dates.push(shiftYmd_(end, -k));
+  var cache = CacheService.getScriptCache();
+  var got = cache.getAll(dates.map(function (x) { return 'd:' + x; }).concat(['ts']));
+  var lists = null, cached = true;
+  var ok = got['ts'] && dates.every(function (x) { return got['d:' + x] != null; });
+  if (ok) {
+    lists = dates.map(function (x) { return JSON.parse(got['d:' + x]); });
+    // 旧形式のキャッシュ(予定工数なし)なら作り直す
+    if (lists.some(function (l) { return l.length && !('p' in l[0]); })) ok = false;
+  }
+  var std;
+  if (ok) {
+    std = JSON.parse(got['ts']);
+  } else {
+    cached = false;
+    var idx = buildIndex_(null);
+    lists = dates.map(function (x) { return idx.byDate[x] || []; });
+    std = JSON.parse(cache.get('ts') || '{}');
+  }
+  var agg = {};
+  lists.forEach(function (l) {
+    l.forEach(function (r) {
+      if (!r.ac) return;                       // 実績工数が未入力の行は除外
+      var a = agg[r.id] || (agg[r.id] = {taskId: r.id, name: r.nm, n: 0, actSum: 0, planSum: 0, planN: 0});
+      a.n++; a.actSum += r.h;
+      if (r.p != null) { a.planSum += r.p; a.planN++; }
+    });
+  });
+  var tasks = Object.keys(agg).map(function (id) {
+    var a = agg[id], m = std[id] || {};
+    return {taskId: id, name: m.name || a.name, n: a.n,
+            std: m.std == null ? null : m.std,
+            planAvg: a.planN ? Math.round(a.planSum / a.planN * 1000) / 1000 : null,
+            actAvg: Math.round(a.actSum / a.n * 1000) / 1000,
+            actSum: Math.round(a.actSum * 100) / 100};
+  });
+  return {ok: true, tasks: tasks, start: dates[0], end: end, cached: cached, ms: Date.now() - t0};
 }
 
 function readTaskMap_(ss) {
