@@ -1100,7 +1100,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 
   <section class="admin-card" id="admin-task-section" style="margin-top:14px;">
     <h2>タスク対応表（タスク管理アプリ → 日報）</h2>
-    <div class="admin-note" style="margin-bottom:10px;">「Folioから取込」で使う、タスクIDと日報の中分類の対応です。変更すると即Firebaseへ保存されます。</div>
+    <div class="admin-note" style="margin-bottom:10px;">「Folioから取込」での中分類は、Folioのタスクマスタ「日報中分類CD」列が優先です。ここは列が空のタスク用の予備の対応表です（変更すると即Firebaseへ保存）。</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+      <button class="btn btn-outline btn-sm" onclick="pushTaskMapToMaster()">タスクマスタへ一括反映（未設定のみ）</button>
+      <span class="admin-status" id="admin-task-push-res"></span>
+    </div>
     <div class="admin-form sub">
       <input id="admin-task-id" placeholder="タスクID（例: K29, α7）">
       <select id="admin-task-sub"></select>
@@ -4463,17 +4467,77 @@ async function openTaskImport(force) {
   }
   rows.sort((a, b) => String(a.start || '99:99').localeCompare(String(b.start || '99:99')));
   _taskImportRows = rows.map(r => {
-    const cd = TASK_MAP[r.taskId];
-    const ok = !!cd && _ALL_SUBS.includes(cd);
     // 開始日が完了日と違う(日跨ぎ)タスクは時刻で判定できないので全て通常扱い
     const start = (r.startDate && r.startDate !== date) ? null : r.start;
-    const reason = !cd ? '対応表に未登録' : (!SUB_MAP[cd] ? `中分類 ${cd} がマスタに無い` : (!ok ? `中分類 ${cd} が無効` : ''));
+    const x = {r, start, placed: !!r.start, sp: splitTaskNormalOT(start, r.hours, date)};
+    _resolveTaskRow(x);
     // 時間割(Folio)に配置済み＝開始時刻ありのタスクだけ既定で取込む。未配置は手動でチェック。
-    return {r, cd, ok, reason, start, placed: !!r.start, sp: splitTaskNormalOT(start, r.hours, date), checked: ok && !!r.start};
+    x.checked = x.ok && x.placed;
+    return x;
   });
   _taskImportPlan = {date, author, plan:[]};
   renderTaskImport();
   _showFolioTiming(d);
+}
+
+// 中分類の決定: タスクマスタ「日報中分類CD」(GASがcdSubで返す)を優先、無ければ日報側の対応表
+function _resolveTaskRow(x) {
+  const r = x.r;
+  x.cd = r.cdSub || TASK_MAP[r.taskId] || '';
+  x.src = r.cdSub ? 'マスタ' : (TASK_MAP[r.taskId] ? '日報側' : '');
+  x.ok = !!x.cd && _ALL_SUBS.includes(x.cd);
+  x.reason = !x.cd ? '中分類が未設定' : (!SUB_MAP[x.cd] ? `中分類 ${x.cd} が日報に無い` : (!x.ok ? `中分類 ${x.cd} が無効` : ''));
+}
+
+function _activeSubOptions() {
+  return activeInputCats().map(c => c.subs.map(sb =>
+    `<option value="${escHtml(sb.cd)}">${escHtml(sb.cd)} ${escHtml(sb.label)}</option>`).join('')).join('');
+}
+
+// 取込画面で、未設定タスクの中分類をその場で登録（タスクマスタへ書き込み。失敗時は日報側の対応表へ）
+async function registerTaskCd(i) {
+  const x = _taskImportRows[i];
+  const sel = document.getElementById(`ti-sel-${i}`);
+  if (!x || !sel || !sel.value) return;
+  const taskId = x.r.taskId, cd = sel.value;
+  const btn = document.getElementById(`ti-btn-${i}`);
+  if (btn) { btn.disabled = true; btn.textContent = '登録中...'; }
+  let msg;
+  try {
+    const d = await _gasJsonpTag(taskImportUrl(), {action:'setTaskCd', taskId, cd});
+    if (!d || !d.ok) throw new Error((d && d.error) || '書き込みに失敗しました');
+    _taskImportRows.forEach(y => { if (y.r.taskId === taskId) y.r.cdSub = cd; });
+    msg = `${taskId} → ${cd} をタスクマスタに登録しました。`;
+  } catch(e) {
+    TASK_MAP[taskId] = cd;
+    try { applyTaskMap(TASK_MAP); await seedMasterToFirebase(); renderAdminTaskMap(); } catch(_) {}
+    msg = `タスクマスタへ書き込めなかったため、日報側の対応表に保存しました（${e.message}）`;
+  }
+  _taskImportRows.forEach(y => {
+    if (y.r.taskId !== taskId) return;
+    _resolveTaskRow(y);
+    if (y.ok && y.placed) y.checked = true;
+  });
+  renderTaskImport();
+  const note = document.getElementById('task-import-note');
+  if (note) note.textContent = msg;
+}
+
+// 管理タブ: 日報側の対応表をタスクマスタの空欄へ一括反映
+async function pushTaskMapToMaster() {
+  const res = document.getElementById('admin-task-push-res');
+  const ids = Object.keys(TASK_MAP);
+  if (!ids.length) return;
+  if (!confirm(`日報側の対応 ${ids.length} 件を、タスクマスタの「日報中分類CD」列へ反映します（既に値がある行は変更しません）。よろしいですか？`)) return;
+  if (res) res.textContent = '反映中...';
+  try {
+    const d = await _gasJsonpTag(taskImportUrl(), {action:'setTaskCds', map: JSON.stringify(TASK_MAP)});
+    if (!d || !d.ok) throw new Error((d && d.error) || '失敗しました');
+    _folioCache.clear();
+    if (res) res.textContent = `反映 ${d.written} 件 / 既に設定済み ${d.skippedExisting} 件` + (d.notFound && d.notFound.length ? ` / タスクマスタに無いID: ${d.notFound.join(', ')}` : '');
+  } catch(e) {
+    if (res) res.textContent = '反映に失敗しました: ' + e.message;
+  }
 }
 
 function _showFolioTiming(d) {
@@ -4516,7 +4580,11 @@ function renderTaskImport() {
       <td style="padding:4px 6px;"><input type="checkbox" ${checked ? 'checked' : ''} ${ok ? '' : 'disabled'} onchange="toggleTaskImportRow(${i}, this.checked)"></td>
       <td style="padding:4px 6px;white-space:nowrap;">${escHtml(start || '-')}</td>
       <td style="padding:4px 6px;">${escHtml(r.taskId)} ${escHtml(r.taskName || '')}${!placed ? '<span style="margin-left:6px;font-size:10px;color:var(--g500);border:1px solid var(--g300);border-radius:4px;padding:0 4px;">時間割に未配置</span>' : ''}${r.note ? `<div style="color:var(--g400);font-size:11px;">${escHtml(r.note)}</div>` : ''}</td>
-      <td style="padding:4px 6px;white-space:nowrap;">${ok ? escHtml(cd + ' ' + SUB_MAP[cd].label) : `<span style="color:var(--danger);">${escHtml(reason)}</span>`}</td>
+      <td style="padding:4px 6px;white-space:nowrap;">${ok
+        ? `${escHtml(cd + ' ' + SUB_MAP[cd].label)}<span style="margin-left:4px;font-size:10px;color:var(--g400);">${escHtml(x.src)}</span>`
+        : `<div style="color:var(--danger);font-size:11px;">${escHtml(reason)}</div>
+           <select id="ti-sel-${i}" style="font-size:11px;max-width:150px;"><option value="">中分類を選択</option>${_activeSubOptions()}</select>
+           <button id="ti-btn-${i}" class="btn btn-primary btn-sm" style="font-size:11px;padding:2px 8px;" onclick="registerTaskCd(${i})">登録</button>`}</td>
       <td style="padding:4px 6px;text-align:right;white-space:nowrap;">${sp.normal ? sp.normal.toFixed(2) : ''}</td>
       <td style="padding:4px 6px;text-align:right;white-space:nowrap;color:var(--danger);">${sp.ot ? sp.ot.toFixed(2) : ''}</td>
     </tr>`;
@@ -4536,7 +4604,8 @@ function renderTaskImport() {
       ${plan.map(p => `${escHtml(p.cdSub)} ${escHtml(SUB_MAP[p.cdSub].label)} 通常${p.hoursNormal}${p.hoursOT ? ` / 残業${p.hoursOT}` : ''}`).join('、') || 'なし'}
       <div style="margin-top:4px;">合計 通常 <b>${totN.toFixed(2)}h</b> ／ 残業 <b>${totO.toFixed(2)}h</b></div>
       ${unplaced ? `<div style="margin-top:4px;color:var(--g500);">※ 時間割(Folio)に未配置の完了タスクが ${unplaced} 件あります。既定では取込みません（必要ならチェック）</div>` : ''}
-      ${warn ? `<div style="margin-top:4px;color:var(--danger);">※ 反映できないタスクが ${warn} 件あります（「管理」タブのタスク対応表で設定できます）</div>` : ''}
+      ${warn ? `<div style="margin-top:4px;color:var(--danger);">※ 中分類が未設定のタスクが ${warn} 件あります（行の「登録」でタスクマスタに設定できます）</div>` : ''}
+      <div id="task-import-note" style="margin-top:4px;color:var(--primary);"></div>
     </div>`;
   if (_taskImportPlan) _taskImportPlan.plan = plan;
   applyBtn.disabled = !plan.length;
