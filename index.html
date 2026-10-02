@@ -2766,26 +2766,40 @@ function dailyReportDoc(date, author, rows, leaveTime) {
 }
 
 async function loadDayFirebase(date, author) {
-  await ensureFirebaseReady();
-  const snap = await getDailyRef(date, author).get();
+  // 起動時の「処理中...」ハング防止: ログイン待ち・読込それぞれにタイムアウトを付与。
+  // 失敗時は呼び出し元(loadDay_and_render)が「読込失敗 / 再試行」を表示する。
+  await withTimeout(ensureFirebaseReady(), 12000, 'Firebaseログイン待ちがタイムアウトしました');
+  const snap = await withTimeout(getDailyRef(date, author).get(), 10000, '日報の読込がタイムアウトしました');
   if (!snap.exists) {
-    const url = getGasUrl();
-    if (url) {
-      try {
-        const d = await _fetchDayFromGas(url, date, author);
-        if ((d.rows && d.rows.length) || d.leaveTime) {
-          await saveDayFirebase(date, author, d.rows || []);
-          await saveLeaveTimeFirebase(date, author, d.leaveTime || '');
-        }
-        return d;
-      } catch(e) {
-        console.warn('GAS fallback load failed:', e.message);
-      }
-    }
+    // Firestoreに無い日は旧スプレッドシート(GAS)から移行を試みるが、GASは遅い
+    // (コールドスタート＋最大25秒×リトライ)ため画面を待たせず裏で実行する。
+    // 当日分は保存先がFirebaseのみなので、GASを見る必要はない(朝の起動が遅い主因だった)。
+    if (date !== todayStr()) migrateDayFromGasInBackground(date, author);
     return {rows:[], leaveTime:''};
   }
   const d = snap.data() || {};
   return {rows:normalizeRows(d.rows || []), leaveTime:d.leaveTime || ''};
+}
+
+const _gasMigrateTried = new Set();
+function migrateDayFromGasInBackground(date, author) {
+  const url = getGasUrl();
+  const key = `${date}__${author}`;
+  if (!url || _gasMigrateTried.has(key)) return;
+  _gasMigrateTried.add(key);
+  (async () => {
+    try {
+      const d = await withTimeout(_fetchDayFromGas(url, date, author), 30000, 'GAS fallback timeout');
+      if (!((d.rows && d.rows.length) || d.leaveTime)) return;
+      await saveDayFirebase(date, author, d.rows || []);
+      await saveLeaveTimeFirebase(date, author, d.leaveTime || '');
+      // まだ同じ日・同じ担当者を表示中で、未入力のままなら移行したデータで再描画
+      const untouched = Object.values(_INP_CACHE).every(c => !getH(c.h) && !getH(c.ot));
+      if (currentDate === date && getAuthor() === author && untouched) loadDay_and_render();
+    } catch(e) {
+      console.warn('GAS fallback load failed:', e.message);
+    }
+  })();
 }
 
 async function loadDashDataFirebase(date) {
