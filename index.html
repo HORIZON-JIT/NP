@@ -7,6 +7,9 @@
 <!-- 部署別設定(config.js)をFirebaseSDKと並行して先読み。<script src="config.js">到達時には
      取得済みとなり、メインスクリプトの起動待ち(ワンテンポの遅延)を無くす。挙動は不変。 -->
 <link rel="preload" href="config.js" as="script">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;800&display=swap">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -37,7 +40,7 @@
   --sh-md:0 12px 28px rgba(17,17,17,.10);
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Inter','Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP','Yu Gothic','Meiryo',sans-serif;background:var(--page);background-attachment:fixed;color:var(--g800);min-height:100vh;font-size:14px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+body{font-family:'Inter','Noto Sans JP','Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP','Yu Gothic','Meiryo',sans-serif;background:var(--page);background-attachment:fixed;color:var(--g800);min-height:100vh;font-size:14px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
 button,a,input,textarea,select{font:inherit;}
 button,a{-webkit-tap-highlight-color:transparent;}
 ::selection{background:rgba(164,129,73,.18);}
@@ -707,6 +710,246 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 [data-theme="dark"] #first-launch-box p{color:var(--g700);}
 [data-theme="dark"] #first-launch-box .fl-note{color:var(--g600);background:var(--g100);border-color:var(--g200);}
 /* ── 退勤時刻ボタン（緑系プレビュー）は変数で対応済み ── */
+
+/* ══════════════════════════════════════════════════════════════════
+   DASHBOARD DESIGN SYSTEM v2 — 「業務の静かな精度」
+   既存ブランド(ウォームニュートラル＋ブロンズ)を継承し、数字が主役の
+   エディトリアルなダッシュボードへ。状態色は icon+label と必ず併用。
+   ══════════════════════════════════════════════════════════════════ */
+:root{
+  --dx-radius:14px; --dx-radius-sm:10px;
+  --dx-line:rgba(40,32,20,.08); --dx-line-2:rgba(40,32,20,.14);
+  --dx-hover:rgba(138,106,55,.05);
+  --dx-sh:0 1px 0 rgba(40,32,20,.03),0 1px 2px rgba(40,32,20,.04),0 18px 36px -24px rgba(40,32,20,.18);
+  --dx-sh-hover:0 1px 0 rgba(40,32,20,.03),0 2px 6px rgba(40,32,20,.06),0 24px 48px -24px rgba(40,32,20,.24);
+  --dx-ink-1:#16130F; --dx-ink-2:#5E574E; --dx-ink-3:#8C8377;
+  --dx-track:rgba(40,32,20,.07);
+  /* 状態色: fill=マーク用, ink=文字用(AA), bg=淡色面 */
+  --st-crit:#d03b3b; --st-crit-ink:#b42318; --st-crit-bg:rgba(208,59,59,.09);
+  --st-warn:#e9a20c; --st-warn-ink:#8a5a00; --st-warn-bg:rgba(250,178,25,.15);
+  --st-ok:#1a9b4b;   --st-ok-ink:#11743a;   --st-ok-bg:rgba(26,155,75,.10);
+  --st-info:#2a78d6; --st-info-ink:#1d5fb4; --st-info-bg:rgba(42,120,214,.09);
+  --dx-accent:#8A6A37; --dx-accent-2:#C9A464;
+  --dx-s2:#2a78d6;   /* 比較系列（Folio）。状態色とは別のカテゴリ色 */
+}
+[data-theme="dark"]{
+  --dx-line:rgba(255,255,255,.07); --dx-line-2:rgba(255,255,255,.12);
+  --dx-hover:rgba(215,183,124,.06);
+  --dx-sh:0 1px 0 rgba(255,255,255,.03) inset,0 18px 36px -22px rgba(0,0,0,.65);
+  --dx-sh-hover:0 1px 0 rgba(255,255,255,.04) inset,0 26px 48px -22px rgba(0,0,0,.75);
+  --dx-ink-1:#EEF0F3; --dx-ink-2:#AEB4BF; --dx-ink-3:#848B98;
+  --dx-track:rgba(255,255,255,.08);
+  --st-crit:#ef5a5a; --st-crit-ink:#ff9b94; --st-crit-bg:rgba(239,90,90,.16);
+  --st-warn:#f2b632; --st-warn-ink:#f6cb6b; --st-warn-bg:rgba(242,182,50,.15);
+  --st-ok:#34c26b;   --st-ok-ink:#7be0a2;   --st-ok-bg:rgba(52,194,107,.14);
+  --st-info:#4f97ef; --st-info-ink:#9cc6ff; --st-info-bg:rgba(79,151,239,.15);
+  --dx-accent:#D7B77C; --dx-accent-2:#A48149;
+  --dx-s2:#5b9cf0;
+}
+
+#view-dash{color:var(--dx-ink-1);}
+#view-dash .num,#view-dash .dx-table td.num,#view-dash .dx-table th.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}
+
+/* ── ヘッダー＋セグメントタブ ── */
+.dx-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:20px 2px 18px;}
+.dx-eyebrow{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--dx-accent);margin-bottom:6px;}
+.dx-title{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.15;color:var(--dx-ink-1);}
+#view-dash .dash-subtabs{display:inline-flex;gap:2px;padding:4px;margin:0;background:var(--dx-track);border:1px solid var(--dx-line);border-radius:999px;box-shadow:none;backdrop-filter:none;}
+[data-theme="dark"] #view-dash .dash-subtabs{background:rgba(255,255,255,.04);}
+#view-dash .dash-stab{border:none;border-radius:999px;padding:8px 16px;margin:0;font-size:13px;font-weight:600;color:var(--dx-ink-2);transition:background .2s,color .2s,box-shadow .2s;}
+#view-dash .dash-stab:hover:not(.active){color:var(--dx-ink-1);background:var(--dx-hover);}
+#view-dash .dash-stab.active{background:var(--surface);color:var(--dx-ink-1);box-shadow:0 1px 2px rgba(0,0,0,.08),0 4px 12px -4px rgba(0,0,0,.12);}
+#view-dash .dash-stab:focus-visible,#view-dash button:focus-visible,#view-dash select:focus-visible{outline:2px solid var(--dx-accent);outline-offset:2px;}
+
+/* ── 期間ツールバー ── */
+#view-dash .period-controls{gap:10px;margin-bottom:18px;}
+#view-dash .period-nav{border-radius:999px;padding:4px 6px;gap:4px;box-shadow:none;border:1px solid var(--dx-line-2);background:var(--surface);}
+#view-dash .period-nav button{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:var(--dx-ink-2);transition:background .15s,color .15s;}
+#view-dash .period-nav button:hover{background:var(--dx-hover);color:var(--dx-ink-1);}
+#view-dash .period-sel{border:none;background:transparent;font-size:14px;font-weight:700;padding:6px 8px;border-radius:999px;color:var(--dx-ink-1);}
+#view-dash .period-sel:hover{background:var(--dx-hover);}
+#view-dash .period-range-label{background:transparent;border:none;box-shadow:none;padding:0 4px;font-size:12px;color:var(--dx-ink-3);font-variant-numeric:tabular-nums;}
+#view-dash .btn-refresh{border-radius:999px;border:1px solid var(--dx-line-2);background:var(--surface);color:var(--dx-ink-2);padding:7px 14px;font-weight:600;}
+#view-dash .btn-refresh:hover{color:var(--dx-ink-1);border-color:var(--dx-accent);}
+#view-dash .btn-pdf{border-radius:999px;padding:7px 16px;font-weight:700;background:var(--dx-ink-1);color:var(--surface);border:none;box-shadow:none;}
+#view-dash .btn-pdf:hover{opacity:.88;}
+
+/* ── KPI タイル ── */
+#view-dash .dash-stats,#view-dash .dash-stats-7{gap:12px;margin-bottom:18px;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));}
+#view-dash .d-stat .sv.ot.zero{color:var(--dx-ink-1);}
+#view-dash #daily-range{background:var(--surface)!important;color:var(--dx-ink-2)!important;border:1px solid var(--dx-line-2)!important;border-radius:999px!important;padding:7px 14px!important;font-weight:600!important;}
+#view-dash #daily-range:hover{color:var(--dx-ink-1)!important;border-color:var(--dx-accent)!important;}
+#view-dash .d-stat{text-align:left;padding:16px 18px 15px;border-radius:var(--dx-radius);border:1px solid var(--dx-line);box-shadow:var(--dx-sh);display:flex;flex-direction:column;gap:2px;transition:box-shadow .25s,transform .25s;}
+#view-dash .d-stat:hover{box-shadow:var(--dx-sh-hover);transform:translateY(-1px);}
+#view-dash .d-stat::before{display:none;}
+#view-dash .d-stat .sl{order:-1;font-size:12px;font-weight:600;color:var(--dx-ink-2);margin:0 0 6px;letter-spacing:.01em;}
+#view-dash .d-stat .sv{font-size:28px;font-weight:700;color:var(--dx-ink-1);letter-spacing:-.025em;line-height:1.1;}
+#view-dash .d-stat .sv .u{font-size:.55em;font-weight:600;color:var(--dx-ink-3);margin-left:2px;letter-spacing:0;}
+#view-dash .d-stat .sv.ot{color:var(--st-crit-ink);}
+#view-dash .d-stat .sv.avg{color:var(--dx-ink-1);}
+#view-dash .d-stat .sd{margin-top:8px;font-size:12px;font-weight:600;color:var(--dx-ink-3);}
+#view-dash .d-stat .sd:empty{display:none;}
+
+/* ── カード ── */
+#view-dash .card{border-radius:var(--dx-radius);border:1px solid var(--dx-line);box-shadow:var(--dx-sh);margin-bottom:16px;}
+#view-dash .card-hd{background:transparent;border-bottom:none;padding:18px 20px 4px;align-items:flex-start;gap:6px 16px;}
+#view-dash .card-hd h2{font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--dx-ink-1);}
+#view-dash .card-sub{font-size:12px;color:var(--dx-ink-3);line-height:1.6;}
+#view-dash .card-body{padding:12px 20px 20px;}
+#view-dash .dash-layout{gap:16px;}
+#view-dash .dash-col{gap:16px;}
+#view-dash .dash-col .card{margin-bottom:0;}
+#view-dash .card .card{box-shadow:none;}
+#view-dash .person-grid{gap:12px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));}
+#view-dash .dash-layout{align-items:start;}
+#view-dash .person-card{border-radius:var(--dx-radius-sm);border:1px solid var(--dx-line);box-shadow:none;background:var(--surface);}
+#view-dash .person-card:hover{box-shadow:var(--dx-sh-hover);}
+#view-dash .person-card h3{font-size:14px;color:var(--dx-ink-1);}
+#view-dash .no-data-msg,.dx-empty{text-align:center;color:var(--dx-ink-3);font-size:13px;padding:28px 12px;}
+#view-dash .ot-empty{color:var(--dx-ink-3);}
+
+#view-dash .b-ot{background:var(--st-crit-bg)!important;color:var(--st-crit-ink)!important;border-color:transparent!important;border-radius:999px;font-weight:700;}
+#view-dash .b-ok{background:var(--st-ok-bg)!important;color:var(--st-ok-ink)!important;border-color:transparent!important;border-radius:999px;font-weight:700;}
+#view-dash .b-work{background:var(--dx-track)!important;color:var(--dx-ink-2)!important;border-color:transparent!important;border-radius:999px;}
+
+/* ── テーブル ── */
+.dx-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;}
+.dx-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;}
+.dx-table th{font-size:11px;font-weight:600;color:var(--dx-ink-3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--dx-line-2);white-space:nowrap;letter-spacing:.02em;}
+.dx-table td{padding:10px;border-bottom:1px solid var(--dx-line);vertical-align:middle;color:var(--dx-ink-1);}
+.dx-table tbody tr:last-child td{border-bottom:none;}
+.dx-table tbody tr{transition:background .15s;}
+.dx-table tbody tr:hover td{background:var(--dx-hover);}
+.dx-table .num{text-align:right;white-space:nowrap;}
+.dx-table .muted{color:var(--dx-ink-3);}
+.dx-table .name{font-weight:700;white-space:nowrap;}
+.dx-table .sticky{position:sticky;left:0;background:var(--surface);z-index:1;}
+.dx-table tbody tr:hover td.sticky{background:var(--surface);box-shadow:inset 0 0 0 999px var(--dx-hover);}
+.dx-table .is-current td{background:var(--dx-hover);}
+.dx-table .dim{opacity:.38;}
+.t-crit{color:var(--st-crit-ink)!important;font-weight:700;}
+.t-warn{color:var(--st-warn-ink)!important;font-weight:700;}
+.t-ok{color:var(--st-ok-ink)!important;}
+.t-info{color:var(--st-info-ink)!important;}
+.t-muted{color:var(--dx-ink-3)!important;}
+
+/* ── チップ（アラート）── icon+label 必須 */
+.dx-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+.dx-chip{display:inline-flex;align-items:center;gap:7px;padding:6px 12px 6px 8px;border-radius:999px;font-size:12.5px;font-weight:600;line-height:1.35;background:var(--dx-track);color:var(--dx-ink-1);}
+.dx-chip::before{content:'';flex:none;width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--surface);background:currentColor;}
+.dx-chip .ic{display:none;}
+.dx-chip.is-crit{background:var(--st-crit-bg);color:var(--st-crit-ink);}
+.dx-chip.is-warn{background:var(--st-warn-bg);color:var(--st-warn-ink);}
+.dx-chip.is-info{background:var(--st-info-bg);color:var(--st-info-ink);}
+.dx-chip.is-ok{background:var(--st-ok-bg);color:var(--st-ok-ink);}
+.dx-chip.is-crit::before{content:'!';background:var(--st-crit);}
+.dx-chip.is-warn::before{content:'!';background:var(--st-warn);color:#2a1d00;}
+.dx-chip.is-info::before{content:'i';background:var(--st-info);font-style:italic;font-family:Georgia,serif;}
+.dx-chip.is-ok::before{content:'✓';background:var(--st-ok);}
+.dx-chip b{font-weight:800;}
+
+/* ── メーター（目盛り付き）── 未充填部=同系色の淡いトラック */
+.dx-meter{--m:var(--dx-accent);position:relative;height:6px;border-radius:999px;background:color-mix(in srgb,var(--m) 16%,transparent);min-width:96px;}
+.dx-meter>.f{position:absolute;inset:0 auto 0 0;border-radius:999px;background:var(--m);width:0;transition:width .7s cubic-bezier(.2,.7,.2,1);}
+.dx-meter>.tk{position:absolute;top:-4px;bottom:-4px;width:1.5px;border-radius:1px;background:var(--dx-ink-3);opacity:.55;}
+.dx-meter>.tk.lim{background:var(--st-crit);opacity:.8;}
+.dx-meter>.avg{position:absolute;top:-5px;bottom:-5px;width:2px;border-radius:1px;background:var(--dx-ink-1);opacity:.7;}
+.dx-meter.is-ok{--m:var(--st-ok);} .dx-meter.is-warn{--m:var(--st-warn);} .dx-meter.is-crit{--m:var(--st-crit);} .dx-meter.is-info{--m:var(--st-info);}
+.dx-meter.thin{height:4px;}
+.dx-meter-row{display:flex;align-items:center;gap:10px;}
+.dx-meter-row .dx-meter{flex:1;}
+.dx-meter-row .v{min-width:52px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;}
+
+/* ── タグ ── */
+.dx-tag{display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.02em;vertical-align:1px;background:var(--dx-track);color:var(--dx-ink-2);}
+.dx-tag.is-crit{background:var(--st-crit-bg);color:var(--st-crit-ink);}
+.dx-tag.is-warn{background:var(--st-warn-bg);color:var(--st-warn-ink);}
+.dx-tag.is-info{background:var(--st-info-bg);color:var(--st-info-ink);}
+
+/* ── 凡例・スウォッチ ── */
+.dx-sw{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:7px;vertical-align:0;flex:none;}
+.dx-legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--dx-ink-2);margin-top:12px;align-items:center;}
+.dx-legend span{display:inline-flex;align-items:center;}
+.dx-legend .dx-sw{margin-right:6px;}
+.dx-note{font-size:12px;color:var(--dx-ink-3);margin-top:12px;line-height:1.6;}
+
+/* ── 入力状況マトリクス ── */
+.dx-mx{border-collapse:separate;border-spacing:3px;width:max-content;min-width:100%;}
+.dx-mx th{font-size:10.5px;font-weight:600;color:var(--dx-ink-3);padding:2px 0 6px;text-align:center;min-width:38px;line-height:1.3;}
+.dx-mx th.sun{color:var(--st-crit-ink);} .dx-mx th.sat{color:var(--st-info-ink);}
+.dx-mx th.today{color:var(--dx-ink-1);}
+.dx-mx th.today span{display:inline-block;padding:1px 6px;border-radius:999px;background:var(--dx-ink-1);color:var(--surface);}
+.dx-mx td{height:38px;min-width:38px;border-radius:7px;text-align:center;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--dx-ink-1);background:var(--dx-track);position:relative;padding:0 2px;line-height:1.15;transition:transform .12s;}
+.dx-mx td.nm{background:transparent;text-align:left;font-weight:700;font-size:13px;padding-right:12px;white-space:nowrap;position:sticky;left:0;z-index:1;background:var(--surface);}
+.dx-mx td.cnt{background:transparent;font-weight:700;padding-left:10px;}
+.dx-mx td.ok{background:color-mix(in srgb,var(--dx-accent) 13%,transparent);}
+.dx-mx td.miss{background:var(--st-crit-bg);color:var(--st-crit-ink);font-weight:800;}
+.dx-mx td.off{background:repeating-linear-gradient(135deg,transparent 0 5px,var(--dx-track) 5px 6px);}
+.dx-mx td.fut{background:transparent;box-shadow:inset 0 0 0 1px var(--dx-line);}
+.dx-mx td.diff{box-shadow:inset 0 0 0 2px var(--st-warn);}
+.dx-mx td.tcol{outline:1.5px solid var(--dx-ink-1);outline-offset:1px;}
+.dx-mx td .f{display:block;font-size:9.5px;font-weight:600;color:var(--dx-ink-3);margin-top:1px;}
+.dx-mx tr:hover td:not(.nm):not(.cnt){transform:scale(1.04);}
+.dx-mx tr:hover td.nm{color:var(--dx-accent);}
+
+/* ── 2本棒比較・横棒リスト ── */
+.dx-bar2{display:flex;flex-direction:column;gap:4px;min-width:140px;}
+.dx-bar2 i{display:block;height:6px;border-radius:999px;background:var(--dx-accent);width:0;transition:width .7s cubic-bezier(.2,.7,.2,1);}
+.dx-bar2 i.b{background:var(--dx-s2);}
+.dx-hbars{display:grid;gap:10px;}
+.dx-hbar{display:grid;grid-template-columns:minmax(0,180px) minmax(0,1fr) auto;gap:12px;align-items:center;font-size:13px;}
+.dx-hbar .lb{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dx-ink-1);}
+.dx-hbar .tr{height:8px;border-radius:999px;background:var(--dx-track);position:relative;}
+.dx-hbar .tr i{position:absolute;inset:0 auto 0 0;border-radius:999px;width:0;transition:width .7s cubic-bezier(.2,.7,.2,1);}
+.dx-hbar .tr i.team{top:auto;height:3px;bottom:-6px;background:var(--dx-ink-3);opacity:.6;}
+.dx-hbar .vv{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap;}
+.dx-hbar .vv small{font-weight:600;color:var(--dx-ink-3);margin-left:4px;font-size:11px;}
+.dx-hbars.cols{grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px 32px;}
+
+/* ── ヒートセル ── */
+.dx-heat td.h{font-variant-numeric:tabular-nums;text-align:right;border-radius:6px;}
+
+/* ── 動き ── */
+@keyframes dxIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+#view-dash.dx-anim .d-stat,#view-dash.dx-anim .card{animation:dxIn .55s cubic-bezier(.2,.7,.2,1) both;}
+#view-dash.dx-anim .d-stat:nth-child(2){animation-delay:.04s}
+#view-dash.dx-anim .d-stat:nth-child(3){animation-delay:.08s}
+#view-dash.dx-anim .d-stat:nth-child(4){animation-delay:.12s}
+#view-dash.dx-anim .d-stat:nth-child(5){animation-delay:.16s}
+#view-dash.dx-anim .d-stat:nth-child(6){animation-delay:.2s}
+#view-dash.dx-anim .d-stat:nth-child(7){animation-delay:.24s}
+#view-dash.dx-anim .card{animation-delay:.12s}
+@media (prefers-reduced-motion:reduce){
+  #view-dash *,#view-dash *::before{animation:none!important;transition:none!important;}
+}
+
+/* ── レスポンシブ ── */
+@media(max-width:1100px){
+  .dx-hbars.cols{grid-template-columns:1fr;}
+}
+@media(max-width:768px){
+  .dx-head{padding:14px 0 14px;align-items:flex-start;}
+  .dx-title{font-size:22px;}
+  #view-dash .dash-subtabs{width:100%;display:flex;}
+  #view-dash .dash-stab{flex:1;padding:8px 6px;font-size:12.5px;}
+  #view-dash .dash-stats,#view-dash .dash-stats-7{grid-template-columns:repeat(2,1fr)!important;gap:10px;}
+  #view-dash .d-stat{padding:13px 14px;}
+  #view-dash .dash-stats .d-stat:last-child:nth-child(odd){grid-column:1 / -1;}
+  #view-dash .d-stat .sv{font-size:23px;}
+  #view-dash .dash-layout{grid-template-columns:1fr;}
+  #view-dash .card-hd{padding:16px 16px 2px;}
+  #view-dash .card-body{padding:10px 16px 16px;}
+  #view-dash .period-controls{gap:8px;}
+  #view-dash .btn-refresh{margin-left:0;}
+  .dx-hbar{grid-template-columns:minmax(0,110px) minmax(0,1fr) auto;gap:8px;font-size:12px;}
+}
+
+/* ── 印刷 ── */
+@media print{
+  .dx-head{display:none!important;}
+  #view-dash .card,#view-dash .d-stat{box-shadow:none!important;border:1px solid #ddd!important;animation:none!important;}
+  .dx-mx td,.dx-meter,.dx-chip{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+}
 </style>
 </head>
 <body>
@@ -876,12 +1119,18 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 </div>
 <div id="view-dash" class="tab-content">
 
-  <!-- ダッシュボード サブタブ -->
-  <div class="dash-subtabs no-print">
+  <!-- ダッシュボード ヘッダー（タイトル＋セグメントタブ） -->
+  <div class="dx-head no-print">
+    <div class="dx-head-title">
+      <div class="dx-eyebrow" id="dx-eyebrow">Monthly report</div>
+      <h1 class="dx-title" id="dx-title">月次レポート</h1>
+    </div>
+  <div class="dash-subtabs no-print" role="tablist">
     <button class="dash-stab active" id="stab-monthly" onclick="showDashTab('monthly')">月次（15日締め）</button>
     <button class="dash-stab"        id="stab-yearly"  onclick="showDashTab('yearly')">年次</button>
     <button class="dash-stab"        id="stab-daily"   onclick="showDashTab('daily')">日別</button>
     <button class="dash-stab"        id="stab-person"  onclick="showDashTab('person')">個人</button>
+  </div>
   </div>
 
   <!-- ─── 日別ビュー ─── -->
@@ -948,7 +1197,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <div class="card" style="margin-bottom:14px;">
       <div class="card-hd"><h2>管理者サマリー</h2><span class="card-sub" id="mgr-sub">残業は退勤時刻から算出（17:30以降）</span></div>
       <div class="card-body">
-        <div id="mgr-alerts" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
+        <div id="mgr-alerts" class="dx-chips"></div>
         <div id="mgr-table" style="overflow-x:auto;"></div>
       </div>
     </div>
@@ -976,12 +1225,12 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       </div>
     </div>
     <!-- 日報 入力状況（未入力チェック）＋ Folio 併記 -->
-    <div class="card" style="margin-top:14px;">
+    <div class="card">
       <div class="card-hd"><h2>日報 入力状況</h2><span class="card-sub" id="entry-matrix-sub">赤=未入力（平日の過去日）／グレー=土日・休日</span></div>
       <div class="card-body"><div id="entry-matrix" style="overflow-x:auto;"></div></div>
     </div>
     <!-- Folio 予実対比 -->
-    <div class="card" id="folio-compare-card" style="margin-top:14px;">
+    <div class="card" id="folio-compare-card">
       <div class="card-hd"><h2>Folio 予実対比</h2><span class="card-sub" id="folio-compare-sub">日報の入力時間 と Folioの実績工数（時間割に配置済みの完了タスク）</span></div>
       <div class="card-body"><div id="folio-compare"></div></div>
     </div>
@@ -1052,7 +1301,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       </div>
     </div>
     <!-- 中分類別 工数推移 -->
-    <div class="card" style="margin-top:14px;">
+    <div class="card">
       <div class="card-hd"><h2>中分類別 工数推移</h2>
         <span class="card-sub" style="display:flex;align-items:center;gap:8px;">月期ごとの作業時間（定時＋残業）
           <select id="sub-trend-filter" class="period-sel" onchange="renderSubTrend()" style="min-width:110px;"></select>
@@ -1060,12 +1309,12 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <div class="card-body"><div id="sub-trend" style="overflow-x:auto;"></div></div>
     </div>
     <!-- 業務の属人化マップ -->
-    <div class="card" style="margin-top:14px;">
+    <div class="card">
       <div class="card-hd"><h2>業務の属人化マップ</h2><span class="card-sub" id="skill-map-sub">中分類×担当の年度作業時間（定時＋残業）</span></div>
       <div class="card-body"><div id="skill-map" style="overflow-x:auto;"></div></div>
     </div>
     <!-- タスク別 標準工数と実績（Folio） -->
-    <div class="card" id="task-stats-card" style="margin-top:14px;">
+    <div class="card" id="task-stats-card">
       <div class="card-hd"><h2>タスク別 標準工数と実績（Folio）</h2>
         <span class="card-sub" style="display:flex;align-items:center;gap:8px;"><span id="task-stats-sub">実績工数が入力された完了タスク</span>
           <select id="task-stats-days" class="period-sel" onchange="loadTaskStats(true)">
@@ -1102,11 +1351,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </div>
       </div>
     </div>
-    <div class="card" style="margin-top:14px;">
+    <div class="card">
       <div class="card-hd"><h2>中分類別 作業時間（年度）</h2><span class="card-sub">上位の業務</span></div>
       <div class="card-body"><div id="person-subs"></div></div>
     </div>
-    <div class="dash-layout" style="margin-top:14px;">
+    <div class="dash-layout">
       <div class="card">
         <div class="card-hd"><h2>日別明細</h2>
           <span class="card-sub" style="display:flex;align-items:center;gap:8px;"><span id="person-days-sub"></span>
@@ -4793,6 +5042,7 @@ async function showTab(name) {
   document.getElementById('view-'+name).classList.add('active');
   document.getElementById('tab-'+name).classList.add('active');
   if (name==='dash') {
+    dxSetHead(_dashTab);
     if (_dashTab==='daily') await renderDash();
     else if (_dashTab==='yearly') { initYearSelector(); await renderYearlyDash(); }
     else if (_dashTab==='person') { initPersonSelectors(); await renderPersonDash(); }
@@ -4804,6 +5054,7 @@ async function showTab(name) {
 
 function showDashTab(name) {
   _dashTab=name;
+  dxSetHead(name);
   document.getElementById('dash-daily').style.display   =name==='daily'  ?'':'none';
   document.getElementById('dash-monthly').style.display =name==='monthly'?'':'none';
   document.getElementById('dash-yearly').style.display  =name==='yearly' ?'':'none';
@@ -5049,6 +5300,55 @@ async function refreshMonthly() {
 }
 
 // ═══════════════════════════════════════════
+//  ダッシュボード デザイン補助（バーの伸長アニメ・KPI単位・タブ見出し）
+// ═══════════════════════════════════════════
+const _dxReduce = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// data-w(%) を持つバー要素を、次フレームで幅へ反映して伸ばす
+function dxGrow(root) {
+  if (!root) return;
+  const els = root.querySelectorAll('[data-w]');
+  const apply = () => els.forEach(e => { e.style.width = e.dataset.w + '%'; });
+  if (_dxReduce()) apply(); else requestAnimationFrame(() => requestAnimationFrame(apply));
+}
+// KPI の値 "12.5h" "30日" "12ヶ月" を 数値＋小さな単位 に整形し、数値は短くカウントアップ
+function dxKpiFormat(el) {
+  if (!el || (el.querySelector('.u') && el.dataset.dxFmt === el.textContent)) return;
+  const m = /^(-?[\d,]+(?:\.\d+)?)(h|日|ヶ月|%|件|回)$/.exec(el.textContent.trim());
+  if (!m) { el.dataset.dxFmt = el.textContent; return; }
+  const target = parseFloat(m[1].replace(/,/g, '')), dec = (m[1].split('.')[1] || '').length, unit = m[2];
+  el.classList.toggle('zero', target === 0);
+  const render = v => { el.innerHTML = `${v.toFixed(dec)}<span class="u">${unit}</span>`; el.dataset.dxFmt = el.textContent; };
+  if (_dxReduce() || !isFinite(target)) { render(target); return; }
+  const t0 = performance.now(), dur = 650;
+  const step = now => {
+    const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    render(target * e);
+    if (k < 1 && el.isConnected) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+(function dxObserveKpi() {
+  const run = () => document.querySelectorAll('#view-dash .d-stat .sv').forEach(dxKpiFormat);
+  const mo = new MutationObserver(muts => {
+    if (muts.some(m => m.target.closest && m.target.closest('.d-stat') || (m.target.parentElement && m.target.parentElement.closest && m.target.parentElement.closest('.d-stat')))) run();
+  });
+  const start = () => { const v = document.getElementById('view-dash'); if (v) { mo.observe(v, {subtree:true, childList:true, characterData:true}); run(); } };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+const _DX_TITLES = {
+  monthly: ['Monthly report', '月次レポート'], yearly: ['Annual report', '年次レポート'],
+  daily: ['Daily report', '日別レポート'], person: ['Individual', '個人レポート']
+};
+function dxSetHead(name) {
+  const t = _DX_TITLES[name] || _DX_TITLES.monthly;
+  const e = document.getElementById('dx-eyebrow'), h = document.getElementById('dx-title');
+  if (e) e.textContent = t[0];
+  if (h) h.textContent = t[1];
+  const v = document.getElementById('view-dash');
+  if (v && !_dxReduce()) { v.classList.remove('dx-anim'); void v.offsetWidth; v.classList.add('dx-anim'); }
+}
+
+// ═══════════════════════════════════════════
 //  日報 入力状況（未入力チェック）／ Folio 予実対比 ／ 中分類別 工数推移
 // ═══════════════════════════════════════════
 let _entryCtx = null;
@@ -5117,10 +5417,9 @@ function renderEntryMatrix() {
   });
   let totalMissing = 0;
   const missingBy = {};
-  const C = {miss:'rgba(239,68,68,.16)', off:'var(--g100, #f1f1f1)', diff:'#f59e0b'};
-  const head = `<tr><th style="position:sticky;left:0;background:var(--surface);padding:4px 8px;text-align:left;font-size:11px;color:var(--g500);">担当</th>` +
-    dayInfo.map(x => `<th style="padding:2px 3px;font-size:10px;font-weight:600;color:${x.dow===0?'#ef4444':x.dow===6?'#3b82f6':'var(--g500)'};min-width:34px;">${Number(x.d.slice(8))}<br>${wd[x.dow]}</th>`).join('') +
-    `<th style="padding:4px 8px;font-size:11px;color:var(--g500);white-space:nowrap;">未入力</th></tr>`;
+  const head = `<tr><th style="text-align:left;">担当</th>` +
+    dayInfo.map(x => `<th class="${x.dow===0?'sun':x.dow===6?'sat':''}${x.d===today?' today':''}"><span>${Number(x.d.slice(8))}</span><br>${wd[x.dow]}</th>`).join('') +
+    `<th>未入力</th></tr>`;
   const body = authors.map(a => {
     let miss = 0;
     const cells = dayInfo.map(x => {
@@ -5128,23 +5427,30 @@ function renderEntryMatrix() {
       const calc = t ? calcFromLeave(t, x.d) : null;
       const h = calc ? calc.normal + calc.ot : null;
       const fh = _folioHoursFor(ctx, a, x.d);
-      let bg = '', txt = '', title = `${x.d} ${a}`;
-      if (x.future) { /* 空欄 */ }
-      else if (h != null) { txt = h.toFixed(1); title += ` 日報 ${h.toFixed(2)}h`; }
-      else if (!x.off) { bg = C.miss; txt = '未'; miss++; title += ' 未入力'; }
-      if (x.off && h == null) bg = C.off;
-      const ftxt = (fh != null && !x.future && (fh > 0 || h != null)) ? `<div style="font-size:9px;color:var(--g400);">F${fh.toFixed(1)}</div>` : '';
+      let cls = '', txt = '', title = `${x.d} ${a}`;
+      if (h != null) { cls = 'ok'; txt = h.toFixed(1); title += ` 日報 ${h.toFixed(2)}h`; }
+      else if (x.future) { cls = 'fut'; }
+      else if (!x.off) { cls = 'miss'; txt = '未'; miss++; title += ' 未入力'; }
+      else cls = 'off';
+      const ftxt = (fh != null && !x.future && (fh > 0 || h != null)) ? `<span class="f">F${fh.toFixed(1)}</span>` : '';
       if (fh != null) title += ` / Folio ${fh.toFixed(2)}h`;
-      const diff = (h != null && fh != null && Math.abs(h - fh) > 1) ? `box-shadow:inset 0 0 0 2px ${C.diff};` : '';
-      return `<td title="${escHtml(title)}" style="padding:2px 3px;text-align:center;font-size:11px;background:${bg};${diff}${txt==='未'?'color:#dc2626;font-weight:700;':''}">${txt}${ftxt}</td>`;
+      if (h != null && fh != null && Math.abs(h - fh) > 1) cls += ' diff';
+      if (x.d === today) cls += ' tcol';
+      return `<td class="${cls}" title="${escHtml(title)}">${txt}${ftxt}</td>`;
     }).join('');
     totalMissing += miss;
     missingBy[a] = miss;
-    return `<tr><td style="position:sticky;left:0;background:var(--surface);padding:4px 8px;font-size:12px;font-weight:700;white-space:nowrap;">${escHtml(a)}</td>${cells}<td style="padding:4px 8px;text-align:center;font-size:12px;font-weight:700;color:${miss?'#dc2626':'var(--g400)'};">${miss ? miss + '日' : '—'}</td></tr>`;
+    return `<tr><td class="nm">${escHtml(a)}</td>${cells}<td class="cnt ${miss ? 't-crit' : 't-muted'}">${miss ? miss + '日' : '—'}</td></tr>`;
   }).join('');
   el.innerHTML = authors.length
-    ? `<table style="border-collapse:separate;border-spacing:2px;width:max-content;min-width:100%;">${head}${body}</table>`
-    : '<p class="no-data-msg">担当者がいません</p>';
+    ? `<table class="dx-mx">${head}${body}</table>
+       <div class="dx-legend">
+         <span><i class="dx-sw" style="background:color-mix(in srgb,var(--dx-accent) 30%,transparent)"></i>入力済み（時間）</span>
+         <span><i class="dx-sw" style="background:var(--st-crit)"></i>未入力（平日の過去日）</span>
+         <span><i class="dx-sw" style="background:repeating-linear-gradient(135deg,transparent 0 2px,var(--dx-ink-3) 2px 3px)"></i>土日・休日</span>
+         ${ctx.folio ? '<span><i class="dx-sw" style="box-shadow:inset 0 0 0 2px var(--st-warn)"></i>日報とFolioの差が1h超（F=Folio実績）</span>' : ''}
+       </div>`
+    : '<p class="dx-empty">担当者がいません</p>';
   // 管理者サマリー用: 未入力日数と、稼働日（経過/期間全体）
   ctx.missing = missingBy;
   ctx.workElapsed = dayInfo.filter(x => !x.off && !x.future && (x.d < today || anyEntry(x.d))).length;
@@ -5152,8 +5458,9 @@ function renderEntryMatrix() {
   ctx.inProgress = startDate <= today && today <= endDate;
   renderMgrSummary();
   const sub = document.getElementById('entry-matrix-sub');
-  if (sub) sub.innerHTML = `未入力 <b style="color:${totalMissing?'#dc2626':'inherit'};">${totalMissing}件</b> ／ 赤=未入力（平日の過去日）・グレー=土日/休日` +
-    (ctx.folio ? '・F=Folio実績・黄枠=日報とFolioの差が1h超' : '');
+  if (sub) sub.innerHTML = totalMissing
+    ? `未入力 <b class="t-crit">${totalMissing}件</b>　担当×日付の入力状況`
+    : '未入力はありません　担当×日付の入力状況';
 }
 
 function renderFolioCompare() {
@@ -5162,8 +5469,8 @@ function renderFolioCompare() {
   const ctx = _entryCtx;
   if (!el || !ctx) return;
   if (card) card.style.display = taskImportUrl() ? '' : 'none';
-  if (ctx.folioErr) { el.innerHTML = `<p class="no-data-msg">Folioデータなし（${escHtml(ctx.folioErr)}）</p>`; return; }
-  if (!ctx.folio) { el.innerHTML = '<p class="no-data-msg">Folioのデータを読み込み中...</p>'; return; }
+  if (ctx.folioErr) { el.innerHTML = `<p class="dx-empty">Folioデータなし（${escHtml(ctx.folioErr)}）</p>`; return; }
+  if (!ctx.folio) { el.innerHTML = '<p class="dx-empty">Folioのデータを読み込み中…</p>'; return; }
   const today = todayStr();
   const dates = eachDateInRange(ctx.startDate, ctx.endDate).filter(d => d <= today);
   const rows = _entryAuthors(ctx.leaveMap).map(a => {
@@ -5179,27 +5486,22 @@ function renderFolioCompare() {
   ctx.folioRatio = {};
   rows.forEach(r => { if (r.n > 0) ctx.folioRatio[r.a] = r.f / r.n; });
   renderMgrSummary();
-  if (!rows.length) { el.innerHTML = '<p class="no-data-msg">この期間のデータがありません</p>'; return; }
+  if (!rows.length) { el.innerHTML = '<p class="dx-empty">この期間のデータがありません</p>'; return; }
   const max = Math.max(...rows.map(r => Math.max(r.n, r.f)), 1);
-  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
-    <tr style="color:var(--g500);font-size:11px;text-align:left;border-bottom:1px solid var(--g200);">
-      <th style="padding:4px 6px;">担当</th><th style="padding:4px 6px;width:45%;">日報（上）／ Folio実績（下）</th>
-      <th style="padding:4px 6px;text-align:right;">日報</th><th style="padding:4px 6px;text-align:right;">Folio</th>
-      <th style="padding:4px 6px;text-align:right;">差</th><th style="padding:4px 6px;text-align:right;">Folio比率</th></tr>
-    ${rows.map(r => {
-      const diff = r.f - r.n, ratio = r.n > 0 ? Math.round(r.f / r.n * 100) : null;
-      return `<tr style="border-bottom:1px solid var(--g100, #eee);">
-        <td style="padding:6px;font-weight:700;white-space:nowrap;">${escHtml(r.a)}</td>
-        <td style="padding:6px;">
-          <div style="height:7px;border-radius:4px;background:var(--primary, #7b5b3a);width:${(r.n/max*100).toFixed(1)}%;margin-bottom:3px;"></div>
-          <div style="height:7px;border-radius:4px;background:#f59e0b;width:${(r.f/max*100).toFixed(1)}%;"></div></td>
-        <td style="padding:6px;text-align:right;">${r.n.toFixed(1)}h</td>
-        <td style="padding:6px;text-align:right;">${r.f.toFixed(1)}h</td>
-        <td style="padding:6px;text-align:right;color:${Math.abs(diff) > 8 ? '#dc2626' : 'inherit'};">${diff >= 0 ? '+' : ''}${diff.toFixed(1)}h</td>
-        <td style="padding:6px;text-align:right;">${ratio == null ? '—' : ratio + '%'}</td></tr>`;
-    }).join('')}
-  </table>
-  <div style="font-size:11px;color:var(--g400);margin-top:6px;">集計対象: ${escHtml(ctx.startDate)} 〜 ${escHtml(dates[dates.length-1] || ctx.startDate)}（今日まで）。Folio比率が低い担当は、Folioへの実績登録漏れの可能性があります。</div>`;
+  el.innerHTML = `<div class="dx-scroll"><table class="dx-table">
+    <thead><tr><th>担当</th><th style="width:42%;">日報 ／ Folio実績</th><th class="num">日報</th><th class="num">Folio</th><th class="num">差</th><th class="num">Folio比率</th></tr></thead>
+    <tbody>${rows.map(r => {
+      const diff = r.f - r.n, ratio = r.n > 0 ? r.f / r.n : null;
+      const rc = ratio == null ? '' : ratio < 0.7 ? 't-crit' : ratio < 0.85 ? 't-warn' : '';
+      return `<tr><td class="name">${escHtml(r.a)}</td>
+        <td><div class="dx-bar2"><i data-w="${(r.n/max*100).toFixed(1)}"></i><i class="b" data-w="${(r.f/max*100).toFixed(1)}"></i></div></td>
+        <td class="num">${r.n.toFixed(1)}h</td><td class="num">${r.f.toFixed(1)}h</td>
+        <td class="num ${Math.abs(diff) > 8 ? 't-warn' : 't-muted'}">${diff >= 0 ? '+' : ''}${diff.toFixed(1)}h</td>
+        <td class="num ${rc}">${ratio == null ? '—' : Math.round(ratio * 100) + '%'}</td></tr>`;
+    }).join('')}</tbody></table></div>
+    <div class="dx-legend"><span><i class="dx-sw" style="background:var(--dx-accent)"></i>日報の入力時間</span><span><i class="dx-sw" style="background:var(--dx-s2)"></i>Folio実績（時間割に配置済みの完了タスク）</span></div>
+    <p class="dx-note">集計対象 ${escHtml(ctx.startDate)} 〜 ${escHtml(dates[dates.length-1] || ctx.startDate)}（今日まで）。Folio比率が低い担当は、Folioへの実績登録漏れの可能性があります。</p>`;
+  dxGrow(el);
 }
 
 // ── 管理者サマリー（月次）──
@@ -5258,7 +5560,7 @@ function renderMgrSummary() {
   const noEntry = allA.filter(a => !ctx.cur[a] && missing[a]);
   const authors = allA.filter(a => ctx.cur[a] || (ctx.prev && ctx.prev[a]));
   const alerts = [];
-  if (noEntry.length) alerts.push(['info', `この期間に日報の入力がない担当: ${noEntry.join('、')}`]);
+  if (noEntry.length) alerts.push(['info', `この期間に日報の入力がない担当: <b>${noEntry.map(escHtml).join('、')}</b>`]);
   const rows = authors.map(a => {
     const c = ctx.cur[a] || {n: 0, ot: 0};
     const pv = ctx.prev ? (ctx.prev[a] || {n: 0, ot: 0}) : null;
@@ -5268,61 +5570,61 @@ function renderMgrSummary() {
       fyOT = ctx.fy.reduce((t, m) => t + ((m[a] || {}).ot || 0), 0);
       over = ctx.fy.filter(m => ((m[a] || {}).ot || 0) > limit).length;
     }
-    const lvl = v => v > limit ? 'red' : (v >= warn ? 'amber' : '');
+    const lvl = v => v > limit ? 'crit' : (v >= warn ? 'warn' : '');
     const curLv = lvl(c.ot), pjLv = pj != null ? lvl(pj) : '';
-    if (curLv === 'red') alerts.push(['red', `${a}: 今期残業 ${c.ot.toFixed(1)}h（上限${limit}h超）`]);
-    else if (pjLv === 'red') alerts.push(['red', `${a}: 期末見込 ${pj.toFixed(1)}h（上限${limit}h超の見込み）`]);
-    else if (curLv === 'amber' || pjLv === 'amber') alerts.push(['amber', `${a}: 残業 ${c.ot.toFixed(1)}h${pj != null ? `（見込 ${pj.toFixed(1)}h）` : ''}・警告ライン${warn}h`]);
-    if (fyOT != null && fyOT >= yLimit * 0.8) alerts.push([fyOT >= yLimit ? 'red' : 'amber', `${a}: 年度累計残業 ${fyOT.toFixed(1)}h／${yLimit}h`]);
-    if (over != null && over >= maxOver - 2) alerts.push([over >= maxOver ? 'red' : 'amber', `${a}: 月${limit}h超が年度${over}回（上限${maxOver}回）`]);
-    if ((missing[a] || 0) >= 3) alerts.push(['amber', `${a}: 日報未入力 ${missing[a]}日`]);
-    if (ratio && ratio[a] != null && ratio[a] < 0.7 && c.n + c.ot > 16) alerts.push(['info', `${a}: Folio登録率 ${Math.round(ratio[a] * 100)}%（登録漏れの可能性）`]);
+    const A = `<b>${escHtml(a)}</b>`;
+    if (curLv === 'crit') alerts.push(['crit', `${A} 今期残業 ${c.ot.toFixed(1)}h（上限${limit}h超）`]);
+    else if (pjLv === 'crit') alerts.push(['crit', `${A} 期末見込 ${pj.toFixed(1)}h（上限${limit}h超の見込み）`]);
+    else if (curLv === 'warn' || pjLv === 'warn') alerts.push(['warn', `${A} 残業 ${c.ot.toFixed(1)}h${pj != null ? `（見込 ${pj.toFixed(1)}h）` : ''}／警告ライン${warn}h`]);
+    if (fyOT != null && fyOT >= yLimit * 0.8) alerts.push([fyOT >= yLimit ? 'crit' : 'warn', `${A} 年度累計残業 ${fyOT.toFixed(1)}h／${yLimit}h`]);
+    if (over != null && over >= maxOver - 2) alerts.push([over >= maxOver ? 'crit' : 'warn', `${A} 月${limit}h超が年度${over}回（上限${maxOver}回）`]);
+    if ((missing[a] || 0) >= 3) alerts.push(['warn', `${A} 日報未入力 ${missing[a]}日`]);
+    if (ratio && ratio[a] != null && ratio[a] < 0.7 && c.n + c.ot > 16) alerts.push(['info', `${A} Folio登録率 ${Math.round(ratio[a] * 100)}%（登録漏れの可能性）`]);
     return {a, c, pv, pj, fyOT, over, curLv, pjLv};
   });
-  const col = {red: '#dc2626', amber: '#d97706', info: '#2563eb'};
-  const bg = {red: 'rgba(239,68,68,.12)', amber: 'rgba(245,158,11,.14)', info: 'rgba(59,130,246,.10)'};
-  alerts.sort((x, y) => ['red', 'amber', 'info'].indexOf(x[0]) - ['red', 'amber', 'info'].indexOf(y[0]));
+  const order = ['crit', 'warn', 'info'];
+  alerts.sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0]));
+  al.className = 'dx-chips';
   al.innerHTML = alerts.length
-    ? alerts.map(([lv, t]) => `<span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:${bg[lv]};color:${col[lv]};">${lv === 'red' ? '⚠ ' : ''}${escHtml(t)}</span>`).join('')
-    : '<span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(34,197,94,.12);color:#16a34a;">✓ アラートはありません</span>';
-  const otCell = (v, lv) => `<span style="color:${lv ? col[lv] : 'inherit'};font-weight:${lv ? 800 : 400};">${v.toFixed(1)}h</span>`;
-  const bar = (v, max, marks) => {
-    const w = Math.min(100, v / max * 100);
-    const c2 = v > limit ? '#ef4444' : (v >= warn ? '#f59e0b' : '#22c55e');
-    return `<div style="position:relative;height:8px;background:var(--g100, #eee);border-radius:4px;min-width:110px;">
-      <div style="position:absolute;left:0;top:0;bottom:0;width:${w}%;background:${c2};border-radius:4px;"></div>
-      ${marks.map(m => `<div style="position:absolute;top:-2px;bottom:-2px;left:${m / max * 100}%;width:1px;background:var(--g500);"></div>`).join('')}</div>`;
+    ? alerts.map(([lv, t]) => `<span class="dx-chip is-${lv}">${t}</span>`).join('')
+    : '<span class="dx-chip is-ok">対応が必要なアラートはありません</span>';
+  const otCell = (v, lv) => `<span class="${lv ? 't-' + lv : ''}">${v.toFixed(1)}h</span>`;
+  const meter = (v) => {
+    const max = Math.max(limit * 1.2, v);
+    const lv = v > limit ? 'crit' : v >= warn ? 'warn' : 'ok';
+    return `<div class="dx-meter is-${lv}"><span class="f" data-w="${Math.min(100, v / max * 100).toFixed(1)}"></span>
+      <span class="tk" style="left:${(warn / max * 100).toFixed(1)}%"></span><span class="tk lim" style="left:${(limit / max * 100).toFixed(1)}%"></span></div>`;
   };
-  const th = t => `<th style="padding:5px 8px;font-size:11px;color:var(--g500);white-space:nowrap;text-align:right;">${t}</th>`;
-  tbl.innerHTML = rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:12px;">
-    <tr style="border-bottom:1px solid var(--g200);"><th style="padding:5px 8px;font-size:11px;color:var(--g500);text-align:left;">担当</th>
-      ${th('通常')}${th('残業')}${proj ? th('期末見込') : ''}${th('前月期')}${th('増減')}
-      <th style="padding:5px 8px;font-size:11px;color:var(--g500);text-align:left;">月${limit}hに対する残業${proj ? '（見込）' : ''}</th>
-      ${th(`年度累計/${yLimit}h`)}${th(`${limit}h超`)}${th('未入力')}${ratio ? th('Folio比率') : ''}</tr>
-    ${rows.map(r => {
+  tbl.innerHTML = rows.length ? `<div class="dx-scroll"><table class="dx-table">
+    <thead><tr><th>担当</th><th class="num">通常</th><th class="num">残業</th>${proj ? '<th class="num">期末見込</th>' : ''}
+      <th class="num">前月期</th><th class="num">増減</th><th style="min-width:150px;">月${limit}hに対する残業${proj ? '（見込）' : ''}</th>
+      <th class="num">年度累計 / ${yLimit}h</th><th class="num">${limit}h超</th><th class="num">未入力</th>${ratio ? '<th class="num">Folio比率</th>' : ''}</tr></thead>
+    <tbody>${rows.map(r => {
       const diff = r.pv ? r.c.ot - r.pv.ot : null;
       const v = r.pj != null ? r.pj : r.c.ot;
-      return `<tr style="border-bottom:1px solid var(--g100, #eee);">
-        <td style="padding:6px 8px;font-weight:700;white-space:nowrap;">${escHtml(r.a)}</td>
-        <td style="padding:6px 8px;text-align:right;">${r.c.n.toFixed(1)}h</td>
-        <td style="padding:6px 8px;text-align:right;">${otCell(r.c.ot, r.curLv)}</td>
-        ${proj ? `<td style="padding:6px 8px;text-align:right;">${otCell(r.pj, r.pjLv)}</td>` : ''}
-        <td style="padding:6px 8px;text-align:right;color:var(--g500);">${r.pv ? r.pv.ot.toFixed(1) + 'h' : '…'}</td>
-        <td style="padding:6px 8px;text-align:right;color:${diff == null ? 'var(--g400)' : diff > 0 ? '#dc2626' : '#16a34a'};">${diff == null ? '…' : (diff > 0 ? '+' : '') + diff.toFixed(1) + 'h'}</td>
-        <td style="padding:6px 8px;">${bar(v, Math.max(limit * 1.2, v), [warn, limit])}</td>
-        <td style="padding:6px 8px;text-align:right;">${r.fyOT == null ? '…' : `<span style="color:${r.fyOT >= yLimit ? col.red : r.fyOT >= yLimit * 0.8 ? col.amber : 'inherit'};">${r.fyOT.toFixed(1)}h</span>`}</td>
-        <td style="padding:6px 8px;text-align:right;">${r.over == null ? '…' : `<span style="color:${r.over >= maxOver ? col.red : r.over >= maxOver - 2 ? col.amber : 'inherit'};">${r.over}回</span>`}</td>
-        <td style="padding:6px 8px;text-align:right;color:${(missing[r.a] || 0) ? '#dc2626' : 'var(--g400)'};">${missing[r.a] ? missing[r.a] + '日' : '—'}</td>
-        ${ratio ? `<td style="padding:6px 8px;text-align:right;">${ratio[r.a] == null ? '—' : Math.round(ratio[r.a] * 100) + '%'}</td>` : ''}</tr>`;
-    }).join('')}</table>` : '<p class="no-data-msg">この期間のデータがありません</p>';
+      return `<tr><td class="name">${escHtml(r.a)}</td>
+        <td class="num">${r.c.n.toFixed(1)}h</td>
+        <td class="num">${otCell(r.c.ot, r.curLv)}</td>
+        ${proj ? `<td class="num">${otCell(r.pj, r.pjLv)}</td>` : ''}
+        <td class="num t-muted">${r.pv ? r.pv.ot.toFixed(1) + 'h' : '…'}</td>
+        <td class="num ${diff == null ? 't-muted' : diff > 0.05 ? 't-crit' : diff < -0.05 ? 't-ok' : 't-muted'}">${diff == null ? '…' : (diff > 0 ? '+' : '') + diff.toFixed(1) + 'h'}</td>
+        <td>${meter(v)}</td>
+        <td class="num">${r.fyOT == null ? '<span class="t-muted">…</span>' : `<span class="${r.fyOT >= yLimit ? 't-crit' : r.fyOT >= yLimit * 0.8 ? 't-warn' : ''}">${r.fyOT.toFixed(1)}h</span>`}</td>
+        <td class="num">${r.over == null ? '<span class="t-muted">…</span>' : `<span class="${r.over >= maxOver ? 't-crit' : r.over >= maxOver - 2 ? 't-warn' : r.over ? '' : 't-muted'}">${r.over}回</span>`}</td>
+        <td class="num ${(missing[r.a] || 0) ? 't-crit' : 't-muted'}">${missing[r.a] ? missing[r.a] + '日' : '—'}</td>
+        ${ratio ? `<td class="num">${ratio[r.a] == null ? '—' : Math.round(ratio[r.a] * 100) + '%'}</td>` : ''}</tr>`;
+    }).join('')}</tbody></table></div>
+    <div class="dx-legend"><span><i class="dx-sw" style="background:var(--st-ok)"></i>${warn}h未満</span><span><i class="dx-sw" style="background:var(--st-warn)"></i>警告 ${warn}h以上</span><span><i class="dx-sw" style="background:var(--st-crit)"></i>上限 ${limit}h超</span><span class="t-muted">目盛線＝${warn}h／${limit}h</span></div>`
+    : '<p class="dx-empty">この期間のデータがありません</p>';
+  dxGrow(tbl);
   const sub = document.getElementById('mgr-sub');
-  if (sub) sub.textContent = `残業は退勤時刻から算出（${R.otStart}以降）／警告${warn}h・上限${limit}h（目盛線）` + (proj ? `／期末見込=稼働日 ${ec.workElapsed}/${ec.workTotal}日から按分` : '');
+  if (sub) sub.textContent = `残業は退勤時刻から算出（${R.otStart}以降）` + (proj ? `・期末見込は稼働日 ${ec.workElapsed}/${ec.workTotal}日から按分` : '');
   // KPI: 前月期比
   const d = document.getElementById('ms-ot-diff');
   if (d && ctx.prev) {
     const curT = Object.values(ctx.cur).reduce((t, x) => t + x.ot, 0), prevT = Object.values(ctx.prev).reduce((t, x) => t + x.ot, 0);
     const df = curT - prevT;
-    d.innerHTML = `前月期比 <span style="color:${df > 0 ? '#dc2626' : '#16a34a'};">${df > 0 ? '+' : ''}${df.toFixed(1)}h</span>`;
+    d.innerHTML = `前月期比 <span class="${df > 0.05 ? 't-crit' : df < -0.05 ? 't-ok' : ''}">${df > 0 ? '▲ +' : df < 0 ? '▼ ' : ''}${df.toFixed(1)}h</span>`;
   } else if (d) d.textContent = '';
 }
 
@@ -5366,7 +5668,8 @@ async function renderPersonDash(force) {
   const periods = getFiscalPeriods(fy);
   const ctx = {a, fy, periods, data: null};
   _personCtx = ctx;
-  document.getElementById('person-range').textContent = `${a} ／ ${fy + 1}年度（${fy - 1952}期）`;
+  { const f = getPeriodDates(periods[0].year, periods[0].month), l = getPeriodDates(periods[11].year, periods[11].month);
+    document.getElementById('person-range').textContent = `${f.startDate.replace(/-/g,'/')} 〜 ${l.endDate.replace(/-/g,'/')}`; }
   setLoading(true);
   try {
     if (force) { _cache.clear(); }
@@ -5397,42 +5700,39 @@ async function renderPersonDash(force) {
   const curIdx = per.findIndex(x => { const {startDate, endDate} = getPeriodDates(x.p.year, x.p.month); return startDate <= today && today <= endDate; });
   const cur = curIdx >= 0 ? per[curIdx] : null;
   const allLeave = per.flatMap(x => x.leaveMins);
+  const lvOf = (v, l) => v >= l ? 'crit' : v >= l * 0.8 ? 'warn' : 'ok';
 
-  // KPI
+  // KPI（年度/今期は進捗メーター付き）
   const tile = (v, l, cls, sd) => `<div class="d-stat"><div class="sv ${cls || ''}">${v}</div><div class="sl">${l}</div>${sd ? `<div class="sd">${sd}</div>` : ''}</div>`;
-  const pct = v => `<span style="color:${v >= 1 ? '#dc2626' : v >= 0.8 ? '#d97706' : 'inherit'};">${Math.round(v * 100)}%</span>`;
+  const prog = (v, l) => `<div class="dx-meter thin is-${lvOf(v, l)}" style="margin-top:2px"><span class="f" data-w="${Math.min(100, v / l * 100).toFixed(1)}"></span></div><div style="margin-top:6px">${Math.round(v / l * 100)}% <span class="t-muted">／ 上限 ${l}h</span></div>`;
   document.getElementById('person-kpi').innerHTML =
-    tile(totOT.toFixed(1) + 'h', `年度残業累計（上限${yLimit}h）`, 'ot', pct(totOT / yLimit)) +
-    tile(cur ? cur.me.ot.toFixed(1) + 'h' : '—', `今期残業（上限${limit}h）`, 'ot', cur ? pct(cur.me.ot / limit) : '') +
-    tile((active.length ? totOT / active.length : 0).toFixed(1) + 'h', '残業 月平均', 'avg') +
-    tile(`${over}/${maxOver}`, `月${limit}h超の回数`, over >= maxOver ? 'ot' : '') +
+    tile(totOT.toFixed(1) + 'h', '年度 残業累計', totOT >= yLimit * 0.8 ? 'ot' : '', prog(totOT, yLimit)) +
+    tile(cur ? cur.me.ot.toFixed(1) + 'h' : '—', '今期 残業', cur && cur.me.ot >= warn ? 'ot' : '', cur ? prog(cur.me.ot, limit) : '') +
+    tile((active.length ? totOT / active.length : 0).toFixed(1) + 'h', '残業 月平均') +
+    tile(`${over}/${maxOver}`, `月${limit}h超の回数`, over >= maxOver - 2 ? 'ot' : '') +
     tile(_avgHm(allLeave), '平均退勤時刻') +
-    tile(totN.toFixed(0) + 'h', '年度 通常時間計') +
-    tile(String(active.reduce((t, x) => t + x.days, 0)) + '日', '日報入力日数');
+    tile(totN.toFixed(0) + 'h', '年度 通常時間') +
+    tile(String(active.reduce((t, x) => t + x.days, 0)) + '日', '日報 入力日数');
 
   // 月期別 推移
   const maxOT = Math.max(limit * 1.1, ...per.map(x => x.me.ot));
-  document.getElementById('person-trend').innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
-    <tr style="border-bottom:1px solid var(--g200);color:var(--g500);font-size:11px;">
-      <th style="padding:4px 6px;text-align:left;">月期</th><th style="padding:4px 6px;text-align:right;">通常</th>
-      <th style="padding:4px 6px;text-align:left;">残業</th><th style="padding:4px 6px;text-align:right;">チーム平均</th>
-      <th style="padding:4px 6px;text-align:right;">入力日数</th><th style="padding:4px 6px;text-align:right;">平均退勤</th></tr>
-    ${per.map((x, i) => {
-      const c = x.me.ot > limit ? '#ef4444' : x.me.ot >= warn ? '#f59e0b' : '#3b82f6';
+  document.getElementById('person-trend').innerHTML = `<table class="dx-table">
+    <thead><tr><th>月期</th><th class="num">通常</th><th style="min-width:170px;">残業</th><th class="num">チーム平均</th><th class="num">入力日数</th><th class="num">平均退勤</th></tr></thead>
+    <tbody>${per.map((x, i) => {
+      const lv = x.me.ot > limit ? 'crit' : x.me.ot >= warn ? 'warn' : 'info';
       const future = x.days === 0 && (i > curIdx && curIdx >= 0);
-      return `<tr style="border-bottom:1px solid var(--g100, #eee);${i === curIdx ? 'background:rgba(59,130,246,.06);' : ''}${future ? 'opacity:.4;' : ''}">
-        <td style="padding:5px 6px;white-space:nowrap;font-weight:${i === curIdx ? 800 : 400};">${x.p.month}月期${i === curIdx ? '（今期）' : ''}</td>
-        <td style="padding:5px 6px;text-align:right;">${x.me.n ? x.me.n.toFixed(1) + 'h' : ''}</td>
-        <td style="padding:5px 6px;min-width:160px;"><div style="display:flex;align-items:center;gap:6px;">
-          <div style="flex:1;position:relative;height:8px;background:var(--g100, #eee);border-radius:4px;">
-            <div style="position:absolute;inset:0 auto 0 0;width:${(x.me.ot / maxOT * 100).toFixed(1)}%;background:${c};border-radius:4px;"></div>
-            ${x.teamAvgOT != null ? `<div title="チーム平均" style="position:absolute;top:-3px;bottom:-3px;left:${Math.min(100, x.teamAvgOT / maxOT * 100).toFixed(1)}%;width:2px;background:var(--g500);"></div>` : ''}
-            <div style="position:absolute;top:-3px;bottom:-3px;left:${(limit / maxOT * 100).toFixed(1)}%;width:1px;background:#ef4444;opacity:.6;"></div></div>
-          <span style="min-width:44px;text-align:right;font-weight:700;color:${x.me.ot > limit ? '#dc2626' : x.me.ot >= warn ? '#d97706' : 'inherit'};">${x.me.ot ? x.me.ot.toFixed(1) + 'h' : ''}</span></div></td>
-        <td style="padding:5px 6px;text-align:right;color:var(--g500);">${x.teamAvgOT != null && x.days ? x.teamAvgOT.toFixed(1) + 'h' : ''}</td>
-        <td style="padding:5px 6px;text-align:right;">${x.days || ''}</td>
-        <td style="padding:5px 6px;text-align:right;">${x.leaveMins.length ? _avgHm(x.leaveMins) : ''}</td></tr>`;
-    }).join('')}</table>`;
+      return `<tr class="${i === curIdx ? 'is-current' : ''}${future ? ' dim' : ''}">
+        <td class="name">${x.p.month}月期${i === curIdx ? '<span class="dx-tag">今期</span>' : ''}</td>
+        <td class="num">${x.me.n ? x.me.n.toFixed(1) + 'h' : ''}</td>
+        <td><div class="dx-meter-row"><div class="dx-meter is-${lv}"><span class="f" data-w="${(x.me.ot / maxOT * 100).toFixed(1)}"></span>
+            ${x.teamAvgOT != null && x.days ? `<span class="avg" title="チーム平均 ${x.teamAvgOT.toFixed(1)}h" style="left:${Math.min(100, x.teamAvgOT / maxOT * 100).toFixed(1)}%"></span>` : ''}
+            <span class="tk lim" style="left:${(limit / maxOT * 100).toFixed(1)}%"></span></div>
+          <span class="v ${x.me.ot > limit ? 't-crit' : x.me.ot >= warn ? 't-warn' : ''}">${x.me.ot ? x.me.ot.toFixed(1) + 'h' : ''}</span></div></td>
+        <td class="num t-muted">${x.teamAvgOT != null && x.days ? x.teamAvgOT.toFixed(1) + 'h' : ''}</td>
+        <td class="num">${x.days || ''}</td>
+        <td class="num">${x.leaveMins.length ? _avgHm(x.leaveMins) : ''}</td></tr>`;
+    }).join('')}</tbody></table>
+    <div class="dx-legend"><span><i class="dx-sw" style="width:2px;border-radius:0;background:var(--dx-ink-1)"></i>チーム平均</span><span><i class="dx-sw" style="width:2px;border-radius:0;background:var(--st-crit)"></i>上限 ${limit}h</span></div>`;
 
   // 業務構成（大分類 本人 vs チーム）
   const mainOf = cd => (SUB_MAP[cd] && SUB_MAP[cd].mainCd) || 'O';
@@ -5444,25 +5744,26 @@ async function renderPersonDash(force) {
     const all = _otByAuthor(d);
     Object.keys(all).forEach(x2 => _scaledRows(d, x2, all[x2].n).forEach(r => { const h = r.hoursNormal + (r.hoursOT || 0); teamMain[mainOf(r.cdSub)] = (teamMain[mainOf(r.cdSub)] || 0) + h; teamTot += h; }));
   });
-  document.getElementById('person-mix').innerHTML = meTot ? CATS.filter(c => (meMain[c.cd] || 0) + (teamMain[c.cd] || 0) > 0).map(c => {
-    const m = (meMain[c.cd] || 0) / meTot, t = teamTot ? (teamMain[c.cd] || 0) / teamTot : 0;
-    return `<div style="display:grid;grid-template-columns:90px 1fr 92px;gap:8px;align-items:center;margin:6px 0;font-size:12px;">
-      <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${c.color};margin-right:5px;"></span>${escHtml(c.label)}</span>
-      <div><div style="height:8px;border-radius:4px;background:${c.color};width:${(m * 100).toFixed(1)}%;margin-bottom:2px;"></div>
-           <div style="height:4px;border-radius:2px;background:var(--g300, #ccc);width:${(t * 100).toFixed(1)}%;"></div></div>
-      <span style="text-align:right;"><b>${Math.round(m * 100)}%</b> <span style="color:var(--g400);">/ ${Math.round(t * 100)}%</span></span></div>`;
-  }).join('') + '<div style="font-size:11px;color:var(--g400);margin-top:4px;">太い棒=本人、細い棒=チーム全体</div>' : '<p class="no-data-msg">この年度のデータがありません</p>';
+  const mixItems = CATS.filter(c => (meMain[c.cd] || 0) + (teamMain[c.cd] || 0) > 0)
+    .map(c => ({c, m: (meMain[c.cd] || 0) / (meTot || 1), t: teamTot ? (teamMain[c.cd] || 0) / teamTot : 0}))
+    .sort((x, y) => y.m - x.m);
+  const mixMax = Math.max(0.01, ...mixItems.map(x => Math.max(x.m, x.t)));
+  document.getElementById('person-mix').innerHTML = meTot ? `<div class="dx-hbars">${mixItems.map(({c, m, t}) => `
+      <div class="dx-hbar"><span class="lb"><i class="dx-sw" style="background:${c.color}"></i>${escHtml(c.label)}</span>
+        <div class="tr"><i style="background:${c.color}" data-w="${(m / mixMax * 100).toFixed(1)}"></i><i class="team" data-w="${(t / mixMax * 100).toFixed(1)}"></i></div>
+        <span class="vv">${Math.round(m * 100)}%<small>チーム ${Math.round(t * 100)}%</small></span></div>`).join('')}</div>
+      <div class="dx-legend"><span><i class="dx-sw" style="background:var(--dx-ink-2)"></i>本人</span><span><i class="dx-sw" style="height:3px;background:var(--dx-ink-3)"></i>チーム全体</span></div>`
+    : '<p class="dx-empty">この年度のデータがありません</p>';
 
   // 中分類 上位
   const subList = Object.keys(meSub).filter(cd => meSub[cd] > 0.05).sort((x, y) => meSub[y] - meSub[x]);
   const maxSub = subList.length ? meSub[subList[0]] : 1;
-  document.getElementById('person-subs').innerHTML = subList.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:4px 20px;">` + subList.map(cd => {
+  document.getElementById('person-subs').innerHTML = subList.length ? `<div class="dx-hbars cols">` + subList.map(cd => {
     const sb = SUB_MAP[cd] || {}, color = CAT_COLOR[sb.mainCd] || '#6b7280';
-    return `<div style="display:grid;grid-template-columns:150px 1fr 70px;gap:8px;align-items:center;font-size:12px;">
-      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(cd)} ${escHtml(sb.label || '')}</span>
-      <div style="height:8px;border-radius:4px;background:${color};width:${(meSub[cd] / maxSub * 100).toFixed(1)}%;"></div>
-      <span style="text-align:right;">${meSub[cd].toFixed(1)}h <span style="color:var(--g400);">${Math.round(meSub[cd] / meTot * 100)}%</span></span></div>`;
-  }).join('') + '</div>' : '<p class="no-data-msg">この年度のデータがありません</p>';
+    return `<div class="dx-hbar"><span class="lb" title="${escHtml(cd + ' ' + (sb.label || ''))}"><i class="dx-sw" style="background:${color}"></i>${escHtml(sb.label || cd)}</span>
+      <div class="tr"><i style="background:${color}" data-w="${(meSub[cd] / maxSub * 100).toFixed(1)}"></i></div>
+      <span class="vv">${meSub[cd].toFixed(1)}h<small>${Math.round(meSub[cd] / meTot * 100)}%</small></span></div>`;
+  }).join('') + '</div>' : '<p class="dx-empty">この年度のデータがありません</p>';
 
   // 曜日別 退勤
   const wd = ['日','月','火','水','木','金','土'];
@@ -5472,18 +5773,21 @@ async function renderPersonDash(force) {
     if (m > 0) byDow[dow].mins.push(m);
     byDow[dow].n++; if (c && c.ot > 0) byDow[dow].otDays++;
   }));
-  document.getElementById('person-dow').innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
-    <tr style="color:var(--g500);font-size:11px;border-bottom:1px solid var(--g200);"><th style="padding:4px 6px;text-align:left;">曜日</th><th style="padding:4px 6px;text-align:right;">平均退勤</th><th style="padding:4px 6px;text-align:left;">残業した日の割合</th><th style="padding:4px 6px;text-align:right;">日数</th></tr>
-    ${[1,2,3,4,5,6,0].filter(i => byDow[i].n).map(i => { const r = byDow[i].otDays / byDow[i].n;
-      return `<tr style="border-bottom:1px solid var(--g100, #eee);"><td style="padding:4px 6px;">${wd[i]}</td><td style="padding:4px 6px;text-align:right;font-weight:700;">${_avgHm(byDow[i].mins)}</td>
-        <td style="padding:4px 6px;"><div style="display:flex;align-items:center;gap:6px;"><div style="flex:1;height:7px;background:var(--g100, #eee);border-radius:4px;position:relative;"><div style="position:absolute;inset:0 auto 0 0;width:${(r * 100).toFixed(0)}%;background:${r >= 0.6 ? '#ef4444' : r >= 0.3 ? '#f59e0b' : '#22c55e'};border-radius:4px;"></div></div><span>${Math.round(r * 100)}%</span></div></td>
-        <td style="padding:4px 6px;text-align:right;color:var(--g500);">${byDow[i].n}</td></tr>`; }).join('') || ''}</table>`;
+  const dows = [1,2,3,4,5,6,0].filter(i => byDow[i].n);
+  document.getElementById('person-dow').innerHTML = dows.length ? `<table class="dx-table">
+    <thead><tr><th>曜日</th><th class="num">平均退勤</th><th style="min-width:150px;">残業した日の割合</th><th class="num">日数</th></tr></thead>
+    <tbody>${dows.map(i => { const r = byDow[i].otDays / byDow[i].n; const lv = r >= 0.6 ? 'crit' : r >= 0.3 ? 'warn' : 'ok';
+      return `<tr><td class="name">${wd[i]}曜</td><td class="num"><b>${_avgHm(byDow[i].mins)}</b></td>
+        <td><div class="dx-meter-row"><div class="dx-meter is-${lv}"><span class="f" data-w="${(r * 100).toFixed(0)}"></span></div><span class="v">${Math.round(r * 100)}%</span></div></td>
+        <td class="num t-muted">${byDow[i].n}</td></tr>`; }).join('')}</tbody></table>`
+    : '<p class="dx-empty">この年度のデータがありません</p>';
 
   // 日別明細の月期セレクト（既定=今期、無ければデータのある最後の期）
   const sp = document.getElementById('person-sel-period');
   const defIdx = curIdx >= 0 ? curIdx : Math.max(0, per.map(x => x.days > 0).lastIndexOf(true));
   sp.innerHTML = periods.map((p, i) => `<option value="${i}"${i === defIdx ? ' selected' : ''}>${p.month}月期</option>`).join('');
   ctx.per = per;
+  dxGrow(document.getElementById('dash-person'));
   renderPersonDetail();
 }
 
@@ -5511,42 +5815,43 @@ async function renderPersonDetail() {
       if (d > today && !t) return '';
       if ((wk || (!missing && d < today)) && !t) return '';
       const diff = c && fh != null && Math.abs(c.normal + c.ot - fh) > 1;
-      return `<tr style="border-bottom:1px solid var(--g100, #eee);${missing ? 'background:rgba(239,68,68,.08);' : ''}">
-        <td style="padding:4px 6px;white-space:nowrap;color:${dow === 0 ? '#ef4444' : dow === 6 ? '#3b82f6' : 'inherit'};">${Number(d.slice(5,7))}/${Number(d.slice(8))}（${wd[dow]}）</td>
-        <td style="padding:4px 6px;text-align:right;">${t ? escHtml(t) : (missing ? '<span style="color:#dc2626;font-weight:700;">未入力</span>' : '')}</td>
-        <td style="padding:4px 6px;text-align:right;">${c ? c.normal.toFixed(2) : ''}</td>
-        <td style="padding:4px 6px;text-align:right;color:${c && c.ot ? '#dc2626' : 'inherit'};font-weight:${c && c.ot ? 700 : 400};">${c && c.ot ? c.ot.toFixed(2) : ''}</td>
-        ${hasFolio ? `<td style="padding:4px 6px;text-align:right;${diff ? 'color:#d97706;font-weight:700;' : 'color:var(--g500);'}">${fh != null ? fh.toFixed(2) : ''}</td>` : ''}</tr>`;
+      return `<tr${missing ? ' style="background:var(--st-crit-bg)"' : ''}>
+        <td class="name ${dow === 0 ? 't-crit' : dow === 6 ? 't-info' : ''}" style="font-weight:600">${Number(d.slice(5,7))}/${Number(d.slice(8))}<span class="t-muted">（${wd[dow]}）</span></td>
+        <td class="num">${t ? escHtml(t) : (missing ? '<span class="dx-chip is-crit" style="padding:2px 9px 2px 5px;font-size:11px">未入力</span>' : '')}</td>
+        <td class="num">${c ? c.normal.toFixed(2) : ''}</td>
+        <td class="num ${c && c.ot ? 't-crit' : ''}">${c && c.ot ? c.ot.toFixed(2) : ''}</td>
+        ${hasFolio ? `<td class="num ${diff ? 't-warn' : 't-muted'}">${fh != null ? fh.toFixed(2) : ''}</td>` : ''}</tr>`;
     }).join('');
-    document.getElementById('person-days').innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
-      <tr style="color:var(--g500);font-size:11px;border-bottom:1px solid var(--g200);"><th style="padding:4px 6px;text-align:left;">日付</th><th style="padding:4px 6px;text-align:right;">退勤</th><th style="padding:4px 6px;text-align:right;">通常</th><th style="padding:4px 6px;text-align:right;">残業</th>${hasFolio ? '<th style="padding:4px 6px;text-align:right;">Folio実績</th>' : ''}</tr>
-      ${rows}</table>
-      <div style="font-size:11px;color:var(--g400);margin-top:6px;">未入力 ${miss}日（平日の過去日。全員未入力の日は休日として除外）／残業は${R.otStart}以降${hasFolio ? '／Folio実績が日報と1h超違う日は橙色' : ''}</div>`;
+    document.getElementById('person-days').innerHTML = `<table class="dx-table">
+      <thead><tr><th>日付</th><th class="num">退勤</th><th class="num">通常</th><th class="num">残業</th>${hasFolio ? '<th class="num">Folio実績</th>' : ''}</tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" class="dx-empty">この月期の記録はありません</td></tr>'}</tbody></table>
+      <p class="dx-note">未入力 ${miss}日（平日の過去日。全員未入力の日は休日として除外）・残業は${R.otStart}以降${hasFolio ? '・Folio実績が日報と1h超違う日は黄色' : ''}</p>`;
   };
   draw(null);
   const tasksEl = document.getElementById('person-tasks'), card = document.getElementById('person-tasks-card');
   if (!taskImportUrl()) { if (card) card.style.display = 'none'; return; }
   if (card) card.style.display = '';
   const end = endDate < today ? endDate : today;
-  if (end < startDate) { tasksEl.innerHTML = '<p class="no-data-msg">この月期はまだ始まっていません</p>'; return; }
+  if (end < startDate) { tasksEl.innerHTML = '<p class="dx-empty">この月期はまだ始まっていません</p>'; return; }
   loadFolioRange(startDate, end).then(f => { if (_personCtx === ctx) draw(f); }).catch(() => {});
-  tasksEl.innerHTML = '<p class="no-data-msg">Folioのデータを読み込み中...</p>';
+  tasksEl.innerHTML = '<p class="dx-empty">Folioのデータを読み込み中…</p>';
   try {
     const d = await _gasJsonpTag(taskImportUrl(), {action:'getPersonTasks', name: ctx.a, start: startDate, end});
     if (_personCtx !== ctx) return;
     if (!d || !d.ok) throw new Error((d && d.error) || '取得に失敗しました');
     const ts = d.tasks || [];
-    if (!ts.length) { tasksEl.innerHTML = '<p class="no-data-msg">この月期の完了タスクはありません</p>'; return; }
+    if (!ts.length) { tasksEl.innerHTML = '<p class="dx-empty">この月期の完了タスクはありません</p>'; return; }
     const tot = ts.reduce((t, r) => t + r.hours, 0), mx = ts[0].hours || 1;
-    tasksEl.innerHTML = ts.map(r => {
-      const cd = r.cdSub || TASK_MAP[r.taskId], sb = SUB_MAP[cd] || {}, color = CAT_COLOR[sb.mainCd] || '#6b7280';
-      return `<div style="display:grid;grid-template-columns:minmax(0,1fr) 90px 92px;gap:8px;align-items:center;font-size:12px;margin:4px 0;">
-        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escHtml(r.taskId + ' ' + r.name)}">${escHtml(r.taskId)} ${escHtml(r.name)}${r.unplaced ? ` <span style="font-size:10px;color:var(--g400);">未配置${r.unplaced}</span>` : ''}</span>
-        <div style="height:7px;border-radius:4px;background:${color};width:${(r.hours / mx * 100).toFixed(1)}%;"></div>
-        <span style="text-align:right;">${r.hours.toFixed(1)}h <span style="color:var(--g400);">×${r.n}</span></span></div>`;
-    }).join('') + `<div style="font-size:11px;color:var(--g400);margin-top:6px;">合計 ${tot.toFixed(1)}h／${ts.reduce((t, r) => t + r.n, 0)}件</div>`;
+    tasksEl.innerHTML = `<div class="dx-hbars">${ts.map(r => {
+      const cd = r.cdSub || TASK_MAP[r.taskId], sb = SUB_MAP[cd] || {}, color = CAT_COLOR[sb.mainCd] || '#8C8377';
+      return `<div class="dx-hbar"><span class="lb" title="${escHtml(r.taskId + ' ' + r.name)}"><i class="dx-sw" style="background:${color}"></i>${escHtml(r.name || r.taskId)}${r.unplaced ? `<span class="dx-tag">未配置 ${r.unplaced}</span>` : ''}</span>
+        <div class="tr"><i style="background:${color}" data-w="${(r.hours / mx * 100).toFixed(1)}"></i></div>
+        <span class="vv">${r.hours.toFixed(1)}h<small>${r.n}件</small></span></div>`;
+    }).join('')}</div>
+    <p class="dx-note">合計 ${tot.toFixed(1)}h・${ts.reduce((t, r) => t + r.n, 0)}件（色＝日報の大分類）</p>`;
+    dxGrow(tasksEl);
   } catch(e) {
-    tasksEl.innerHTML = `<p class="no-data-msg">Folioデータなし（${escHtml(e.message)}）</p>`;
+    tasksEl.innerHTML = `<p class="dx-empty">Folioデータなし（${escHtml(e.message)}）</p>`;
   }
 }
 
@@ -5561,38 +5866,36 @@ function renderSkillMap(byAuthorRows) {
     if (h <= 0.01) return;
     (m[r.cdSub] = m[r.cdSub] || {})[a] = ((m[r.cdSub] || {})[a] || 0) + h;
   }));
+  const rank = lv => lv === 'crit' ? 0 : lv === 'warn' ? 1 : 2;
   const subs = Object.keys(m).map(cd => {
     const tot = Object.values(m[cd]).reduce((t, v) => t + v, 0);
     const shares = authors.map(a => ({a, h: m[cd][a] || 0})).sort((x, y) => y.h - x.h);
     const top = shares[0];
     const people = shares.filter(x => x.h / tot >= 0.1).length;   // シェア10%以上を「担える人」とみなす
     const share = top.h / tot;
-    const lv = (people <= 1 && tot >= 20) ? 'red' : (share >= 0.8 && tot >= 20) ? 'amber' : '';
+    const lv = (people <= 1 && tot >= 20) ? 'crit' : (share >= 0.8 && tot >= 20) ? 'warn' : '';
     return {cd, tot, top, people, share, lv};
-  }).filter(x => x.tot >= 1).sort((x, y) => (x.lv === 'red' ? 0 : x.lv === 'amber' ? 1 : 2) - (y.lv === 'red' ? 0 : y.lv === 'amber' ? 1 : 2) || y.tot - x.tot);
-  if (!subs.length) { el.innerHTML = '<p class="no-data-msg">この年度のデータがありません</p>'; return; }
+  }).filter(x => x.tot >= 1).sort((x, y) => rank(x.lv) - rank(y.lv) || y.tot - x.tot);
+  if (!subs.length) { el.innerHTML = '<p class="dx-empty">この年度のデータがありません</p>'; return; }
   const ordA = authors.sort((x, y) => getAuthorList().indexOf(x) - getAuthorList().indexOf(y));
-  const nRed = subs.filter(x => x.lv === 'red').length, nAmb = subs.filter(x => x.lv === 'amber').length;
+  const nCrit = subs.filter(x => x.lv === 'crit').length, nWarn = subs.filter(x => x.lv === 'warn').length;
   const sub = document.getElementById('skill-map-sub');
-  if (sub) sub.innerHTML = `赤=1人しか担えない業務 <b style="color:#dc2626;">${nRed}件</b>・黄=1人に8割以上集中 <b style="color:#d97706;">${nAmb}件</b>（年度20h以上の業務）／セルの濃さ=その業務内のシェア`;
-  el.innerHTML = `<table style="border-collapse:separate;border-spacing:2px;width:max-content;min-width:100%;font-size:12px;">
-    <tr><th style="position:sticky;left:0;background:var(--surface);padding:4px 8px;text-align:left;font-size:11px;color:var(--g500);">中分類</th>
-      ${ordA.map(a => `<th style="padding:4px 6px;font-size:11px;color:var(--g500);">${escHtml(a)}</th>`).join('')}
-      <th style="padding:4px 8px;font-size:11px;color:var(--g500);">合計</th><th style="padding:4px 8px;font-size:11px;color:var(--g500);">担える人数</th>
-      <th style="padding:4px 8px;font-size:11px;color:var(--g500);text-align:left;">主担当</th></tr>
-    ${subs.map(x => {
+  if (sub) sub.innerHTML = `属人化 <b class="${nCrit ? 't-crit' : ''}">${nCrit}件</b>・集中 <b class="${nWarn ? 't-warn' : ''}">${nWarn}件</b>（年度20h以上の業務）`;
+  el.innerHTML = `<table class="dx-table dx-heat">
+    <thead><tr><th class="sticky">中分類</th>${ordA.map(a => `<th class="num">${escHtml(a)}</th>`).join('')}
+      <th class="num">合計</th><th class="num">担える人数</th><th>主担当</th></tr></thead>
+    <tbody>${subs.map(x => {
       const s2 = SUB_MAP[x.cd] || {};
-      const color = CAT_COLOR[s2.mainCd] || '#6b7280';
-      const tag = x.lv === 'red' ? '<span style="margin-left:6px;font-size:10px;font-weight:800;color:#dc2626;border:1px solid #dc2626;border-radius:4px;padding:0 4px;">属人化</span>'
-        : x.lv === 'amber' ? '<span style="margin-left:6px;font-size:10px;font-weight:800;color:#d97706;border:1px solid #d97706;border-radius:4px;padding:0 4px;">集中</span>' : '';
-      return `<tr><td style="position:sticky;left:0;background:var(--surface);padding:4px 8px;white-space:nowrap;">
-          <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${color};margin-right:5px;"></span>${escHtml(x.cd)} ${escHtml(s2.label || '')}${tag}</td>
+      const color = CAT_COLOR[s2.mainCd] || '#8C8377';
+      const tag = x.lv === 'crit' ? '<span class="dx-tag is-crit">属人化</span>' : x.lv === 'warn' ? '<span class="dx-tag is-warn">集中</span>' : '';
+      return `<tr><td class="sticky" style="white-space:nowrap"><i class="dx-sw" style="background:${color}"></i>${escHtml(s2.label || x.cd)}${tag}</td>
         ${ordA.map(a => { const h = m[x.cd][a] || 0, sh = h / x.tot;
-          return `<td title="${escHtml(a)} ${h.toFixed(1)}h（${Math.round(sh*100)}%）" style="padding:4px 6px;text-align:right;background:${h ? `rgba(59,130,246,${(0.06 + 0.55 * sh).toFixed(2)})` : 'transparent'};">${h >= 0.05 ? h.toFixed(1) : ''}</td>`; }).join('')}
-        <td style="padding:4px 8px;text-align:right;font-weight:700;">${x.tot.toFixed(1)}</td>
-        <td style="padding:4px 8px;text-align:center;font-weight:700;color:${x.people <= 1 ? '#dc2626' : 'inherit'};">${x.people}人</td>
-        <td style="padding:4px 8px;white-space:nowrap;">${escHtml(x.top.a)}（${Math.round(x.share * 100)}%）</td></tr>`;
-    }).join('')}</table>`;
+          return `<td class="h" title="${escHtml(a)} ${h.toFixed(1)}h（${Math.round(sh*100)}%）" style="background:${h ? `color-mix(in srgb,var(--st-info) ${Math.round(6 + 50 * sh)}%,transparent)` : 'transparent'}">${h >= 0.05 ? h.toFixed(1) : '<span class="t-muted">·</span>'}</td>`; }).join('')}
+        <td class="num"><b>${x.tot.toFixed(1)}</b></td>
+        <td class="num ${x.people <= 1 ? 't-crit' : ''}">${x.people}人</td>
+        <td style="white-space:nowrap">${escHtml(x.top.a)} <span class="t-muted">${Math.round(x.share * 100)}%</span></td></tr>`;
+    }).join('')}</tbody></table>
+    <div class="dx-legend"><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-info) 56%,transparent)"></i>濃いほど、その業務を担う割合が高い</span><span class="dx-tag is-crit" style="margin:0">属人化</span>担える人が1人<span class="dx-tag is-warn" style="margin:0">集中</span>主担当に8割以上</div>`;
 }
 
 // ── タスク別 標準工数と実績（年次・Folio）──
@@ -5625,25 +5928,24 @@ function renderTaskStats(d) {
     return {...t, base, ratio, excess};
   }).sort((x, y) => (y.n >= 3) - (x.n >= 3) || Math.abs(y.excess || 0) - Math.abs(x.excess || 0));
   const sub = document.getElementById('task-stats-sub');
-  if (sub) sub.textContent = `${d.start}〜${d.end}／実績工数が入力された完了タスク・3件以上を上位に／赤=実績が標準の1.3倍超・青=0.7倍未満`;
-  if (!rows.length) { el.innerHTML = '<p class="no-data-msg">実績工数が入力された完了タスクがありません</p>'; return; }
-  const th = (t, al) => `<th style="padding:5px 8px;font-size:11px;color:var(--g500);white-space:nowrap;text-align:${al || 'right'};">${t}</th>`;
+  if (sub) sub.textContent = `${d.start} 〜 ${d.end}・実績工数が入力された完了タスク`;
+  if (!rows.length) { el.innerHTML = '<p class="dx-empty">実績工数が入力された完了タスクがありません</p>'; return; }
   const fmt = h => h == null ? '—' : (h >= 1 ? h.toFixed(2) + 'h' : Math.round(h * 60) + '分');
-  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
-    <tr style="border-bottom:1px solid var(--g200);">${th('タスク', 'left')}${th('件数')}${th('標準工数')}${th('予定平均')}${th('実績平均')}${th('実績/標準')}${th('標準との差×件数')}${th('総実績')}</tr>
-    ${rows.map(r => {
-      const c = r.ratio == null ? 'inherit' : r.ratio > 1.3 ? '#dc2626' : r.ratio < 0.7 ? '#2563eb' : 'inherit';
-      return `<tr style="border-bottom:1px solid var(--g100, #eee);${r.n < 3 ? 'opacity:.6;' : ''}">
-        <td style="padding:5px 8px;">${escHtml(r.taskId)} ${escHtml(r.name || '')}</td>
-        <td style="padding:5px 8px;text-align:right;">${r.n}</td>
-        <td style="padding:5px 8px;text-align:right;">${fmt(r.std)}</td>
-        <td style="padding:5px 8px;text-align:right;">${fmt(r.planAvg)}</td>
-        <td style="padding:5px 8px;text-align:right;font-weight:700;">${fmt(r.actAvg)}</td>
-        <td style="padding:5px 8px;text-align:right;font-weight:800;color:${c};">${r.ratio == null ? '—' : Math.round(r.ratio * 100) + '%'}</td>
-        <td style="padding:5px 8px;text-align:right;color:${c};">${r.excess == null ? '—' : (r.excess > 0 ? '+' : '') + r.excess.toFixed(1) + 'h'}</td>
-        <td style="padding:5px 8px;text-align:right;">${r.actSum.toFixed(1)}h</td></tr>`;
-    }).join('')}</table>
-    <div style="font-size:11px;color:var(--g400);margin-top:6px;">標準工数が未設定のタスクは予定平均と比較。標準との差が大きいタスクは、標準工数の見直しか、作業手順の改善を検討してください。</div>`;
+  el.innerHTML = `<table class="dx-table">
+    <thead><tr><th>タスク</th><th class="num">件数</th><th class="num">標準工数</th><th class="num">予定平均</th><th class="num">実績平均</th><th style="min-width:150px;">実績 ÷ 標準</th><th class="num">標準との差×件数</th><th class="num">総実績</th></tr></thead>
+    <tbody>${rows.map(r => {
+      const lv = r.ratio == null ? '' : r.ratio > 1.3 ? 'crit' : r.ratio < 0.7 ? 'info' : 'ok';
+      const w = r.ratio == null ? 0 : Math.min(100, r.ratio / 2 * 100);
+      return `<tr class="${r.n < 3 ? 'dim' : ''}">
+        <td><span class="t-muted" style="font-variant-numeric:tabular-nums;margin-right:6px">${escHtml(r.taskId)}</span>${escHtml(r.name || '')}</td>
+        <td class="num">${r.n}</td><td class="num">${fmt(r.std)}</td><td class="num t-muted">${fmt(r.planAvg)}</td>
+        <td class="num"><b>${fmt(r.actAvg)}</b></td>
+        <td>${r.ratio == null ? '<span class="t-muted">—</span>' : `<div class="dx-meter-row"><div class="dx-meter is-${lv}"><span class="f" data-w="${w.toFixed(1)}"></span><span class="tk" style="left:50%"></span></div><span class="v ${lv === 'crit' ? 't-crit' : lv === 'info' ? 't-info' : ''}">${Math.round(r.ratio * 100)}%</span></div>`}</td>
+        <td class="num ${lv === 'crit' ? 't-crit' : lv === 'info' ? 't-info' : 't-muted'}">${r.excess == null ? '—' : (r.excess > 0 ? '+' : '') + r.excess.toFixed(1) + 'h'}</td>
+        <td class="num">${r.actSum.toFixed(1)}h</td></tr>`;
+    }).join('')}</tbody></table>
+    <div class="dx-legend"><span><i class="dx-sw" style="background:var(--st-crit)"></i>標準の1.3倍超（時間がかかりすぎ）</span><span><i class="dx-sw" style="background:var(--st-ok)"></i>標準どおり</span><span><i class="dx-sw" style="background:var(--st-info)"></i>0.7倍未満（標準が過大）</span><span class="t-muted">目盛線＝100%・薄い行は件数2件以下</span></div>`;
+  dxGrow(el);
 }
 
 // ── 36協定チェック（年次）──
@@ -5654,32 +5956,27 @@ function render36Check(periods, personMonth) {
   const warn = R.otMonthWarn || 36, limit = R.otMonthLimit || 45, yLimit = R.otYearLimit || 360, maxOver = R.otOverMonthsMax || 6;
   const authors = Object.keys(personMonth).filter(a => personMonth[a].some(v => v > 0))
     .sort((a, b) => personMonth[b].reduce((t, v) => t + v, 0) - personMonth[a].reduce((t, v) => t + v, 0));
-  if (!authors.length) { el.innerHTML = '<p class="no-data-msg">この年度の残業データがありません</p>'; return; }
-  const cellBg = v => v > limit ? 'rgba(239,68,68,.22)' : v >= warn ? 'rgba(245,158,11,.22)' : 'transparent';
-  el.innerHTML = `<table style="border-collapse:separate;border-spacing:2px;width:max-content;min-width:100%;font-size:12px;">
-    <tr><th style="position:sticky;left:0;background:var(--surface);padding:4px 8px;text-align:left;font-size:11px;color:var(--g500);">担当</th>
-      <th style="padding:4px 8px;font-size:11px;color:var(--g500);text-align:left;">年度累計 / ${yLimit}h</th>
-      <th style="padding:4px 6px;font-size:11px;color:var(--g500);">${limit}h超</th>
-      <th style="padding:4px 6px;font-size:11px;color:var(--g500);">最大月</th>
-      <th style="padding:4px 6px;font-size:11px;color:var(--g500);">月平均</th>
-      ${periods.map(p => `<th style="padding:4px 6px;font-size:11px;color:var(--g500);">${p.month}月期</th>`).join('')}</tr>
-    ${authors.map(a => {
+  if (!authors.length) { el.innerHTML = '<p class="dx-empty">この年度の残業データがありません</p>'; return; }
+  const cellCls = v => v > limit ? 'crit' : v >= warn ? 'warn' : '';
+  el.innerHTML = `<table class="dx-table dx-heat">
+    <thead><tr><th class="sticky">担当</th><th style="min-width:190px;">年度累計 / ${yLimit}h</th><th class="num">${limit}h超</th><th class="num">最大月</th><th class="num">月平均</th>
+      ${periods.map(p => `<th class="num">${p.month}月期</th>`).join('')}</tr></thead>
+    <tbody>${authors.map(a => {
       const vs = personMonth[a];
       const tot = vs.reduce((t, v) => t + v, 0);
       const act = vs.filter(v => v > 0).length || 1;
       const over = vs.filter(v => v > limit).length;
       const mx = Math.max(...vs);
-      const w = Math.min(100, tot / yLimit * 100);
-      const c = tot >= yLimit ? '#ef4444' : tot >= yLimit * 0.8 ? '#f59e0b' : '#22c55e';
-      return `<tr><td style="position:sticky;left:0;background:var(--surface);padding:4px 8px;font-weight:700;white-space:nowrap;">${escHtml(a)}</td>
-        <td style="padding:4px 8px;min-width:170px;"><div style="display:flex;align-items:center;gap:6px;">
-          <div style="flex:1;height:8px;background:var(--g100, #eee);border-radius:4px;position:relative;"><div style="position:absolute;inset:0 auto 0 0;width:${w}%;background:${c};border-radius:4px;"></div></div>
-          <span style="white-space:nowrap;font-weight:700;">${tot.toFixed(1)}h</span></div></td>
-        <td style="padding:4px 6px;text-align:center;font-weight:700;color:${over >= maxOver ? '#dc2626' : over >= maxOver - 2 ? '#d97706' : 'inherit'};">${over}/${maxOver}</td>
-        <td style="padding:4px 6px;text-align:right;">${mx.toFixed(1)}h</td>
-        <td style="padding:4px 6px;text-align:right;">${(tot / act).toFixed(1)}h</td>
-        ${vs.map(v => `<td style="padding:4px 6px;text-align:right;background:${cellBg(v)};">${v ? v.toFixed(1) : ''}</td>`).join('')}</tr>`;
-    }).join('')}</table>`;
+      const lv = tot >= yLimit ? 'crit' : tot >= yLimit * 0.8 ? 'warn' : 'ok';
+      return `<tr><td class="sticky name">${escHtml(a)}</td>
+        <td><div class="dx-meter-row"><div class="dx-meter is-${lv}"><span class="f" data-w="${Math.min(100, tot / yLimit * 100).toFixed(1)}"></span><span class="tk" style="left:80%"></span></div><span class="v">${tot.toFixed(1)}h</span></div></td>
+        <td class="num ${over >= maxOver ? 't-crit' : over >= maxOver - 2 ? 't-warn' : over ? '' : 't-muted'}">${over} / ${maxOver}</td>
+        <td class="num ${cellCls(mx) ? 't-' + cellCls(mx) : ''}">${mx.toFixed(1)}h</td>
+        <td class="num">${(tot / act).toFixed(1)}h</td>
+        ${vs.map(v => { const c = cellCls(v); return `<td class="h ${c ? 't-' + c : ''}" style="background:${c ? `var(--st-${c}-bg)` : 'transparent'}">${v ? v.toFixed(1) : '<span class="t-muted">·</span>'}</td>`; }).join('')}</tr>`;
+    }).join('')}</tbody></table>
+    <div class="dx-legend"><span><i class="dx-sw" style="background:var(--st-warn)"></i>月${warn}h以上</span><span><i class="dx-sw" style="background:var(--st-crit)"></i>月${limit}h超（年${maxOver}回まで）</span><span class="t-muted">累計バーの目盛線＝上限の80%</span></div>`;
+  dxGrow(el);
 }
 
 function renderSubTrend() {
@@ -5688,35 +5985,26 @@ function renderSubTrend() {
   const ctx = _subTrendCtx;
   if (!el || !sel || !ctx) return;
   const cur = sel.value || '';
-  sel.innerHTML = `<option value="">全ての大分類</option>` + CATS.map(c => `<option value="${escHtml(c.cd)}"${c.cd===cur?' selected':''}>${escHtml(c.cd)} ${escHtml(c.label)}</option>`).join('');
+  sel.innerHTML = `<option value="">全ての大分類</option>` + CATS.map(c => `<option value="${escHtml(c.cd)}"${c.cd===cur?' selected':''}>${escHtml(c.label)}</option>`).join('');
   const totals = {};
   ctx.periodSub.forEach(p => Object.keys(p).forEach(cd => { totals[cd] = (totals[cd] || 0) + p[cd]; }));
   const subs = Object.keys(totals)
     .filter(cd => totals[cd] > 0.01 && (!cur || (SUB_MAP[cd] ? SUB_MAP[cd].mainCd : cd.charAt(0)) === cur))
     .sort((a, b) => totals[b] - totals[a]);
-  if (!subs.length) { el.innerHTML = '<p class="no-data-msg">この年度のデータがありません</p>'; return; }
+  if (!subs.length) { el.innerHTML = '<p class="dx-empty">この年度のデータがありません</p>'; return; }
   const max = Math.max(...subs.map(cd => Math.max(...ctx.periodSub.map(p => p[cd] || 0))), 1);
-  const hexA = (hex, a) => {
-    const m = String(hex || '').match(/^#?([0-9a-f]{6})$/i);
-    if (!m) return `rgba(107,114,128,${a})`;
-    const n = parseInt(m[1], 16);
-    return `rgba(${n>>16},${(n>>8)&255},${n&255},${a.toFixed(2)})`;
-  };
-  const head = `<tr><th style="position:sticky;left:0;background:var(--surface);padding:4px 8px;text-align:left;font-size:11px;color:var(--g500);">中分類</th>` +
-    ctx.periods.map(p => `<th style="padding:4px 6px;font-size:11px;color:var(--g500);">${p.month}月期</th>`).join('') +
-    `<th style="padding:4px 8px;font-size:11px;color:var(--g500);">年度計</th></tr>`;
-  const body = subs.map(cd => {
-    const s = SUB_MAP[cd] || {};
-    const color = CAT_COLOR[s.mainCd] || '#6b7280';
-    const cells = ctx.periodSub.map(p => {
-      const v = p[cd] || 0;
-      return `<td style="padding:4px 6px;text-align:right;font-size:12px;background:${v ? hexA(color, 0.08 + 0.6 * v / max) : 'transparent'};">${v ? v.toFixed(1) : ''}</td>`;
-    }).join('');
-    return `<tr><td style="position:sticky;left:0;background:var(--surface);padding:4px 8px;font-size:12px;white-space:nowrap;">
-      <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${color};margin-right:5px;"></span>${escHtml(cd)} ${escHtml(s.label || '')}</td>${cells}
-      <td style="padding:4px 8px;text-align:right;font-size:12px;font-weight:700;">${totals[cd].toFixed(1)}</td></tr>`;
-  }).join('');
-  el.innerHTML = `<table style="border-collapse:separate;border-spacing:2px;width:max-content;min-width:100%;">${head}${body}</table>`;
+  el.innerHTML = `<table class="dx-table dx-heat">
+    <thead><tr><th class="sticky">中分類</th>${ctx.periods.map(p => `<th class="num">${p.month}月期</th>`).join('')}<th class="num">年度計</th></tr></thead>
+    <tbody>${subs.map(cd => {
+      const s = SUB_MAP[cd] || {};
+      const color = CAT_COLOR[s.mainCd] || '#8C8377';
+      const cells = ctx.periodSub.map(p => {
+        const v = p[cd] || 0;
+        return `<td class="h" style="background:${v ? `color-mix(in srgb,${color} ${Math.round(8 + 52 * v / max)}%,transparent)` : 'transparent'}">${v ? v.toFixed(1) : '<span class="t-muted">·</span>'}</td>`;
+      }).join('');
+      return `<tr><td class="sticky" style="white-space:nowrap"><i class="dx-sw" style="background:${color}"></i>${escHtml(s.label || cd)}</td>${cells}<td class="num"><b>${totals[cd].toFixed(1)}</b></td></tr>`;
+    }).join('')}</tbody></table>
+    <p class="dx-note">セルの濃さ＝その中分類の月期内での多さ（同じ表の最大値に対する比率）</p>`;
 }
 
 async function renderMonthlyDash(silent) {
@@ -6082,7 +6370,7 @@ async function renderYearlyDash(silent) {
       });
       if (diffEl) {
         const df = curOT - prevOT;
-        diffEl.innerHTML = n && prevOT > 0 ? `前年同期比 <span style="color:${df > 0 ? '#dc2626' : '#16a34a'};">${df > 0 ? '+' : ''}${df.toFixed(1)}h</span>` : '';
+        diffEl.innerHTML = n && prevOT > 0 ? `前年同期比 <span class="${df > 0.05 ? 't-crit' : df < -0.05 ? 't-ok' : ''}">${df > 0 ? '▲ +' : df < 0 ? '▼ ' : ''}${df.toFixed(1)}h</span>` : '';
       }
     }
     renderSubTrend();
@@ -6121,7 +6409,7 @@ function renderYearlyOTLine(monthOT, canvasId, emptyId, avgOT=0, prevMonthOT=nul
   if (!hasData) { canvas.style.display='none'; emptyEl.style.display='block'; return; }
   canvas.style.display='block'; emptyEl.style.display='none';
 
-  const W = (canvas.parentElement.clientWidth||700)-2;
+  const W = _contentW(canvas.parentElement, 700) - 2;
   const PL=48, PR=70, PT=44, PB=44;
   const n = monthOT.length;
   const H = 240;
@@ -6154,8 +6442,8 @@ function renderYearlyOTLine(monthOT, canvasId, emptyId, avgOT=0, prevMonthOT=nul
       if (!prev || !prev.totalOT) return;
       const x = PL+cW*(i+0.5)/n;
       const bH = (prev.totalOT/maxOT)*cH;
-      ctx.fillStyle=CHT_GRID;
-      ctx.fillRect(x-barW*0.9, PT+cH-bH, barW*0.9, bH);
+      ctx.fillStyle=CHT_PREV;
+      _rr(ctx, x-barW*0.9, PT+cH-bH, barW*0.9, bH, 4, 'up');
     });
   }
 
@@ -6164,11 +6452,9 @@ function renderYearlyOTLine(monthOT, canvasId, emptyId, avgOT=0, prevMonthOT=nul
     const x = PL+cW*(i+0.5)/n;
     if(d.totalOT>0){
       const bH=(d.totalOT/maxOT)*cH;
-      const grd=ctx.createLinearGradient(0,PT+cH-bH,0,PT+cH);
-      grd.addColorStop(0,'#f43f5e'); grd.addColorStop(1,'#fca5a5');
-      ctx.fillStyle=grd;
-      ctx.fillRect(x-barW/2+2, PT+cH-bH, barW-2, bH);
-      ctx.fillStyle='#f43f5e'; ctx.font='bold 9px sans-serif';
+      ctx.fillStyle=CHT_OT;
+      _rr(ctx, x-barW/2+2, PT+cH-bH, barW-2, bH, 4, 'up');
+      ctx.fillStyle=CHT_MUTED; ctx.font='600 10px Inter, sans-serif';
       ctx.textAlign='center'; ctx.textBaseline='bottom';
       ctx.fillText(d.totalOT.toFixed(2)+'h', x, PT+cH-bH-2);
     }
@@ -6179,7 +6465,7 @@ function renderYearlyOTLine(monthOT, canvasId, emptyId, avgOT=0, prevMonthOT=nul
     // 前年比ラベル
     if(prevMonthOT && prevMonthOT[i]?.totalOT>0 && d.totalOT>0){
       const ratio=Math.round(d.totalOT/prevMonthOT[i].totalOT*100);
-      const col=ratio>100?'#f43f5e':ratio<100?'#10b981':CHT_MUTED;
+      const col=ratio>100?CHT_OT_INK:ratio<100?CHT_OK_INK:CHT_MUTED;
       ctx.fillStyle=col; ctx.font='bold 8px sans-serif';
       ctx.fillText(ratio+'%', x, PT+cH+17);
     }
@@ -6241,8 +6527,8 @@ function renderYearlyOTLine(monthOT, canvasId, emptyId, avgOT=0, prevMonthOT=nul
 
   // 凡例
   const legend=[
-    {col:'#f43f5e', label:'当期残業'},
-    {col:CHT_GRID, label:'前年'},
+    {col:CHT_OT, label:'当期残業'},
+    {col:CHT_PREV, label:'前年'},
     {col:'#06b6d4', label:'累計平均'},
     {col:'#f59e0b', label:'月平均', dash:true},
   ];
@@ -6293,7 +6579,7 @@ function renderStackBar(byAuthor, canvasId, emptyId) {
   });
 
   const maxTotal = Math.max(...data.map(d => d.total), 1);
-  const W = (canvas.parentElement.clientWidth || 500) - 2;
+  const W = _contentW(canvas.parentElement, 500) - 2;
   const PL = 50, PR = 16, PT = 16, PB = 60;
   const barCount = authors.length;
   const H = Math.max(200, barCount * 48 + PT + PB);
@@ -6373,7 +6659,7 @@ function renderCatBar(byAuthor, canvasId, emptyId) {
   if (!cats.length){ canvas.style.display='none'; emptyEl.style.display='block'; return; }
   canvas.style.display='block'; emptyEl.style.display='none';
 
-  const W=(canvas.parentElement.clientWidth||640)-2;
+  const W=_contentW(canvas.parentElement, 640) - 2;
   const PL=44, PR=20, PT=16, PB=80; // PB大きめ：ラベル用
   const barCount=cats.length;
   const H=Math.max(180, barCount*40+PT+PB);
@@ -6399,12 +6685,10 @@ function renderCatBar(byAuthor, canvasId, emptyId) {
     const bH = (c.total/maxVal)*cH;
     const col = CAT_COLOR[c.mainCd]||CHT_FAINT;
     // バー描画（グラデーション）
-    const grd=ctx.createLinearGradient(0,PT+cH-bH,0,PT+cH);
-    grd.addColorStop(0,col+'cc'); grd.addColorStop(1,col);
-    ctx.fillStyle=grd;
-    ctx.fillRect(x-barW/2, PT+cH-bH, barW, bH);
+    ctx.fillStyle=col;
+    _rr(ctx, x-barW/2, PT+cH-bH, barW, bH, 4, 'up');
     // 値ラベル（バー上部）
-    ctx.fillStyle=CHT_TEXT; ctx.font='bold 9px sans-serif';
+    ctx.fillStyle=CHT_MUTED; ctx.font='600 10px Inter, sans-serif';
     ctx.textAlign='center'; ctx.textBaseline='bottom';
     ctx.fillText(c.total.toFixed(2)+'h', x, PT+cH-bH-2);
     // X軸ラベル（斜め表示）
@@ -6478,15 +6762,36 @@ function renderPersonPies(byAuthor, gridId, leaveNormal=null, leaveOT=null) {
 const PIE_SIZE=180; // 個人円グラフの描画サイズ(px)
 
 // ── Canvasチャート用テーマカラー（ライト/ダークで切替。applyTheme()で更新）──
-let CHT_GRID='#e5e0d8', CHT_AXIS='#a09589', CHT_TEXT='#3b322c',
-    CHT_MUTED='#6d6358', CHT_FAINT='#b0a598', CHT_FILL='#f3f0ec';
+let CHT_GRID='#eee8dd', CHT_AXIS='#a39a8c', CHT_TEXT='#2a241d',
+    CHT_MUTED='#6b6358', CHT_FAINT='#b8ae9f', CHT_FILL='#f4f0e8',
+    CHT_OT='#d03b3b', CHT_OT_INK='#b42318', CHT_OK_INK='#11743a', CHT_PREV='#e4ddd0';
+// ダッシュボードのデザイントークン(--st-*, --dx-*)と揃えた配色。ライト/ダークで個別に選定。
 function applyChartTheme(dark){
-  CHT_GRID = dark ? '#3a332c' : '#e5e0d8';
-  CHT_AXIS = dark ? '#8a7f72' : '#a09589';
-  CHT_TEXT = dark ? '#e8e1d6' : '#3b322c';
-  CHT_MUTED= dark ? '#b3a89a' : '#6d6358';
-  CHT_FAINT= dark ? '#8a7f72' : '#b0a598';
-  CHT_FILL = dark ? '#2e2820' : '#f3f0ec';
+  CHT_GRID = dark ? '#262a33' : '#eee8dd';
+  CHT_AXIS = dark ? '#7d8594' : '#a39a8c';
+  CHT_TEXT = dark ? '#e6e8ec' : '#2a241d';
+  CHT_MUTED= dark ? '#aeb4bf' : '#6b6358';
+  CHT_FAINT= dark ? '#5b6270' : '#b8ae9f';
+  CHT_FILL = dark ? '#1d2129' : '#f4f0e8';
+  CHT_OT   = dark ? '#ef5a5a' : '#d03b3b';
+  CHT_OT_INK = dark ? '#ff9b94' : '#b42318';
+  CHT_OK_INK = dark ? '#7be0a2' : '#11743a';
+  CHT_PREV = dark ? '#2c313b' : '#e4ddd0';
+}
+// 親要素の内容幅（clientWidth はパディングを含むため差し引く。含めるとグラフが右にはみ出す）
+function _contentW(el, def) {
+  if (!el || !el.clientWidth) return def;
+  const cs = getComputedStyle(el);
+  return el.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+}
+// 角丸の矩形（データ端のみ丸める: dir='up' 上端 / 'right' 右端）
+function _rr(ctx, x, y, w, h, r, dir) {
+  if (w <= 0 || h <= 0) return;
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, dir === 'right' ? [0, r, r, 0] : [r, r, 0, 0]);
+  else ctx.rect(x, y, w, h);
+  ctx.fill();
 }
 
 function drawPie(uid,rows) {
@@ -6710,7 +7015,7 @@ function renderOTBar(byAuthor, canvasId, emptyId, avgOT=0) {
   if(!hasOT){ canvas.style.display='none'; emptyEl.style.display='block'; return; }
   canvas.style.display='block'; emptyEl.style.display='none';
   const BH=36,GAP=10,PL=90,PR=70,PT=22,PB=34;
-  const W=(canvas.parentElement.clientWidth||600)-2;
+  const W=_contentW(canvas.parentElement, 600) - 2;
   const H=data.length*(BH+GAP)+PT+PB;
   canvas.width=W; canvas.height=H;
   const ctx=canvas.getContext('2d');
@@ -6729,18 +7034,16 @@ function renderOTBar(byAuthor, canvasId, emptyId, avgOT=0) {
   data.forEach((d,i)=>{
     const y=PT+i*(BH+GAP);
     const bW=(d.ot/maxOT)*cW;
-    ctx.fillStyle=CHT_FILL; ctx.fillRect(PL,y,cW,BH);
+    ctx.fillStyle=CHT_FILL; _rr(ctx,PL,y+4,cW,BH-8,4,'right');
     if(d.ot>0){
-      const grd=ctx.createLinearGradient(PL,0,PL+bW,0);
-      grd.addColorStop(0,'#fca5a5'); grd.addColorStop(1,'#dc2626');
-      ctx.fillStyle=grd; ctx.fillRect(PL,y+4,Math.max(bW,3),BH-8);
+      ctx.fillStyle=CHT_OT; _rr(ctx,PL,y+4,Math.max(bW,3),BH-8,4,'right');
     }
     // 名前
     ctx.fillStyle=CHT_TEXT; ctx.font='bold 12px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
     ctx.fillText(d.name.length>5?d.name.slice(0,5)+'…':d.name,PL-6,y+BH/2);
     // 残業値
-    if(d.ot>0){ ctx.fillStyle='#dc2626'; ctx.font='bold 12px sans-serif'; ctx.textAlign='left'; ctx.fillText(`+${d.ot.toFixed(2)}h`,PL+bW+5,y+BH/2); }
-    else       { ctx.fillStyle='#22c55e'; ctx.font='11px sans-serif'; ctx.textAlign='left'; ctx.fillText('定時内',PL+5,y+BH/2); }
+    if(d.ot>0){ ctx.fillStyle=CHT_OT_INK; ctx.font='700 12px Inter, sans-serif'; ctx.textAlign='left'; ctx.fillText(`+${d.ot.toFixed(2)}h`,PL+bW+6,y+BH/2); }
+    else       { ctx.fillStyle=CHT_OK_INK; ctx.font='600 11px Inter, sans-serif'; ctx.textAlign='left'; ctx.fillText('定時内',PL+8,y+BH/2); }
   });
   // 平均破線
   if(avgOT>0) {
@@ -6796,7 +7099,7 @@ function renderOTBarEnhanced(byAuthor, canvasId, emptyId, avgPerPerson=0, avgTot
   const hasPrev = prevByAuthor && data.some(d => d.prevOT !== null && d.prevOT > 0);
   const BH = hasPrev ? 48 : 42;
   const GAP = 12, PL = 95, PR = 24, PT = 36, PB = 34;
-  const W = (canvas.parentElement.clientWidth||600) - 2;
+  const W = _contentW(canvas.parentElement, 600) - 2;
   const H = data.length*(BH+GAP)+PT+PB;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -6818,21 +7121,19 @@ function renderOTBarEnhanced(byAuthor, canvasId, emptyId, avgPerPerson=0, avgTot
     const y = PT + i*(BH+GAP);
     const bW = (d.ot/maxOT)*cW;
     // 背景
-    ctx.fillStyle=CHT_FILL; ctx.fillRect(PL,y,cW,hasPrev?BH/2-2:BH);
+    ctx.fillStyle=CHT_FILL; _rr(ctx,PL,y+6,cW,hasPrev?BH/2-8:BH-12,5,'right');
     // 当期バー
     if(d.ot>0){
-      const grd=ctx.createLinearGradient(PL,0,PL+bW,0);
-      grd.addColorStop(0,'#fca5a5'); grd.addColorStop(1,'#f43f5e');
-      ctx.fillStyle=grd;
-      ctx.fillRect(PL, y+2, Math.max(bW,3), (hasPrev?BH/2-4:BH-4));
+      ctx.fillStyle=CHT_OT;
+      _rr(ctx, PL, y+6, Math.max(bW,3), (hasPrev?BH/2-8:BH-12), 5, 'right');
     }
     // 前期バー（薄い）
     if(hasPrev && d.prevOT!==null){
       const pW=(d.prevOT/maxOT)*cW;
-      ctx.fillStyle=CHT_GRID; ctx.fillRect(PL,y+BH/2+1,cW,BH/2-3);
+      ctx.fillStyle=CHT_FILL; _rr(ctx,PL,y+BH/2+1,cW,BH/2-6,4,'right');
       if(d.prevOT>0){
-        ctx.fillStyle=CHT_AXIS;
-        ctx.fillRect(PL,y+BH/2+1,Math.max(pW,3),BH/2-3);
+        ctx.fillStyle=CHT_PREV;
+        _rr(ctx,PL,y+BH/2+1,Math.max(pW,3),BH/2-6,4,'right');
       }
     }
     // 担当者名
@@ -6840,11 +7141,11 @@ function renderOTBarEnhanced(byAuthor, canvasId, emptyId, avgPerPerson=0, avgTot
     ctx.fillText(d.name.length>5?d.name.slice(0,5)+'…':d.name, PL-6, y+BH*0.5);
     // 残業値ラベル（当期）
     if(d.ot>0){
-      ctx.fillStyle='#f43f5e'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left';
-      ctx.fillText(`+${d.ot.toFixed(2)}h`, PL+bW+5, y+(hasPrev?BH*0.25:BH*0.5));
+      ctx.fillStyle=CHT_OT_INK; ctx.font='700 12px Inter, sans-serif'; ctx.textAlign='left';
+      ctx.fillText(`+${d.ot.toFixed(2)}h`, PL+bW+6, y+(hasPrev?BH*0.25:BH*0.5));
     } else {
-      ctx.fillStyle='#10b981'; ctx.font='11px sans-serif'; ctx.textAlign='left';
-      ctx.fillText('定時内', PL+5, y+(hasPrev?BH*0.25:BH*0.5));
+      ctx.fillStyle=CHT_OK_INK; ctx.font='600 11px Inter, sans-serif'; ctx.textAlign='left';
+      ctx.fillText('定時内', PL+10, y+(hasPrev?BH*0.25:BH*0.5));
     }
     // 前期ラベル
     if(hasPrev && d.prevOT!==null && d.prevOT>0){
@@ -6854,7 +7155,7 @@ function renderOTBarEnhanced(byAuthor, canvasId, emptyId, avgPerPerson=0, avgTot
       // 前年比
       if(d.prevOT>0){
         const ratio = Math.round(d.ot/d.prevOT*100);
-        const col = ratio>100?'#f43f5e':ratio<100?'#10b981':CHT_MUTED;
+        const col = ratio>100?CHT_OT_INK:ratio<100?CHT_OK_INK:CHT_MUTED;
         ctx.fillStyle=col; ctx.font='bold 10px sans-serif';
         ctx.fillText(`${ratio}%`, PL+cW+4, y+BH*0.76);
       }
