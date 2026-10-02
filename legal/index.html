@@ -4399,6 +4399,7 @@ function _roundTaskHours(h) {
 }
 
 let _taskImportPlan = null;
+let _taskImportRows = [];
 
 async function openTaskImport() {
   const url = taskImportUrl();
@@ -4407,6 +4408,7 @@ async function openTaskImport() {
   if (!author) { alert('設定から担当者名を入力してください'); openSettings(); return; }
   const date = currentDate;
   _taskImportPlan = null;
+  _taskImportRows = [];
   const body = document.getElementById('task-import-body');
   const applyBtn = document.getElementById('btn-task-import-apply');
   document.getElementById('task-import-sub').textContent = `${date} ／ ${author}　（進捗ステータス「完了」かつ作業完了日がこの日のタスク）`;
@@ -4422,50 +4424,73 @@ async function openTaskImport() {
     return;
   }
   const rows = Array.isArray(d.rows) ? d.rows : [];
-  const sums = {};   // cdSub -> {normal, ot}
-  const lines = [];
-  let warn = 0;
-  rows.sort((a, b) => String(a.start || '99:99').localeCompare(String(b.start || '99:99')));
-  rows.forEach(r => {
-    const cd = TASK_MAP[r.taskId];
-    const ok = cd && _ALL_SUBS.includes(cd);
-    // 開始日が完了日と違う(日跨ぎ)タスクは時刻で判定できないので全て通常扱い
-    const start = (r.startDate && r.startDate !== date) ? null : r.start;
-    const sp = splitTaskNormalOT(start, r.hours);
-    if (ok) {
-      sums[cd] = sums[cd] || {normal:0, ot:0};
-      sums[cd].normal += sp.normal; sums[cd].ot += sp.ot;
-    } else warn++;
-    const reason = !cd ? '対応表に未登録' : (!SUB_MAP[cd] ? `中分類 ${cd} がマスタに無い` : (!ok ? `中分類 ${cd} が無効` : ''));
-    lines.push(`<tr style="${ok ? '' : 'background:rgba(239,68,68,.08);'}">
-      <td style="padding:4px 6px;white-space:nowrap;">${escHtml(start || '-')}</td>
-      <td style="padding:4px 6px;">${escHtml(r.taskId)} ${escHtml(r.taskName || '')}${r.note ? `<div style="color:var(--g400);font-size:11px;">${escHtml(r.note)}</div>` : ''}</td>
-      <td style="padding:4px 6px;white-space:nowrap;">${ok ? escHtml(cd + ' ' + SUB_MAP[cd].label) : `<span style="color:var(--danger);">${escHtml(reason)}</span>`}</td>
-      <td style="padding:4px 6px;text-align:right;white-space:nowrap;">${sp.normal ? sp.normal.toFixed(2) : ''}</td>
-      <td style="padding:4px 6px;text-align:right;white-space:nowrap;color:var(--danger);">${sp.ot ? sp.ot.toFixed(2) : ''}</td>
-    </tr>`);
-  });
-  const plan = Object.keys(sums).map(cd => ({cdSub:cd, hoursNormal:_roundTaskHours(sums[cd].normal), hoursOT:_roundTaskHours(sums[cd].ot)}))
-    .filter(p => p.hoursNormal > 0 || p.hoursOT > 0);
   if (!rows.length) {
     body.innerHTML = '<div style="padding:16px 0;color:var(--g500);">この日の完了タスクはありません。</div>';
     return;
   }
+  rows.sort((a, b) => String(a.start || '99:99').localeCompare(String(b.start || '99:99')));
+  _taskImportRows = rows.map(r => {
+    const cd = TASK_MAP[r.taskId];
+    const ok = !!cd && _ALL_SUBS.includes(cd);
+    // 開始日が完了日と違う(日跨ぎ)タスクは時刻で判定できないので全て通常扱い
+    const start = (r.startDate && r.startDate !== date) ? null : r.start;
+    const reason = !cd ? '対応表に未登録' : (!SUB_MAP[cd] ? `中分類 ${cd} がマスタに無い` : (!ok ? `中分類 ${cd} が無効` : ''));
+    // 時間割(Folio)に配置済み＝開始時刻ありのタスクだけ既定で取込む。未配置は手動でチェック。
+    return {r, cd, ok, reason, start, placed: !!r.start, sp: splitTaskNormalOT(start, r.hours), checked: ok && !!r.start};
+  });
+  _taskImportPlan = {date, author, plan:[]};
+  renderTaskImport();
+}
+
+function toggleTaskImportRow(i, on) {
+  const row = _taskImportRows[i];
+  if (!row || !row.ok) return;
+  row.checked = !!on;
+  renderTaskImport();
+}
+
+function renderTaskImport() {
+  const body = document.getElementById('task-import-body');
+  const applyBtn = document.getElementById('btn-task-import-apply');
+  const sums = {};   // cdSub -> {normal, ot}
+  let warn = 0, unplaced = 0;
+  const lines = _taskImportRows.map((x, i) => {
+    const {r, cd, ok, reason, start, placed, sp, checked} = x;
+    if (!ok) warn++;
+    if (ok && !placed) unplaced++;
+    if (ok && checked) {
+      sums[cd] = sums[cd] || {normal:0, ot:0};
+      sums[cd].normal += sp.normal; sums[cd].ot += sp.ot;
+    }
+    const bg = !ok ? 'background:rgba(239,68,68,.08);' : '';
+    const dim = (ok && !checked) ? 'opacity:.5;' : '';
+    return `<tr style="${bg}${dim}">
+      <td style="padding:4px 6px;"><input type="checkbox" ${checked ? 'checked' : ''} ${ok ? '' : 'disabled'} onchange="toggleTaskImportRow(${i}, this.checked)"></td>
+      <td style="padding:4px 6px;white-space:nowrap;">${escHtml(start || '-')}</td>
+      <td style="padding:4px 6px;">${escHtml(r.taskId)} ${escHtml(r.taskName || '')}${!placed ? '<span style="margin-left:6px;font-size:10px;color:var(--g500);border:1px solid var(--g300);border-radius:4px;padding:0 4px;">時間割に未配置</span>' : ''}${r.note ? `<div style="color:var(--g400);font-size:11px;">${escHtml(r.note)}</div>` : ''}</td>
+      <td style="padding:4px 6px;white-space:nowrap;">${ok ? escHtml(cd + ' ' + SUB_MAP[cd].label) : `<span style="color:var(--danger);">${escHtml(reason)}</span>`}</td>
+      <td style="padding:4px 6px;text-align:right;white-space:nowrap;">${sp.normal ? sp.normal.toFixed(2) : ''}</td>
+      <td style="padding:4px 6px;text-align:right;white-space:nowrap;color:var(--danger);">${sp.ot ? sp.ot.toFixed(2) : ''}</td>
+    </tr>`;
+  });
+  const plan = Object.keys(sums).map(cd => ({cdSub:cd, hoursNormal:_roundTaskHours(sums[cd].normal), hoursOT:_roundTaskHours(sums[cd].ot)}))
+    .filter(p => p.hoursNormal > 0 || p.hoursOT > 0);
   const totN = plan.reduce((a, p) => a + p.hoursNormal, 0), totO = plan.reduce((a, p) => a + p.hoursOT, 0);
   body.innerHTML = `
     <table style="width:100%;border-collapse:collapse;">
       <thead><tr style="color:var(--g500);font-size:11px;text-align:left;border-bottom:1px solid var(--g200);">
-        <th style="padding:4px 6px;">開始</th><th style="padding:4px 6px;">タスク</th><th style="padding:4px 6px;">日報の中分類</th><th style="padding:4px 6px;text-align:right;">通常</th><th style="padding:4px 6px;text-align:right;">残業</th>
+        <th style="padding:4px 6px;"></th><th style="padding:4px 6px;">開始</th><th style="padding:4px 6px;">タスク</th><th style="padding:4px 6px;">日報の中分類</th><th style="padding:4px 6px;text-align:right;">通常</th><th style="padding:4px 6px;text-align:right;">残業</th>
       </tr></thead>
       <tbody>${lines.join('')}</tbody>
     </table>
     <div style="margin-top:12px;padding:8px 10px;background:var(--g50);border:1px solid var(--g200);border-radius:8px;">
-      <b>反映内容</b>（中分類ごとに合計し ${DEPARTMENT_CONFIG.rules.roundStepHours}h 単位に丸め）：
+      <b>反映内容</b>（チェックした行を中分類ごとに合計し ${DEPARTMENT_CONFIG.rules.roundStepHours}h 単位に丸め）：
       ${plan.map(p => `${escHtml(p.cdSub)} ${escHtml(SUB_MAP[p.cdSub].label)} 通常${p.hoursNormal}${p.hoursOT ? ` / 残業${p.hoursOT}` : ''}`).join('、') || 'なし'}
       <div style="margin-top:4px;">合計 通常 <b>${totN.toFixed(2)}h</b> ／ 残業 <b>${totO.toFixed(2)}h</b></div>
+      ${unplaced ? `<div style="margin-top:4px;color:var(--g500);">※ 時間割(Folio)に未配置の完了タスクが ${unplaced} 件あります。既定では取込みません（必要ならチェック）</div>` : ''}
       ${warn ? `<div style="margin-top:4px;color:var(--danger);">※ 反映できないタスクが ${warn} 件あります（「管理」タブのタスク対応表で設定できます）</div>` : ''}
     </div>`;
-  _taskImportPlan = {date, author, plan};
+  if (_taskImportPlan) _taskImportPlan.plan = plan;
   applyBtn.disabled = !plan.length;
 }
 
