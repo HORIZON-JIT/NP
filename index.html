@@ -1000,6 +1000,27 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 @media (prefers-reduced-motion:reduce){
   .ti-loader *,.ti-loader *::after,.ti-scan::after,#task-import-body.ti-reveal *{animation:none!important;transition:none!important;}
 }
+
+/* ── 取込: 初めて出てきたタスクの登録ステップ ── */
+.ti-new{animation:tiFade .35s cubic-bezier(.2,.7,.2,1) both;}
+.ti-new-hd{display:flex;gap:12px;align-items:flex-start;padding:4px 2px 14px;}
+.ti-new-badge{flex:none;font-size:10px;font-weight:800;letter-spacing:.12em;padding:5px 8px;border-radius:8px;background:var(--dx-ink-1);color:var(--surface);}
+.ti-new-title{font-size:14.5px;font-weight:800;color:var(--dx-ink-1);margin-bottom:3px;}
+.ti-new-desc{font-size:12px;color:var(--dx-ink-2);line-height:1.6;}
+.ti-new-list{display:flex;flex-direction:column;gap:8px;max-height:48vh;overflow:auto;padding:2px;}
+.ti-new-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,230px);gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--dx-line-2);border-radius:12px;background:var(--surface);
+  animation:tiRowIn .4s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--i,0) * 60ms + 80ms);}
+.ti-new-task{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;min-width:0;}
+.ti-new-id{font-size:11px;font-weight:800;padding:2px 7px;border-radius:6px;background:var(--dx-track);color:var(--dx-ink-2);font-variant-numeric:tabular-nums;}
+.ti-new-nm{font-size:13.5px;font-weight:700;color:var(--dx-ink-1);}
+.ti-new-meta{font-size:11px;color:var(--dx-ink-3);}
+.ti-new-sel{height:36px;border-radius:9px;border:1.5px dashed var(--dx-line-2);background:var(--surface);color:var(--dx-ink-1);font:inherit;font-size:12.5px;padding:0 8px;min-width:0;transition:border-color .2s,background .2s;}
+.ti-new-sel:focus{outline:2px solid var(--dx-accent);outline-offset:1px;}
+.ti-new-sel.picked{border-style:solid;border-color:var(--st-ok);background:var(--st-ok-bg);}
+.ti-new-msg{min-height:18px;font-size:12px;color:var(--st-crit-ink);margin:8px 2px 0;}
+.ti-new-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:6px;flex-wrap:wrap;}
+@media(max-width:560px){.ti-new-row{grid-template-columns:1fr;}}
+@media (prefers-reduced-motion:reduce){.ti-new,.ti-new-row{animation:none!important;}}
 </style>
 </head>
 <body>
@@ -1454,20 +1475,6 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     </section>
   </div>
 
-  <section class="admin-card" id="admin-task-section" style="margin-top:14px;">
-    <h2>タスク対応表（タスク管理アプリ → 日報）</h2>
-    <div class="admin-note" style="margin-bottom:10px;">「Folioから取込」での中分類は、Folioのタスクマスタ「日報中分類CD」列が優先です。ここは列が空のタスク用の予備の対応表です（変更すると即Firebaseへ保存）。</div>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
-      <button class="btn btn-outline btn-sm" onclick="pushTaskMapToMaster()">タスクマスタへ一括反映（未設定のみ）</button>
-      <span class="admin-status" id="admin-task-push-res"></span>
-    </div>
-    <div class="admin-form sub">
-      <input id="admin-task-id" placeholder="タスクID（例: K29, α7）">
-      <select id="admin-task-sub"></select>
-      <button class="btn btn-primary btn-sm" onclick="addAdminTaskMap()">追加</button>
-    </div>
-    <div class="admin-list" id="admin-task-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;"></div>
-  </section>
 </div>
 
 </div><!-- /.container -->
@@ -1980,7 +1987,6 @@ async function loadMasterFromFirebase(force = false) {
     if (cats.length) applyMasterCats(cats);
     if (data.taskMap && typeof data.taskMap === 'object' && Object.keys(data.taskMap).length) {
       applyTaskMap(data.taskMap);
-      renderAdminTaskMap();
     }
     setAdminStatus(force ? 'マスタを再読込しました。' : '');
     return true;
@@ -2004,7 +2010,6 @@ async function writeMasterSub(mainCd, sub) {
 }
 
 function renderAdminMasters() {
-  renderAdminTaskMap();
   const catList = document.getElementById('admin-cat-list');
   const subList = document.getElementById('admin-sub-list');
   const subCat = document.getElementById('admin-sub-cat');
@@ -2178,63 +2183,6 @@ async function moveAdminCategory(cd, delta) {
   cats.forEach((c, idx) => c.order = idx);
   try { await saveMasterCatsToFirebase(cats); applyMasterCats(cats); setAdminStatus('大分類の並び順を更新しました。'); }
   catch(e) { alert('保存に失敗しました: ' + e.message); }
-}
-
-function _taskSubOptions(selected) {
-  const opts = [];
-  CATS.forEach(c => (c.subs || []).forEach(sb => {
-    const off = (c.active === false || sb.active === false) ? '（無効）' : '';
-    opts.push(`<option value="${escHtml(sb.cd)}"${sb.cd === selected ? ' selected' : ''}>${escHtml(sb.cd)} ${escHtml(sb.label)}${off}</option>`);
-  }));
-  if (selected && !SUB_MAP[selected]) opts.unshift(`<option value="${escHtml(selected)}" selected>${escHtml(selected)}（未登録）</option>`);
-  return opts.join('');
-}
-function _taskIdSortKey(id) {
-  const m = String(id).match(/^(.*?)(\d*)$/);
-  return [m[1], m[2] ? Number(m[2]) : -1];
-}
-function renderAdminTaskMap() {
-  const list = document.getElementById('admin-task-list');
-  const sel = document.getElementById('admin-task-sub');
-  if (!list || !sel) return;
-  const sec = document.getElementById('admin-task-section');
-  if (sec) sec.style.display = taskImportUrl() ? '' : 'none';
-  sel.innerHTML = _taskSubOptions(sel.value);
-  const ids = Object.keys(TASK_MAP).sort((a, b) => {
-    const [ap, an] = _taskIdSortKey(a), [bp, bn] = _taskIdSortKey(b);
-    return ap.localeCompare(bp, 'ja') || an - bn;
-  });
-  list.innerHTML = ids.length ? ids.map(id => `
-    <div class="admin-row" style="grid-template-columns:64px minmax(0,1fr) auto;padding:6px 8px;">
-      <div class="admin-title" style="font-family:monospace;">${escHtml(id)}</div>
-      <select onchange="setAdminTaskMap('${escHtml(id)}', this.value)" style="height:30px;border:1.5px solid var(--g200);border-radius:6px;background:var(--surface);color:var(--g800);font-family:inherit;font-size:12px;min-width:0;">${_taskSubOptions(TASK_MAP[id])}</select>
-      <button class="btn btn-danger btn-sm" onclick="deleteAdminTaskMap('${escHtml(id)}')">削除</button>
-    </div>`).join('') : '<div class="admin-empty">対応がありません。</div>';
-}
-async function _saveTaskMapNow(msg) {
-  applyTaskMap(TASK_MAP);
-  renderAdminTaskMap();
-  try { await seedMasterToFirebase(); setAdminStatus(msg); }
-  catch(e) { console.error(e); setAdminStatus('タスク対応表の保存に失敗しました。', true); alert('保存に失敗しました: ' + e.message); }
-}
-async function addAdminTaskMap() {
-  const idEl = document.getElementById('admin-task-id');
-  const id = idEl.value.trim();
-  const cd = document.getElementById('admin-task-sub').value;
-  if (!id || !cd) { alert('タスクIDと中分類を指定してください。'); return; }
-  if (TASK_MAP[id] && !confirm(`${id} は既に ${TASK_MAP[id]} に対応しています。${cd} に変更しますか？`)) return;
-  TASK_MAP[id] = cd;
-  idEl.value = '';
-  await _saveTaskMapNow(`タスク対応 ${id} → ${cd} を保存しました。`);
-}
-async function setAdminTaskMap(id, cd) {
-  TASK_MAP[id] = cd;
-  await _saveTaskMapNow(`タスク対応 ${id} → ${cd} を保存しました。`);
-}
-async function deleteAdminTaskMap(id) {
-  if (!confirm(`タスク対応 ${id} を削除しますか？`)) return;
-  delete TASK_MAP[id];
-  await _saveTaskMapNow(`タスク対応 ${id} を削除しました。`);
 }
 
 async function addAdminSubCategory() {
@@ -4866,6 +4814,7 @@ async function openTaskImport(force) {
   const applyBtn = document.getElementById('btn-task-import-apply');
   document.getElementById('task-import-sub').textContent = `${date} ／ ${author}　（この日に配置された「完了」タスク）`;
   body.classList.remove('ti-reveal');
+  applyBtn.style.display = '';
   body.innerHTML = _tiLoaderHtml();
   applyBtn.disabled = true;
   document.getElementById('task-import-modal').classList.add('open');
@@ -4894,17 +4843,104 @@ async function openTaskImport(force) {
     return x;
   });
   _taskImportPlan = {date, author, plan:[]};
-  if (!_dxReduce()) body.classList.add('ti-reveal');   // 最初の表示だけ行を順に出す
-  renderTaskImport();
   _showFolioTiming(d);
-  setTimeout(() => body.classList.remove('ti-reveal'), 1500 + rows.length * 55);
+  // タスクマスタに中分類が無い（初めて出てきた）タスクがあれば、先に「何のタスクか」を聞く
+  const unknown = _unknownTasks();
+  if (unknown.length) { _renderNewTaskStep(unknown); return; }
+  _revealTaskImport();
 }
 
-// 中分類の決定: タスクマスタ「日報中分類CD」(GASがcdSubで返す)を優先、無ければ日報側の対応表
+function _revealTaskImport() {
+  const body = document.getElementById('task-import-body');
+  document.getElementById('btn-task-import-apply').style.display = '';
+  if (!_dxReduce()) body.classList.add('ti-reveal');   // 最初の表示だけ行を順に出す
+  renderTaskImport();
+  setTimeout(() => body.classList.remove('ti-reveal'), 1500 + _taskImportRows.length * 55);
+}
+
+function _unknownTasks() {
+  const m = new Map();
+  _taskImportRows.forEach(x => {
+    if (x.cd) return;
+    const id = x.r.taskId;
+    const u = m.get(id) || {taskId: id, name: x.r.taskName || '', n: 0, h: 0};
+    u.n++; u.h += Number(x.r.hours) || 0;
+    m.set(id, u);
+  });
+  return [...m.values()];
+}
+
+// 中分類の選択肢（大分類ごとにグループ化）。タスクIDの頭文字と同じ大分類を先頭に並べる
+function _subOptionsGrouped(taskId) {
+  const head = String(taskId || '').charAt(0).replace('α', 'A').toUpperCase();
+  const cats = activeInputCats().slice().sort((a, b) => (b.cd === head) - (a.cd === head));
+  return cats.map(c => `<optgroup label="${escHtml(c.label)}${c.cd === head ? '（候補）' : ''}">` +
+    c.subs.map(sb => `<option value="${escHtml(sb.cd)}">${escHtml(sb.label)}（${escHtml(sb.cd)}）</option>`).join('') + '</optgroup>').join('');
+}
+
+function _renderNewTaskStep(unknown) {
+  const body = document.getElementById('task-import-body');
+  const applyBtn = document.getElementById('btn-task-import-apply');
+  applyBtn.disabled = true;
+  applyBtn.style.display = 'none';   // 登録ステップ中は下部の「入力欄に反映」を隠し、ボタン列を1つに
+  body.classList.remove('ti-reveal');
+  body.innerHTML = `<div class="ti-new">
+    <div class="ti-new-hd">
+      <div class="ti-new-badge">NEW</div>
+      <div><div class="ti-new-title">初めて出てきたタスクが ${unknown.length} 件あります</div>
+        <div class="ti-new-desc">日報のどの中分類に当たるか選んでください。選んだ内容は Folio のタスクマスタに登録され、次回からは自動で変換されます。</div></div>
+    </div>
+    <div class="ti-new-list">${unknown.map((u, i) => `
+      <div class="ti-new-row" style="--i:${i}">
+        <div class="ti-new-task"><span class="ti-new-id">${escHtml(u.taskId)}</span><span class="ti-new-nm">${escHtml(u.name || '（タスク名なし）')}</span>
+          <span class="ti-new-meta">${u.n}件・${u.h.toFixed(2)}h</span></div>
+        <select class="ti-new-sel" data-task="${escHtml(u.taskId)}" onchange="this.classList.toggle('picked', !!this.value); const m=document.getElementById('ti-new-msg'); if (m) m.textContent='';">
+          <option value="">中分類を選択…</option>${_subOptionsGrouped(u.taskId)}</select>
+      </div>`).join('')}</div>
+    <div class="ti-new-msg" id="ti-new-msg"></div>
+    <div class="ti-new-btns">
+      <button class="btn btn-outline" onclick="_skipNewTasks()">あとで（今回は取り込まない）</button>
+      <button class="btn btn-primary" id="ti-new-save" onclick="_saveNewTasks()">タスクマスタに登録して続ける</button>
+    </div>
+  </div>`;
+}
+
+function _skipNewTasks() { _revealTaskImport(); }
+
+async function _saveNewTasks() {
+  const sels = [...document.querySelectorAll('.ti-new-sel')];
+  const map = {};
+  sels.forEach(s => { if (s.value) map[s.dataset.task] = s.value; });
+  const msg = document.getElementById('ti-new-msg');
+  if (!Object.keys(map).length) { if (msg) msg.textContent = '中分類を1つ以上選んでください（今回取り込まない場合は「あとで」）。'; return; }
+  const btn = document.getElementById('ti-new-save');
+  if (btn) { btn.disabled = true; btn.textContent = '登録中…'; }
+  let note;
+  try {
+    const d = await _gasJsonpTag(taskImportUrl(), {action:'setTaskCds', map: JSON.stringify(map)});
+    if (!d || !d.ok) throw new Error((d && d.error) || '書き込みに失敗しました');
+    const nf = d.notFound || [];
+    note = `${Object.keys(map).length - nf.length}件をタスクマスタに登録しました。` + (nf.length ? `（タスクマスタに無いID: ${nf.join(', ')} は今回の取込にだけ反映）` : '');
+    _folioCache.clear();
+  } catch(e) {
+    note = `タスクマスタへ書き込めなかったため、今回の取込にだけ反映しました（${e.message}）`;
+  }
+  _taskImportRows.forEach(y => {
+    if (!map[y.r.taskId]) return;
+    y.r.cdSub = map[y.r.taskId];
+    _resolveTaskRow(y);
+    if (y.ok && y.placed) y.checked = true;
+  });
+  _revealTaskImport();
+  const n2 = document.getElementById('task-import-note');
+  if (n2) n2.textContent = note;
+}
+
+// 中分類の決定: タスクマスタ「日報中分類CD」(GASがcdSubで返す)が正本
 function _resolveTaskRow(x) {
   const r = x.r;
-  x.cd = r.cdSub || TASK_MAP[r.taskId] || '';
-  x.src = r.cdSub ? 'マスタ' : (TASK_MAP[r.taskId] ? '日報側' : '');
+  x.cd = r.cdSub || '';
+  x.src = '';
   x.ok = !!x.cd && _ALL_SUBS.includes(x.cd);
   x.reason = !x.cd ? '中分類が未設定' : (!SUB_MAP[x.cd] ? `中分類 ${x.cd} が日報に無い` : (!x.ok ? `中分類 ${x.cd} が無効` : ''));
 }
@@ -4914,7 +4950,7 @@ function _activeSubOptions() {
     `<option value="${escHtml(sb.cd)}">${escHtml(sb.cd)} ${escHtml(sb.label)}</option>`).join('')).join('');
 }
 
-// 取込画面で、未設定タスクの中分類をその場で登録（タスクマスタへ書き込み。失敗時は日報側の対応表へ）
+// 取込画面で、未設定タスクの中分類をその場で登録（タスクマスタへ書き込み。失敗時は今回の取込だけに反映）
 async function registerTaskCd(i) {
   const x = _taskImportRows[i];
   const sel = document.getElementById(`ti-sel-${i}`);
@@ -4926,13 +4962,11 @@ async function registerTaskCd(i) {
   try {
     const d = await _gasJsonpTag(taskImportUrl(), {action:'setTaskCd', taskId, cd});
     if (!d || !d.ok) throw new Error((d && d.error) || '書き込みに失敗しました');
-    _taskImportRows.forEach(y => { if (y.r.taskId === taskId) y.r.cdSub = cd; });
     msg = `${taskId} → ${cd} をタスクマスタに登録しました。`;
   } catch(e) {
-    TASK_MAP[taskId] = cd;
-    try { applyTaskMap(TASK_MAP); await seedMasterToFirebase(); renderAdminTaskMap(); } catch(_) {}
-    msg = `タスクマスタへ書き込めなかったため、日報側の対応表に保存しました（${e.message}）`;
+    msg = `タスクマスタへ書き込めなかったため、今回の取込にだけ反映しました（${e.message}）`;
   }
+  _taskImportRows.forEach(y => { if (y.r.taskId === taskId) y.r.cdSub = cd; });
   _taskImportRows.forEach(y => {
     if (y.r.taskId !== taskId) return;
     _resolveTaskRow(y);
@@ -4941,23 +4975,6 @@ async function registerTaskCd(i) {
   renderTaskImport();
   const note = document.getElementById('task-import-note');
   if (note) note.textContent = msg;
-}
-
-// 管理タブ: 日報側の対応表をタスクマスタの空欄へ一括反映
-async function pushTaskMapToMaster() {
-  const res = document.getElementById('admin-task-push-res');
-  const ids = Object.keys(TASK_MAP);
-  if (!ids.length) return;
-  if (!confirm(`日報側の対応 ${ids.length} 件を、タスクマスタの「日報中分類CD」列へ反映します（既に値がある行は変更しません）。よろしいですか？`)) return;
-  if (res) res.textContent = '反映中...';
-  try {
-    const d = await _gasJsonpTag(taskImportUrl(), {action:'setTaskCds', map: JSON.stringify(TASK_MAP)});
-    if (!d || !d.ok) throw new Error((d && d.error) || '失敗しました');
-    _folioCache.clear();
-    if (res) res.textContent = `反映 ${d.written} 件 / 既に設定済み ${d.skippedExisting} 件` + (d.notFound && d.notFound.length ? ` / タスクマスタに無いID: ${d.notFound.join(', ')}` : '');
-  } catch(e) {
-    if (res) res.textContent = '反映に失敗しました: ' + e.message;
-  }
 }
 
 function _showFolioTiming(d) {
