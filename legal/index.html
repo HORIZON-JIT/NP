@@ -5720,8 +5720,10 @@ function renderMgrSummary() {
     : '<p class="dx-empty">この期間のデータがありません</p>';
   dxGrow(tbl);
   const sub = document.getElementById('mgr-sub');
-  if (sub) sub.textContent = `残業は退勤時刻から算出（${R.otStart}以降）` + (proj ? `・月末見込は締め日（15日）までの稼働日 ${ec.workElapsed}/${ec.workTotal}日から按分` : '')
-    + (remainDays ? `・残業可能/日＝${limit}hまでの残り時間÷残り稼働日${remainDays}日（黄＝今のペースだと超える）` : '');
+  if (sub) sub.innerHTML = (ec && ec.inProgress && ec.workTotal)
+    ? `今月期の稼働日 <b>${ec.workTotal}日中 ${ec.workElapsed}日経過</b>（締め日まで残り${remainDays}日）<br>`
+      + `月末見込＝今のペースで締め日まで続けた場合の残業　残業可能/日＝${limit}hに収めるための1日あたりの上限（黄＝今のペースだと超える）`
+    : `残業は退勤時刻から算出（${R.otStart}以降）`;
   // KPI: 前月期比
   const d = document.getElementById('ms-ot-diff');
   if (d && ctx.prev) {
