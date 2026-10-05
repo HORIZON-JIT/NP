@@ -5712,10 +5712,9 @@ function renderMgrSummary() {
   const axis = `<div class="dx-axis"><span style="left:${pc(warn)}%">${warn}h</span><span class="lim" style="left:${pc(limit)}%">${limit}h</span></div>`;
   tbl.innerHTML = rows.length ? `<div class="dx-scroll"><table class="dx-table">
     <thead><tr><th>担当</th><th class="num">通常</th><th class="num">残業</th>${proj ? '<th class="num">月末見込</th>' : ''}${remainDays ? `<th class="num" title="上限${limit}hに収めるため、残り${remainDays}稼働日で1日あたり何時間まで残業できるか">残業可能/日</th>` : ''}
-      <th class="num">前月期</th><th class="num">増減</th><th style="min-width:180px;" class="has-axis">残業${proj ? '（濃＝現在／斜線＝月末見込）' : ''}${axis}</th>
+      <th class="num">前月期</th><th style="min-width:180px;" class="has-axis">残業${proj ? '（濃＝現在／斜線＝月末見込）' : ''}${axis}</th>
       <th class="num">年度累計 / ${yLimit}h</th><th class="num">${limit}h超</th><th class="num">未入力</th>${showRatio ? '<th class="num">Folio比率</th>' : ''}</tr></thead>
     <tbody>${rows.map(r => {
-      const diff = r.pv ? r.c.ot - r.pv.ot : null;
       return `<tr><td class="name">${escHtml(r.a)}</td>
         <td class="num">${r.c.n.toFixed(1)}h</td>
         <td class="num">${otCell(r.c.ot, r.curLv)}</td>
@@ -5728,7 +5727,6 @@ function renderMgrSummary() {
           return `<td class="num ${per < pace ? 't-warn' : ''}" title="${escHtml(tip)}">${per.toFixed(2)}h<span class="t-muted">/日</span></td>`;
         })() : ''}
         <td class="num t-muted">${r.pv ? r.pv.ot.toFixed(1) + 'h' : '…'}</td>
-        <td class="num ${diff == null ? 't-muted' : diff > 0.05 ? 't-crit' : diff < -0.05 ? 't-ok' : 't-muted'}">${diff == null ? '…' : (diff > 0 ? '+' : '') + diff.toFixed(1) + 'h'}</td>
         <td>${meter(r.c.ot, r.pj)}</td>
         <td class="num">${r.fyOT == null ? '<span class="t-muted">…</span>' : `<span class="${r.fyOT >= yLimit ? 't-crit' : r.fyOT >= yLimit * 0.8 ? 't-warn' : ''}">${r.fyOT.toFixed(1)}h</span>`}</td>
         <td class="num">${r.over == null ? '<span class="t-muted">…</span>' : `<span class="${r.over >= maxOver ? 't-crit' : r.over >= maxOver - 2 ? 't-warn' : r.over ? '' : 't-muted'}">${r.over}回</span>`}</td>
