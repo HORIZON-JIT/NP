@@ -5649,6 +5649,8 @@ function renderMgrSummary() {
   const missing = (ec && ec.missing) || {};
   const ratio = (ec && ec.folioRatio) || null;
   const proj = (ec && ec.inProgress && ec.workElapsed > 0 && ec.workTotal > ec.workElapsed) ? ec.workTotal / ec.workElapsed : null;
+  // 残り稼働日（今日〜締め日）。上限に収めるための1日あたり残業可能時間の分母
+  const remainDays = (ec && ec.inProgress) ? Math.max(0, (ec.workTotal || 0) - (ec.workElapsed || 0)) : 0;
   // 期間内に一度も日報が無い担当は一覧から外し、アラート1件にまとめる（日報を使っていない人で埋まらないように）
   const allA = _entryAuthors(ec ? ec.leaveMap : {});
   const noEntry = allA.filter(a => !ctx.cur[a] && missing[a]);
@@ -5689,7 +5691,7 @@ function renderMgrSummary() {
       <span class="tk" style="left:${(warn / max * 100).toFixed(1)}%"></span><span class="tk lim" style="left:${(limit / max * 100).toFixed(1)}%"></span></div>`;
   };
   tbl.innerHTML = rows.length ? `<div class="dx-scroll"><table class="dx-table">
-    <thead><tr><th>担当</th><th class="num">通常</th><th class="num">残業</th>${proj ? '<th class="num">月末見込</th>' : ''}
+    <thead><tr><th>担当</th><th class="num">通常</th><th class="num">残業</th>${proj ? '<th class="num">月末見込</th>' : ''}${remainDays ? `<th class="num" title="上限${limit}hに収めるため、残り${remainDays}稼働日で1日あたり何時間まで残業できるか">残業可能/日</th>` : ''}
       <th class="num">前月期</th><th class="num">増減</th><th style="min-width:150px;">月${limit}hに対する残業${proj ? '（見込）' : ''}</th>
       <th class="num">年度累計 / ${yLimit}h</th><th class="num">${limit}h超</th><th class="num">未入力</th>${ratio ? '<th class="num">Folio比率</th>' : ''}</tr></thead>
     <tbody>${rows.map(r => {
@@ -5699,6 +5701,13 @@ function renderMgrSummary() {
         <td class="num">${r.c.n.toFixed(1)}h</td>
         <td class="num">${otCell(r.c.ot, r.curLv)}</td>
         ${proj ? `<td class="num">${otCell(r.pj, r.pjLv)}</td>` : ''}
+        ${remainDays ? (() => {
+          const left = limit - r.c.ot, per = left / remainDays;
+          const pace = ec.workElapsed > 0 ? r.c.ot / ec.workElapsed : 0;
+          if (left <= 0) return `<td class="num t-crit" title="すでに上限${limit}hを ${(-left).toFixed(1)}h 超えています">上限超過</td>`;
+          const tip = `残り${remainDays}稼働日で${limit}hまであと${left.toFixed(1)}h（現在のペース ${pace.toFixed(2)}h/日）`;
+          return `<td class="num ${per < pace ? 't-warn' : ''}" title="${escHtml(tip)}">${per.toFixed(2)}h<span class="t-muted">/日</span></td>`;
+        })() : ''}
         <td class="num t-muted">${r.pv ? r.pv.ot.toFixed(1) + 'h' : '…'}</td>
         <td class="num ${diff == null ? 't-muted' : diff > 0.05 ? 't-crit' : diff < -0.05 ? 't-ok' : 't-muted'}">${diff == null ? '…' : (diff > 0 ? '+' : '') + diff.toFixed(1) + 'h'}</td>
         <td>${meter(v)}</td>
@@ -5711,7 +5720,8 @@ function renderMgrSummary() {
     : '<p class="dx-empty">この期間のデータがありません</p>';
   dxGrow(tbl);
   const sub = document.getElementById('mgr-sub');
-  if (sub) sub.textContent = `残業は退勤時刻から算出（${R.otStart}以降）` + (proj ? `・月末見込は締め日（15日）までの稼働日 ${ec.workElapsed}/${ec.workTotal}日から按分` : '');
+  if (sub) sub.textContent = `残業は退勤時刻から算出（${R.otStart}以降）` + (proj ? `・月末見込は締め日（15日）までの稼働日 ${ec.workElapsed}/${ec.workTotal}日から按分` : '')
+    + (remainDays ? `・残業可能/日＝${limit}hまでの残り時間÷残り稼働日${remainDays}日（黄＝今のペースだと超える）` : '');
   // KPI: 前月期比
   const d = document.getElementById('ms-ot-diff');
   if (d && ctx.prev) {
