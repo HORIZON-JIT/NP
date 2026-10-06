@@ -1045,6 +1045,10 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .dx-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2;}
 .dx-confetti i{position:absolute;top:-12px;width:7px;height:11px;border-radius:2px;opacity:0;animation:dxConf var(--d,1.8s) cubic-bezier(.2,.6,.4,1) forwards;}
 @keyframes dxConf{0%{opacity:1;transform:translate(0,0) rotate(0);}100%{opacity:0;transform:translate(var(--dx,0),260px) rotate(var(--r,360deg));}}
+.dx-rank{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:800;line-height:1.6;vertical-align:1px;white-space:nowrap;font-style:normal;}
+.dx-rank.is-1{background:var(--st-ok);color:#fff;}
+.dx-rank.is-2,.dx-rank.is-3{background:var(--st-ok-bg);color:var(--st-ok-ink);}
+.dx-table td .dx-rank{float:none;}
 /* ── 効率化ハイライト ── */
 .dx-eff{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:24px;align-items:start;}
 .dx-eff-hero{padding:14px 16px;border-radius:12px;background:var(--dx-track);}
@@ -6018,6 +6022,10 @@ function renderMgrSummary() {
     if (ratio && ratio[a] != null && ratio[a] < 0.7 && c.n + c.ot > 16) alerts.push(['info', `${A} Folio登録率 ${Math.round(ratio[a] * 100)}%（登録漏れの可能性）`]);
     return {a, c, pv, pj, fyOT, over, curLv, pjLv};
   });
+  // 残業が少ない人を称える: 入力がある人を残業（期の途中は月末見込）の少ない順に並べ、上位3人にマーク（同じ値は同じ順位）
+  const basis = r => (r.pj != null ? r.pj : r.c.ot);
+  const ranked = rows.filter(r => r.c.n + r.c.ot > 0 && !r.curLv && !r.pjLv).sort((x, y) => basis(x) - basis(y));
+  ranked.forEach((r, i) => { const rk = i > 0 && basis(r) === basis(ranked[i - 1]) ? ranked[i - 1].rank : i + 1; if (rk <= 3) r.rank = rk; });
   const order = ['crit', 'warn', 'info'];
   alerts.sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0]));
   if (al) al.innerHTML = alerts.length
@@ -6044,7 +6052,7 @@ function renderMgrSummary() {
     <tbody>${rows.map(r => {
       return `<tr><td class="name">${escHtml(r.a)}</td>
         <td class="num">${r.c.n.toFixed(1)}h</td>
-        <td class="num">${otCell(r.c.ot, r.curLv)}</td>
+        <td class="num">${otCell(r.c.ot, r.curLv)}${r.rank ? `<span class="dx-rank is-${r.rank}" title="残業が少ない順 ${r.rank}位${proj ? '（月末見込で判定）' : ''}">${r.rank === 1 ? '◎ ' : ''}${r.rank}位</span>` : ''}</td>
         ${proj ? `<td class="num">${otCell(r.pj, r.pjLv)}</td>` : ''}
         ${remainDays ? (() => {
           const left = limit - r.c.ot, per = left / remainDays;
@@ -6060,7 +6068,7 @@ function renderMgrSummary() {
         <td class="num ${(missing[r.a] || 0) ? 't-crit' : 't-muted'}">${missing[r.a] ? missing[r.a] + '日' : '—'}</td>
         ${showRatio ? `<td class="num">${!ratio ? '<span class="t-muted">…</span>' : ratio[r.a] == null ? '—' : Math.round(ratio[r.a] * 100) + '%'}</td>` : ''}</tr>`;
     }).join('')}</tbody></table></div>
-    <div class="dx-legend"><span><i class="dx-sw" style="background:var(--st-ok)"></i>${warn}h未満</span><span><i class="dx-sw" style="background:var(--st-warn)"></i>警告 ${warn}h以上</span><span><i class="dx-sw" style="background:var(--st-crit)"></i>上限 ${limit}h超</span>${proj ? '<span><i class="dx-sw" style="background:repeating-linear-gradient(135deg,var(--dx-ink-3) 0 2px,transparent 2px 4px)"></i>月末見込までの伸び</span>' : ''}</div>`
+    <div class="dx-legend"><span><i class="dx-sw" style="background:var(--st-ok)"></i>${warn}h未満</span><span><i class="dx-sw" style="background:var(--st-warn)"></i>警告 ${warn}h以上</span><span><i class="dx-sw" style="background:var(--st-crit)"></i>上限 ${limit}h超</span><span><i class="dx-rank is-1" style="margin:0 6px 0 0">◎ 1位</i>残業が少ない順（${proj ? '月末見込で判定' : '今月期'}）</span>${proj ? '<span><i class="dx-sw" style="background:repeating-linear-gradient(135deg,var(--dx-ink-3) 0 2px,transparent 2px 4px)"></i>月末見込までの伸び</span>' : ''}</div>`
     : '<p class="dx-empty">この期間のデータがありません</p>';
   dxGrow(tbl, !!ctx._grown);   // 伸長アニメは最初の1回だけ
   ctx._grown = true;
