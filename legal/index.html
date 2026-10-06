@@ -1021,6 +1021,54 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .ti-new-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:6px;flex-wrap:wrap;}
 @media(max-width:560px){.ti-new-row{grid-template-columns:1fr;}}
 @media (prefers-reduced-motion:reduce){.ti-new,.ti-new-row{animation:none!important;}}
+
+/* ── チーム目標 ── */
+.dx-goal-card{position:relative;overflow:hidden;}
+.dx-goals{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;}
+.dx-goal{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:12px;background:var(--dx-track);transition:background .3s;}
+.dx-goal.is-ok{background:var(--st-ok-bg);}
+.dx-goal .ring{position:relative;width:64px;height:64px;flex:none;}
+.dx-goal .ring svg{width:64px;height:64px;transform:rotate(-90deg);}
+.dx-goal .ring circle{fill:none;stroke-width:8;}
+.dx-goal .ring .trk{stroke:color-mix(in srgb,var(--dx-ink-3) 22%,transparent);}
+.dx-goal .ring .bar{stroke:var(--dx-accent);stroke-linecap:round;transition:stroke-dashoffset 1s cubic-bezier(.2,.7,.2,1);}
+.dx-goal.is-ok .ring .bar{stroke:var(--st-ok);}
+.dx-goal .ring .pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--dx-ink-1);font-variant-numeric:tabular-nums;}
+.dx-goal.is-ok .ring .pct{font-size:20px;color:var(--st-ok-ink);}
+.dx-goal .nm{font-size:12px;font-weight:700;color:var(--dx-ink-2);margin-bottom:2px;}
+.dx-goal .vl{font-size:13px;color:var(--dx-ink-1);}
+.dx-goal .vl b{font-size:20px;font-weight:800;letter-spacing:-.02em;}
+.dx-goal .gl{font-size:12px;font-weight:700;color:var(--dx-ink-2);margin-top:2px;}
+.dx-goal .gl.t-ok{color:var(--st-ok-ink);}
+.dx-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2;}
+.dx-confetti i{position:absolute;top:-12px;width:7px;height:11px;border-radius:2px;opacity:0;animation:dxConf var(--d,1.8s) cubic-bezier(.2,.6,.4,1) forwards;}
+@keyframes dxConf{0%{opacity:1;transform:translate(0,0) rotate(0);}100%{opacity:0;transform:translate(var(--dx,0),260px) rotate(var(--r,360deg));}}
+/* ── 効率化ハイライト ── */
+.dx-eff{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:24px;align-items:start;}
+.dx-eff-hero{padding:14px 16px;border-radius:12px;background:var(--dx-track);}
+.dx-eff-hero.is-good{background:var(--st-ok-bg);}
+.dx-eff-hero .lbl{font-size:12px;font-weight:700;color:var(--dx-ink-2);}
+.dx-eff-hero .big{display:flex;align-items:baseline;gap:4px;margin:4px 0 6px;color:var(--dx-ink-1);}
+.dx-eff-hero.is-good .big{color:var(--st-ok-ink);}
+.dx-eff-hero .big .dx-eff-num{font-size:38px;font-weight:800;letter-spacing:-.03em;line-height:1;}
+.dx-eff-hero .big .u{font-size:18px;font-weight:700;}
+.dx-eff-hero .big .tag{margin-left:6px;font-size:13px;font-weight:800;padding:2px 9px;border-radius:999px;background:var(--surface);}
+.dx-eff-hero .sub{font-size:12px;color:var(--dx-ink-2);margin-top:3px;}
+.dx-eff-hd{font-size:12px;font-weight:700;color:var(--dx-ink-2);margin-bottom:10px;}
+.dx-eff .dx-hbar{grid-template-columns:minmax(0,170px) minmax(0,1fr) auto;}
+.dx-eff .dx-hbar .vv{color:var(--st-ok-ink);}
+/* 管理: 目標設定 */
+.dx-goal-admin{display:flex;flex-direction:column;gap:8px;margin-bottom:6px;}
+.dx-goal-adm{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--g800);}
+.dx-goal-adm .nm{min-width:220px;font-weight:700;}
+.dx-goal-adm input[type=number]{width:84px;height:32px;border:1.5px solid var(--g200);border-radius:7px;padding:0 8px;background:var(--panel);color:var(--g800);font:inherit;}
+.dx-goal-adm .u{color:var(--g500);}
+@media(max-width:768px){.dx-eff{grid-template-columns:1fr;gap:14px;}.dx-eff .dx-hbar{grid-template-columns:minmax(0,110px) minmax(0,1fr) auto;}.dx-eff .dx-hbar .vv small{display:block;margin-left:0;font-size:10px;text-align:right;}.dx-goal-adm .nm{min-width:0;flex:1;}}
+@media (prefers-reduced-motion:reduce){.dx-confetti{display:none;}.dx-goal .ring .bar{transition:none;}}
+@media print{.dx-confetti{display:none!important;}.dx-goal,.dx-eff-hero{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .dx-goals{grid-template-columns:repeat(3,1fr)!important;gap:6px!important;}.dx-goal{padding:6px 8px!important;}
+  .dx-goal .ring,.dx-goal .ring svg{width:44px!important;height:44px!important;}.dx-goal .vl b{font-size:14px!important;}
+  .dx-eff-hero .big .dx-eff-num{font-size:24px!important;}}
 </style>
 </head>
 <body>
@@ -1256,6 +1304,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <button class="btn-refresh no-print" onclick="refreshMonthly()">再読込</button>
       <button class="btn-pdf no-print" onclick="exportPdf('monthly')">PDF出力</button>
     </div>
+    <!-- チーム目標の達成度 -->
+    <div class="card dx-goal-card" id="goal-card" style="display:none;">
+      <div class="card-hd"><h2>チーム目標</h2><span class="card-sub" id="goal-sub">今月期の達成度</span></div>
+      <div class="card-body"><div class="dx-goals" id="team-goals"></div></div>
+    </div>
     <!-- 統計カード（5枚） -->
     <div class="dash-stats">
       <div class="d-stat"><div class="sv"    id="ms-persons">—</div><div class="sl">記録者数</div></div>
@@ -1263,6 +1316,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <div class="d-stat"><div class="sv ot" id="ms-ot">—</div><div class="sl">残業時間計</div><div class="sd" id="ms-ot-diff"></div></div>
       <div class="d-stat"><div class="sv avg" id="ms-ot-avg-person">—</div><div class="sl">残業平均/人</div></div>
       <div class="d-stat"><div class="sv"    id="ms-days">—</div><div class="sl">集計日数</div></div>
+    </div>
+    <!-- 効率化ハイライト（前月期比・日報ベース） -->
+    <div class="card" id="eff-card">
+      <div class="card-hd"><h2>効率化ハイライト</h2><span class="card-sub" id="eff-sub">1稼働日あたりの作業時間を前月期と比較</span></div>
+      <div class="card-body"><div id="eff-body"><p class="dx-empty">前月期のデータを読み込み中…</p></div></div>
     </div>
     <!-- 管理者サマリー（アラート＋担当別 残業・稼働一覧） -->
     <div class="card" style="margin-bottom:14px;">
@@ -1475,6 +1533,13 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     </section>
   </div>
 
+  <section class="admin-card" style="margin-top:14px;">
+    <h2>チーム目標</h2>
+    <div class="admin-note" style="margin-bottom:10px;">ダッシュボード（月次）の「チーム目標」に表示する目標です。変更すると即保存されます。</div>
+    <div id="admin-goals" class="dx-goal-admin"></div>
+    <span class="admin-status" id="admin-goals-status"></span>
+  </section>
+
 </div>
 
 </div><!-- /.container -->
@@ -1685,6 +1750,12 @@ const DEPARTMENT_CONFIG = (function(){
     // タスク管理アプリ(タスク実績シート)の読取用GAS WebアプリURL。空なら「Folioから取込」ボタンを出さない。
     // GASのコードはリポジトリの gas/task-sheet-reader.gs。
     taskSheetGasUrl: '',
+    // チーム目標（ダッシュボード月次の達成度リング）。管理タブで変更→Firebaseマスタ(goals)に保存
+    goals: {
+      otAvg:     { on: true, target: 20  },   // 残業 平均/人(h) 以下
+      entryRate: { on: true, target: 100 },   // 日報入力率(%) 以上
+      saved:     { on: true, target: 10  }    // 効率化で浮いた時間(h) 以上
+    },
     // タスクID(タスク管理アプリ) → 日報の中分類CD の既定対応表。
     // 「管理」タブで編集するとFirebaseマスタ(taskMap)に保存され、以後はそちらが優先。
     taskMap: {
@@ -1862,6 +1933,19 @@ let _ALL_SUBS = [];
 
 // ── タスク対応表（タスク管理アプリのタスクID → 日報の中分類CD）──
 // 既定値は DEPARTMENT_CONFIG.taskMap。Firebaseマスタ(taskMap)があればそちらを優先。
+// ── チーム目標 ──
+const GOALS_STORAGE_KEY = LS_NS + '__goals__';
+function _normGoals(g) {
+  const d = DEPARTMENT_CONFIG.goals || {}, out = {};
+  Object.keys(d).forEach(k => {
+    const v = (g && g[k]) || {};
+    out[k] = {on: v.on != null ? !!v.on : !!d[k].on, target: Number.isFinite(Number(v.target)) && v.target !== '' ? Number(v.target) : d[k].target};
+  });
+  return out;
+}
+let GOALS = (() => { try { return _normGoals(JSON.parse(localStorage.getItem(GOALS_STORAGE_KEY) || 'null')); } catch(e) { return _normGoals(null); } })();
+function applyGoals(g) { GOALS = _normGoals(g); try { localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(GOALS)); } catch(e) {} }
+
 const TASK_MAP_STORAGE_KEY = LS_NS + '__taskMap__';
 function normalizeTaskMap(map) {
   const out = {};
@@ -1935,7 +2019,7 @@ async function saveMasterCatsToFirebase(cats) {
     updatedBy: firebaseUser ? firebaseUser.email : ''
   }, {merge:true});
   // taskMap はmerge:trueだと削除したキーが残るため、update でフィールドごと置き換える
-  await fdb.collection(MASTER_DOC_COLLECTION).doc(MASTER_DOC_ID).update({taskMap: TASK_MAP});
+  await fdb.collection(MASTER_DOC_COLLECTION).doc(MASTER_DOC_ID).update({taskMap: TASK_MAP, goals: GOALS});
   return true;
 }
 
@@ -1985,6 +2069,7 @@ async function loadMasterFromFirebase(force = false) {
     const data = snap.data() || {};
     const cats = Array.isArray(data.cats) ? data.cats : [];
     if (cats.length) applyMasterCats(cats);
+    if (data.goals && typeof data.goals === 'object') { applyGoals(data.goals); renderAdminGoals(); }
     if (data.taskMap && typeof data.taskMap === 'object' && Object.keys(data.taskMap).length) {
       applyTaskMap(data.taskMap);
     }
@@ -2010,6 +2095,7 @@ async function writeMasterSub(mainCd, sub) {
 }
 
 function renderAdminMasters() {
+  renderAdminGoals();
   const catList = document.getElementById('admin-cat-list');
   const subList = document.getElementById('admin-sub-list');
   const subCat = document.getElementById('admin-sub-cat');
@@ -5627,6 +5713,199 @@ function renderFolioCompare() {
   dxGrow(el);
 }
 
+
+// ═══════════════════════════════════════════
+//  効率化ハイライト（前月期比・日報ベース）／ チーム目標
+// ═══════════════════════════════════════════
+// 期データから: 稼働日（入力のある平日）、人日、中分類ごとの作業時間（退勤時刻ベースで補正）
+function _effStats(d) {
+  const lm = (d && d._leaveMap) || {};
+  const days = new Set();
+  let personDays = 0;
+  Object.keys(lm).forEach(a => {
+    if (a === 'ヘルプ') return;
+    Object.keys(lm[a] || {}).forEach(dt => {
+      const dow = new Date(dt + 'T00:00:00').getDay();
+      if (dow === 0 || dow === 6) return;
+      days.add(dt); personDays++;
+    });
+  });
+  const all = _otByAuthor(d), bySub = {};
+  let total = 0;
+  // 通常＋残業の実働（退勤時刻ベース）を、作業ログの中分類比率で按分
+  Object.keys(all).forEach(a => {
+    const rows = _scaledRows(d, a, all[a].n + all[a].ot);
+    const logT = rows.reduce((t, r) => t + (r.hoursNormal || 0) + (r.hoursOT || 0), 0);
+    const k = logT > 0 ? (all[a].n + all[a].ot) / logT : 0;
+    rows.forEach(r => {
+      const h = ((r.hoursNormal || 0) + (r.hoursOT || 0)) * k;
+      bySub[r.cdSub] = (bySub[r.cdSub] || 0) + h; total += h;
+    });
+  });
+  return {days: days.size, personDays, bySub, total};
+}
+
+function _effCompute() {
+  const ctx = _mgrCtx;
+  if (!ctx || !ctx.curRaw || !ctx.prevRaw) return null;
+  const cur = _effStats(ctx.curRaw), prev = _effStats(ctx.prevRaw);
+  if (!cur.days || !prev.days) return {empty: true, cur, prev};
+  const subs = new Set([...Object.keys(cur.bySub), ...Object.keys(prev.bySub)]);
+  const items = [...subs].map(cd => {
+    const p = (prev.bySub[cd] || 0) / prev.days, c = (cur.bySub[cd] || 0) / cur.days;
+    return {cd, p, c, saved: (p - c) * cur.days, pct: p > 0 ? (c - p) / p : null};
+  });
+  const saved = (prev.total / prev.days - cur.total / cur.days) * cur.days;
+  const ppdPrev = prev.personDays ? prev.total / prev.personDays : 0, ppdCur = cur.personDays ? cur.total / cur.personDays : 0;
+  return {cur, prev, items, saved, ppdPrev, ppdCur};
+}
+
+function renderEfficiency() {
+  const el = document.getElementById('eff-body'), ctx = _mgrCtx;
+  if (!el || !ctx) return;
+  if (!ctx.prevRaw) { el.innerHTML = '<p class="dx-empty">前月期のデータを読み込み中…</p>'; return; }
+  const e = _effCompute();
+  ctx.eff = e;
+  if (!e || e.empty) { el.innerHTML = '<p class="dx-empty">比較できる前月期・今月期のデータがありません</p>'; renderGoals(); return; }
+  const good = e.saved > 0.05;
+  const top = e.items.filter(x => x.saved > 0.05 && x.p > 0).sort((a, b) => b.saved - a.saved).slice(0, 5);
+  const upCount = e.items.filter(x => x.saved < -0.05).length;
+  const maxS = Math.max(0.01, ...top.map(x => x.saved));
+  const dPpd = e.ppdCur - e.ppdPrev;
+  el.innerHTML = `<div class="dx-eff">
+    <div class="dx-eff-hero ${good ? 'is-good' : ''}">
+      <div class="lbl">${good ? '前月期のペースと比べて' : '前月期のペースと比べて'}</div>
+      <div class="big"><span class="dx-eff-num" data-v="${Math.abs(e.saved).toFixed(1)}">${Math.abs(e.saved).toFixed(1)}</span><span class="u">h</span><span class="tag">${good ? '削減' : '増加'}</span></div>
+      <div class="sub">1人1日あたり <b>${e.ppdPrev.toFixed(2)}h → ${e.ppdCur.toFixed(2)}h</b>
+        <span class="${dPpd < -0.005 ? 't-ok' : dPpd > 0.005 ? 't-warn' : 't-muted'}">（${dPpd > 0 ? '+' : ''}${dPpd.toFixed(2)}h）</span></div>
+      <div class="sub t-muted">稼働日 前月期 ${e.prev.days}日／今月期 ${e.cur.days}日で比較</div>
+    </div>
+    <div class="dx-eff-list">
+      <div class="dx-eff-hd">時間を減らせた作業 ${top.length ? `TOP${top.length}` : ''}</div>
+      ${top.length ? `<div class="dx-hbars">${top.map((x, i) => {
+        const sb = SUB_MAP[x.cd] || {}, color = CAT_COLOR[sb.mainCd] || '#8C8377';
+        return `<div class="dx-hbar"><span class="lb" title="${escHtml(x.cd)}"><i class="dx-sw" style="background:${color}"></i>${escHtml(sb.label || x.cd)}</span>
+          <div class="tr"><i style="background:var(--st-ok)" data-w="${(x.saved / maxS * 100).toFixed(1)}"></i></div>
+          <span class="vv">−${x.saved.toFixed(1)}h<small>1日 ${x.p.toFixed(2)}→${x.c.toFixed(2)}h${x.pct != null ? `（${Math.round(x.pct * 100)}%）` : ''}</small></span></div>`;
+      }).join('')}</div>` : '<p class="dx-empty" style="padding:12px 0">今月期はまだ前月期より減った作業がありません</p>'}
+      <p class="dx-note">${upCount ? `時間が増えた作業 ${upCount}件。` : ''}業務量の増減も含みます（同じ作業に1稼働日あたり何時間かけたかの比較）。</p>
+    </div>
+  </div>`;
+  const first = !ctx._effGrown; ctx._effGrown = true;
+  dxGrow(el, !first);
+  const num = el.querySelector('.dx-eff-num');
+  if (num && first && !_dxReduce()) {
+    const target = parseFloat(num.dataset.v), t0 = performance.now();
+    const st = now => { const k = Math.min(1, (now - t0) / 700), v = target * (1 - Math.pow(1 - k, 3)); num.textContent = v.toFixed(1); if (k < 1 && num.isConnected) requestAnimationFrame(st); };
+    requestAnimationFrame(st);
+  }
+  const sub = document.getElementById('eff-sub');
+  if (sub) sub.textContent = '1稼働日あたりの作業時間（チーム合計）を前月期と比較';
+  renderGoals();
+}
+
+// ── チーム目標 ──
+const _goalCelebrated = new Set();
+function _goalValues() {
+  const ctx = _mgrCtx, ec = _entryCtx;
+  if (!ctx || !ec) return null;
+  const R = DEPARTMENT_CONFIG.rules;
+  const proj = (ec.inProgress && ec.workElapsed > 0 && ec.workTotal > ec.workElapsed) ? ec.workTotal / ec.workElapsed : 1;
+  const people = Object.keys(ctx.cur || {}).filter(a => Object.keys((ec.leaveMap || {})[a] || {}).length);
+  const otAvg = people.length ? people.reduce((t, a) => t + ctx.cur[a].ot * proj, 0) / people.length : null;
+  let filled = 0, miss = 0;
+  people.forEach(a => { filled += Object.keys(ec.leaveMap[a] || {}).length; miss += (ec.missing || {})[a] || 0; });
+  const entryRate = (filled + miss) ? filled / (filled + miss) * 100 : null;
+  const saved = ctx.eff && !ctx.eff.empty ? ctx.eff.saved : null;
+  // 前月期の読込が済んでも比較できない（データなし）場合は「集計中」ではなく対象外
+  const na = {saved: !!ctx.prevRaw && saved == null};
+  return {otAvg, entryRate, saved, na, projected: proj !== 1};
+}
+
+function renderGoals() {
+  const card = document.getElementById('goal-card'), el = document.getElementById('team-goals');
+  if (!card || !el) return;
+  const G = GOALS, v = _goalValues();
+  const defs = [
+    {k: 'otAvg', name: '残業 平均/人', unit: 'h', dir: 'le', fmt: x => x.toFixed(1), note: v && v.projected ? '月末見込で判定' : ''},
+    {k: 'entryRate', name: '日報 入力率', unit: '%', dir: 'ge', fmt: x => x.toFixed(0)},
+    {k: 'saved', name: '効率化で浮いた時間', unit: 'h', dir: 'ge', fmt: x => x.toFixed(1), note: '前月期のペース比'}
+  ].filter(d => G[d.k] && G[d.k].on);
+  if (!defs.length || !v) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const C = 2 * Math.PI * 34;
+  let achievedAll = 0, pending = false;
+  el.innerHTML = defs.map(d => {
+    const val = v[d.k], tgt = G[d.k].target;
+    if (val == null && v.na[d.k]) return `<div class="dx-goal is-pending"><div class="ring"><svg viewBox="0 0 80 80"><circle class="trk" cx="40" cy="40" r="34"/></svg><span class="pct">—</span></div>
+      <div class="txt"><div class="nm">${d.name}</div><div class="vl t-muted">前月期のデータがないため判定できません</div><div class="gl">目標 ${d.fmt(tgt)}${d.unit}${d.dir === 'le' ? '以下' : '以上'}</div></div></div>`;
+    if (val == null) { pending = true; return `<div class="dx-goal is-pending"><div class="ring"><svg viewBox="0 0 80 80"><circle class="trk" cx="40" cy="40" r="34"/></svg><span class="pct">…</span></div>
+      <div class="txt"><div class="nm">${d.name}</div><div class="vl t-muted">集計中…</div><div class="gl">目標 ${d.fmt(tgt)}${d.unit}${d.dir === 'le' ? '以下' : '以上'}</div></div></div>`; }
+    const ok = d.dir === 'le' ? val <= tgt : val >= tgt;
+    const frac = d.dir === 'le' ? (val <= 0 ? 1 : Math.min(1, tgt / val)) : (tgt <= 0 ? 1 : Math.max(0, Math.min(1, val / tgt)));
+    const pct = Math.round(frac * 100);
+    const remain = d.dir === 'le' ? `あと ${d.fmt(val - tgt)}${d.unit} 減らせば達成` : `あと ${d.fmt(tgt - val)}${d.unit} で達成`;
+    if (ok) achievedAll++;
+    return `<div class="dx-goal ${ok ? 'is-ok' : ''}">
+      <div class="ring"><svg viewBox="0 0 80 80"><circle class="trk" cx="40" cy="40" r="34"/>
+        <circle class="bar" cx="40" cy="40" r="34" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${C.toFixed(1)}" data-off="${(C * (1 - frac)).toFixed(1)}"/></svg>
+        <span class="pct">${ok ? '✓' : pct + '%'}</span></div>
+      <div class="txt"><div class="nm">${d.name}</div>
+        <div class="vl"><b>${d.fmt(Math.max(0, val))}</b>${d.unit} <span class="t-muted">／ 目標 ${d.fmt(tgt)}${d.unit}${d.dir === 'le' ? '以下' : '以上'}</span></div>
+        <div class="gl ${ok ? 't-ok' : ''}">${ok ? '達成！' : remain}${d.note ? `<span class="t-muted">・${d.note}</span>` : ''}</div></div></div>`;
+  }).join('');
+  const sub = document.getElementById('goal-sub');
+  if (sub) sub.innerHTML = `今月期の達成度　<b class="${achievedAll === defs.length ? 't-ok' : ''}">${achievedAll}/${defs.length} 達成</b>`;
+  // リング: 初回だけ伸ばす
+  const bars = el.querySelectorAll('.bar');
+  const apply = () => bars.forEach(b => b.setAttribute('stroke-dashoffset', b.dataset.off));
+  if (card._grown || _dxReduce()) { bars.forEach(b => b.style.transition = 'none'); apply(); }
+  else requestAnimationFrame(() => requestAnimationFrame(apply));
+  card._grown = true;
+  // 紙吹雪: 全目標の集計がそろってから、期ごとにセッションで1回だけ
+  if (!pending && achievedAll && !_goalCelebrated.has(_mgrCtx.key)) {
+    _goalCelebrated.add(_mgrCtx.key);
+    if (!_dxReduce()) _confetti(card);
+  }
+}
+
+function _confetti(host) {
+  const box = document.createElement('div');
+  box.className = 'dx-confetti';
+  const cols = ['var(--st-ok)', 'var(--dx-accent)', 'var(--st-info)', 'var(--st-warn)', 'var(--dx-s2)'];
+  box.innerHTML = Array.from({length: 46}, (_, i) =>
+    `<i style="left:${Math.random() * 100}%;background:${cols[i % cols.length]};animation-delay:${(Math.random() * .35).toFixed(2)}s;--dx:${(Math.random() * 120 - 60).toFixed(0)}px;--r:${(Math.random() * 720 - 360).toFixed(0)}deg;--d:${(1.4 + Math.random() * .9).toFixed(2)}s"></i>`).join('');
+  host.appendChild(box);
+  setTimeout(() => box.remove(), 2800);
+}
+
+// 管理タブ: チーム目標の設定
+function renderAdminGoals() {
+  const el = document.getElementById('admin-goals');
+  if (!el) return;
+  const rows = [
+    {k: 'otAvg', name: '残業 平均/人', unit: 'h 以下', step: 0.5},
+    {k: 'entryRate', name: '日報 入力率', unit: '% 以上', step: 1},
+    {k: 'saved', name: '効率化で浮いた時間（前月期比）', unit: 'h 以上', step: 0.5}
+  ];
+  el.innerHTML = rows.map(r => `<label class="dx-goal-adm">
+      <input type="checkbox" ${GOALS[r.k].on ? 'checked' : ''} onchange="setGoal('${r.k}','on',this.checked)">
+      <span class="nm">${r.name}</span>
+      <input type="number" step="${r.step}" min="0" value="${GOALS[r.k].target}" onchange="setGoal('${r.k}','target',this.value)">
+      <span class="u">${r.unit}</span></label>`).join('');
+}
+async function setGoal(k, field, val) {
+  const g = JSON.parse(JSON.stringify(GOALS));
+  g[k][field] = field === 'on' ? !!val : Number(val);
+  applyGoals(g);
+  renderGoals();
+  const st = document.getElementById('admin-goals-status');
+  try {
+    if (firebaseConfigured()) await seedMasterToFirebase();
+    if (st) { st.textContent = '保存しました'; setTimeout(() => { st.textContent = ''; }, 1800); }
+  } catch(e) { if (st) st.textContent = '保存に失敗しました: ' + e.message; }
+}
+
 // ── 管理者サマリー（月次）──
 let _mgrCtx = null;
 
@@ -5659,7 +5938,9 @@ async function loadMgrExtras(ctx) {
     const prev = await load(prevP);
     if (_mgrCtx !== ctx) return;
     ctx.prev = _otByAuthor(prev);
+    ctx.prevRaw = prev || {};
     renderMgrSummary();
+    renderEfficiency();
     // 年度の期初〜当期（当期は表示中のデータを使う）
     const before = fyIdx > 0 ? await mapPool(fyPeriods.slice(0, fyIdx), 4, load) : [];
     if (_mgrCtx !== ctx) return;
@@ -5754,6 +6035,7 @@ function renderMgrSummary() {
     : '<p class="dx-empty">この期間のデータがありません</p>';
   dxGrow(tbl, !!ctx._grown);   // 伸長アニメは最初の1回だけ
   ctx._grown = true;
+  renderGoals();
   const sub = document.getElementById('mgr-sub');
   if (sub) sub.innerHTML = (ec && ec.inProgress && ec.workTotal)
     ? `今月期の稼働日 <b>${ec.workTotal}日中 ${ec.workElapsed}日経過</b>（締め日まで残り${remainDays}日）<br>`
@@ -6244,7 +6526,8 @@ async function renderMonthlyDash(silent) {
     // 日報 入力状況 ＋ Folio 予実（Folioは非同期で後から差し込む）
     _entryCtx = {key: renderKey, leaveMap, startDate, endDate, folio: null, folioErr: null};
     _mgrCtx = {key: renderKey, startDate, endDate, period: {...currentPeriod},
-               cur: _otByAuthor(byAuthor), prev: null, fy: null, fyPeriods: null, fyIdx: -1};
+               cur: _otByAuthor(byAuthor), curRaw: byAuthor, prev: null, prevRaw: null, fy: null, fyPeriods: null, fyIdx: -1};
+    renderEfficiency();
     renderEntryMatrix();
     renderFolioCompare();
     loadFolioRangeInto(_entryCtx);
