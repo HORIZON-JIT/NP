@@ -6022,10 +6022,13 @@ function renderMgrSummary() {
     if (ratio && ratio[a] != null && ratio[a] < 0.7 && c.n + c.ot > 16) alerts.push(['info', `${A} Folio登録率 ${Math.round(ratio[a] * 100)}%（登録漏れの可能性）`]);
     return {a, c, pv, pj, fyOT, over, curLv, pjLv};
   });
-  // 残業が少ない人を称える: 入力がある人を残業（期の途中は月末見込）の少ない順に並べ、上位3人にマーク（同じ値は同じ順位）
+  // チーム平均を下げてくれているメンバーに感謝: 残業（期の途中は月末見込）がチーム平均より少ない人にマーク
+  // 入力が半分以下しかない人は、残業が少なく見えるだけなので対象外
   const basis = r => (r.pj != null ? r.pj : r.c.ot);
-  const ranked = rows.filter(r => r.c.n + r.c.ot > 0 && !r.curLv && !r.pjLv).sort((x, y) => basis(x) - basis(y));
-  ranked.forEach((r, i) => { const rk = i > 0 && basis(r) === basis(ranked[i - 1]) ? ranked[i - 1].rank : i + 1; if (rk <= 3) r.rank = rk; });
+  const active = rows.filter(r => r.c.n + r.c.ot > 0);
+  const teamAvg = active.length ? active.reduce((t, r) => t + basis(r), 0) / active.length : 0;
+  const elapsed = (ec && ec.workElapsed) || 0;
+  active.forEach(r => { if (basis(r) < teamAvg - 0.05 && (missing[r.a] || 0) <= elapsed / 2) r.thanks = true; });
   const order = ['crit', 'warn', 'info'];
   alerts.sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0]));
   if (al) al.innerHTML = alerts.length
@@ -6052,7 +6055,7 @@ function renderMgrSummary() {
     <tbody>${rows.map(r => {
       return `<tr><td class="name">${escHtml(r.a)}</td>
         <td class="num">${r.c.n.toFixed(1)}h</td>
-        <td class="num">${otCell(r.c.ot, r.curLv)}${r.rank ? `<span class="dx-rank is-${r.rank}" title="残業が少ない順 ${r.rank}位${proj ? '（月末見込で判定）' : ''}">${r.rank === 1 ? '◎ ' : ''}${r.rank}位</span>` : ''}</td>
+        <td class="num">${otCell(r.c.ot, r.curLv)}${r.thanks ? `<span class="dx-rank is-1" title="残業${proj ? '（月末見込）' : ''} ${basis(r).toFixed(1)}h はチーム平均 ${teamAvg.toFixed(1)}h より少なく、平均を下げてくれています">ありがとう</span>` : ''}</td>
         ${proj ? `<td class="num">${otCell(r.pj, r.pjLv)}</td>` : ''}
         ${remainDays ? (() => {
           const left = limit - r.c.ot, per = left / remainDays;
@@ -6068,7 +6071,7 @@ function renderMgrSummary() {
         <td class="num ${(missing[r.a] || 0) ? 't-crit' : 't-muted'}">${missing[r.a] ? missing[r.a] + '日' : '—'}</td>
         ${showRatio ? `<td class="num">${!ratio ? '<span class="t-muted">…</span>' : ratio[r.a] == null ? '—' : Math.round(ratio[r.a] * 100) + '%'}</td>` : ''}</tr>`;
     }).join('')}</tbody></table></div>
-    <div class="dx-legend"><span><i class="dx-sw" style="background:var(--st-ok)"></i>${warn}h未満</span><span><i class="dx-sw" style="background:var(--st-warn)"></i>警告 ${warn}h以上</span><span><i class="dx-sw" style="background:var(--st-crit)"></i>上限 ${limit}h超</span><span><i class="dx-rank is-1" style="margin:0 6px 0 0">◎ 1位</i>残業が少ない順（${proj ? '月末見込で判定' : '今月期'}）</span>${proj ? '<span><i class="dx-sw" style="background:repeating-linear-gradient(135deg,var(--dx-ink-3) 0 2px,transparent 2px 4px)"></i>月末見込までの伸び</span>' : ''}</div>`
+    <div class="dx-legend"><span><i class="dx-sw" style="background:var(--st-ok)"></i>${warn}h未満</span><span><i class="dx-sw" style="background:var(--st-warn)"></i>警告 ${warn}h以上</span><span><i class="dx-sw" style="background:var(--st-crit)"></i>上限 ${limit}h超</span><span><i class="dx-rank is-1" style="margin:0 6px 0 0">ありがとう</i>残業がチーム平均（${proj ? '月末見込 ' : ''}${teamAvg.toFixed(1)}h）より少なく、平均を下げてくれているメンバー</span>${proj ? '<span><i class="dx-sw" style="background:repeating-linear-gradient(135deg,var(--dx-ink-3) 0 2px,transparent 2px 4px)"></i>月末見込までの伸び</span>' : ''}</div>`
     : '<p class="dx-empty">この期間のデータがありません</p>';
   dxGrow(tbl, !!ctx._grown);   // 伸長アニメは最初の1回だけ
   ctx._grown = true;
