@@ -110,6 +110,33 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
 /* ── 操作欄を「本日の内訳」カード上部へ移設した際の縦積みスタイル ── */
 .input-live-pie .submit-footer{width:100%;flex-direction:column;align-items:stretch;padding:0;margin:0;gap:14px;justify-content:flex-start;}
 .input-live-pie .leave-row{border-top:none;background:transparent;padding:0;flex-wrap:wrap;}
+/* ── 入力演出 ── */
+#entry-tbody tr.hit td{animation:rowHit .55s ease-out;}
+@keyframes rowHit{0%{background:color-mix(in srgb,var(--cat-color,#6b7280) 28%,var(--surface));}100%{background:transparent;}}
+#entry-tbody tr.hit td.td-main{animation:none;}
+.td-name{position:relative;overflow:hidden;}
+.td-ripple{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:color-mix(in srgb,var(--cat-color,#6b7280) 45%,transparent);pointer-events:none;animation:tdRipple .6s ease-out forwards;}
+@keyframes tdRipple{to{transform:scale(28);opacity:0;}}
+.hours-wrap{position:relative;}
+.hours-wrap input.bump{animation:cellBump .42s cubic-bezier(.2,1.4,.4,1);}
+.hours-wrap input.bump-ot{animation:cellBumpOT .42s cubic-bezier(.2,1.4,.4,1);}
+@keyframes cellBump{0%{transform:scale(1);box-shadow:0 0 0 0 color-mix(in srgb,var(--primary) 45%,transparent);}40%{transform:scale(1.14);}100%{transform:scale(1);box-shadow:0 0 0 10px transparent;}}
+@keyframes cellBumpOT{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(244,63,94,.5);}40%{transform:scale(1.14);}100%{transform:scale(1);box-shadow:0 0 0 10px transparent;}}
+.add-chip{position:absolute;left:50%;top:-4px;transform:translate(-50%,0);font-size:11px;font-weight:800;color:var(--primary-dk);background:var(--surface);border:1px solid var(--primary);border-radius:999px;padding:1px 7px;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.12);animation:addChip .8s cubic-bezier(.2,.8,.2,1) forwards;}
+.add-chip.ot{color:#be123c;border-color:#f43f5e;}
+@keyframes addChip{0%{opacity:0;transform:translate(-50%,6px) scale(.8);}20%{opacity:1;transform:translate(-50%,-6px) scale(1.05);}70%{opacity:1;}100%{opacity:0;transform:translate(-50%,-26px) scale(1);}}
+.num-pop{animation:numPop .42s cubic-bezier(.2,1.4,.4,1);display:inline-block;}
+@keyframes numPop{0%{transform:scale(1);}35%{transform:scale(1.12);}100%{transform:scale(1);}}
+.st-bar-fill{transition:width .6s cubic-bezier(.2,1.1,.3,1);}
+.btn-submit.saved{background:var(--success,#059669)!important;color:#fff!important;animation:none;}
+.btn-submit.saved .sv-check path{stroke-dasharray:30;stroke-dashoffset:30;animation:svCheck .45s .05s ease-out forwards;}
+@keyframes svCheck{to{stroke-dashoffset:0;}}
+.input-live-pie{position:sticky;overflow:hidden;}
+.input-live-pie.saved-flash::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.55) 50%,transparent 70%);background-size:250% 100%;animation:savedSweep 1.1s ease-out forwards;}
+[data-theme="dark"] .input-live-pie.saved-flash::after{background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.14) 50%,transparent 70%);background-size:250% 100%;}
+@keyframes savedSweep{from{background-position:120% 0;}to{background-position:-30% 0;}}
+.input-live-pie.saved-flash .live-pie-canvas{animation:numPop .6s cubic-bezier(.2,1.4,.4,1);}
+@media (prefers-reduced-motion:reduce){#entry-tbody tr.hit td,.td-ripple,.add-chip,.num-pop,.hours-wrap input.bump,.hours-wrap input.bump-ot,.input-live-pie.saved-flash::after,.input-live-pie.saved-flash .live-pie-canvas{animation:none!important;}}
 /* ── 右パネル合計ストリップ ── */
 .side-totals{display:flex;gap:0;width:100%;border-radius:8px;overflow:hidden;border:1px solid var(--g200);background:var(--panel);}
 .side-totals .st-cell{flex:1;text-align:center;padding:11px 6px 9px;display:flex;flex-direction:column;gap:2px;}
@@ -4413,6 +4440,7 @@ function buildTable() {
   activeInputCats().forEach(cat=>{
     cat.subs.forEach((sub,i)=>{
       const tr=document.createElement('tr');
+      tr.style.setProperty('--cat-color', cat.color || '#6b7280');
       if (i===0) {
         const td=document.createElement('td');
         td.className='td-main'; td.rowSpan=cat.subs.length;
@@ -4422,7 +4450,7 @@ function buildTable() {
       }
       const tdCd=document.createElement('td'); tdCd.className='td-cd'; tdCd.textContent=sub.cd; tr.appendChild(tdCd);
       const tdName=document.createElement('td'); tdName.className='td-name'; tdName.textContent=sub.label;
-      tdName.setAttribute('data-cd', sub.cd); tdName.onclick=()=>addQuarter(sub.cd); tr.appendChild(tdName);
+      tdName.setAttribute('data-cd', sub.cd); tdName.onclick=(ev)=>addQuarter(sub.cd, ev); tr.appendChild(tdName);
       tr.appendChild(makeHoursCell(`h_${sub.cd}`,  sub.cd, false));
       tr.appendChild(makeHoursCell(`ot_${sub.cd}`, sub.cd, true));
       tbody.appendChild(tr);
@@ -4542,7 +4570,7 @@ function getLeaveWorkLimit() {
   if (!calc) return null;
   return Math.floor((calc.normal + calc.ot) * 4) / 4;
 }
-function addQuarter(cdSub) {
+function addQuarter(cdSub, ev) {
   let step = _clickStep;                      // 加算量は常に時間(h)
   const leaveLimit = getLeaveWorkLimit();
   if (leaveLimit !== null) {
@@ -4561,26 +4589,59 @@ function addQuarter(cdSub) {
     const add = Math.min(step, remaining);
     setHV(inp, Math.round((v + add) * 100) / 100);
     refreshCellStyle(inp);
-    inp.style.transition = 'background .2s'; inp.style.background = '#bfdbfe';
-    setTimeout(() => { inp.style.background = ''; }, 300);
+    _inpFx(cdSub, inp, add, false, ev);
     if (add < step) {
       const otInp = document.getElementById(`ot_${cdSub}`);
       const ov = getH(otInp);
       const otAdd = Math.round((step - add) * 100) / 100;
       setHV(otInp, Math.round((ov + otAdd) * 100) / 100);
       refreshCellStyle(otInp);
-      otInp.style.transition = 'background .2s'; otInp.style.background = '#fecdd3';
-      setTimeout(() => { otInp.style.background = ''; }, 300);
+      _inpFx(cdSub, otInp, otAdd, true, null);
     }
   } else {
     const otInp = document.getElementById(`ot_${cdSub}`);
     const ov = getH(otInp);
     setHV(otInp, Math.round((ov + step) * 100) / 100);
     refreshCellStyle(otInp);
-    otInp.style.transition = 'background .2s'; otInp.style.background = '#fecdd3';
-    setTimeout(() => { otInp.style.background = ''; }, 300);
+    _inpFx(cdSub, otInp, step, true, ev);
   }
   updateTotals();
+}
+
+// ── 入力時の演出: 行の色フラッシュ、クリック位置からの波紋、セルのポップ、「+0.25h」の浮き上がり ──
+function _fxReduce() { return window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches; }
+function _inpFx(cdSub, inp, added, isOT, ev) {
+  if (!inp || _fxReduce()) return;
+  const tr = inp.closest('tr');
+  if (tr) { tr.classList.remove('hit'); void tr.offsetWidth; tr.classList.add('hit'); setTimeout(() => tr.classList.remove('hit'), 600); }
+  const td = ev && ev.currentTarget;
+  if (td && ev.clientX != null) {
+    const r = td.getBoundingClientRect(), rp = document.createElement('span');
+    rp.className = 'td-ripple'; rp.style.left = (ev.clientX - r.left) + 'px'; rp.style.top = (ev.clientY - r.top) + 'px';
+    td.appendChild(rp); setTimeout(() => rp.remove(), 650);
+  }
+  inp.classList.remove('bump', 'bump-ot'); void inp.offsetWidth; inp.classList.add(isOT ? 'bump-ot' : 'bump');
+  setTimeout(() => inp.classList.remove('bump', 'bump-ot'), 450);
+  const wrap = inp.parentElement;
+  if (wrap) {
+    const chip = document.createElement('span');
+    chip.className = 'add-chip' + (isOT ? ' ot' : ''); chip.textContent = '+' + stepLabelStr(added);
+    wrap.appendChild(chip); setTimeout(() => chip.remove(), 800);
+  }
+}
+// 数値のカウントアップ（直前の表示値からなめらかに変化）
+function _tweenNum(el, to, fmt, dur) {
+  if (!el) return;
+  const txt = fmt(to);
+  if (_fxReduce() || el._tv == null) { el._tv = to; if (el.textContent !== txt) el.textContent = txt; return; }
+  const from = el._tv; if (from === to) { if (el.textContent !== txt) el.textContent = txt; return; }
+  el._tv = to;
+  if (el._raf) cancelAnimationFrame(el._raf);
+  el.classList.remove('num-pop'); void el.offsetWidth; el.classList.add('num-pop');
+  const t0 = performance.now(), D = dur || 420;
+  const st = now => { const k = Math.min(1, (now - t0) / D), v = from + (to - from) * (1 - Math.pow(1 - k, 3));
+    el.textContent = k < 1 ? fmt(v) : txt; if (k < 1) el._raf = requestAnimationFrame(st); else { el._raf = 0; el.classList.remove('num-pop'); } };
+  el._raf = requestAnimationFrame(st);
 }
 // DOMキャッシュ構築（buildTable後に呼ぶ）
 function _buildInputCache() {
@@ -4649,15 +4710,12 @@ function updateTotals() {
   // 合計表示（変化があるときだけ書き換えでリフロー抑制）
   const tnEl = document.getElementById('total-normal');
   const toEl = document.getElementById('total-ot');
-  const nStr = normal.toFixed(2), oStr = ot.toFixed(2);
-  if (tnEl.textContent !== nStr) tnEl.textContent = nStr;
-  if (toEl.textContent !== oStr) toEl.textContent = oStr;
+  const f2 = v => v.toFixed(2);
+  _tweenNum(tnEl, normal, f2); _tweenNum(toEl, ot, f2);
   tnEl.classList.toggle('at-max', atMax);
   toEl.classList.toggle('has-ot', ot > 0);
-  const snEl = document.getElementById('side-normal');
-  const soEl = document.getElementById('side-ot');
-  if (snEl && snEl.textContent !== nStr) snEl.textContent = nStr;
-  if (soEl && soEl.textContent !== oStr) soEl.textContent = oStr;
+  _tweenNum(document.getElementById('side-normal'), normal, f2);
+  _tweenNum(document.getElementById('side-ot'), ot, f2);
 
   // スタイル＋ヒントを1ループで（querySelectorAll不要）
   const hintChanged = (updateTotals._lastHint !== hint);
@@ -5209,6 +5267,7 @@ async function submitDay() {
       new Promise((_, rej) => setTimeout(() => rej(new Error('保存がタイムアウトしました（20秒）')), 20000))
     ]);
     cacheInvalidate(currentDate); // キャッシュクリア
+    _saveFx(btn);
     const msg=document.getElementById('save-msg');
     msg.textContent=rows.length>0?`${currentDate} を保存しました（${rows.length}行）`:'データをクリアしました';
     msg.className='ok'; msg.style.display='inline-block';
@@ -5226,6 +5285,19 @@ async function submitDay() {
       if (btn) btn.disabled = false;
     }, 1000);
   }
+}
+
+// 保存成功の演出: ボタンがチェックに変わり、右パネルに光が走る
+function _saveFx(btn) {
+  if (_fxReduce()) return;
+  if (btn && !btn.classList.contains('saved')) {
+    const orig = btn.innerHTML;
+    btn.classList.add('saved');
+    btn.innerHTML = '<svg class="sv-check" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 7"/></svg>保存しました';
+    setTimeout(() => { btn.classList.remove('saved'); btn.innerHTML = orig; }, 1800);
+  }
+  const panel = document.querySelector('.input-live-pie');
+  if (panel) { panel.classList.remove('saved-flash'); void panel.offsetWidth; panel.classList.add('saved-flash'); setTimeout(() => panel.classList.remove('saved-flash'), 1200); }
 }
 
 // 現在時刻を退勤時刻に入力する
@@ -7324,7 +7396,7 @@ function updateLivePie() {
   }
   grand = Math.round(grand * 100) / 100;
 
-  totalEl.textContent = grand.toFixed(2) + 'h';
+  _tweenNum(totalEl, grand, v => v.toFixed(2) + 'h');
 
   const target = {};
   CATS.forEach(c => { if (byMain[c.cd]) target[c.cd] = byMain[c.cd]; });
@@ -7343,17 +7415,18 @@ function updateLivePie() {
   _livePie.prev = { ...target };
   const snap = { ...(_livePie.anim) };
   const t0 = performance.now();
-  const DUR = 350;
+  const DUR = _fxReduce() ? 0 : 620;
 
   if (_livePie.raf) cancelAnimationFrame(_livePie.raf);
 
   function tick(now) {
-    const p = Math.min(1, (now - t0) / DUR);
-    const ease = 1 - Math.pow(1 - p, 3);
+    const p = DUR ? Math.min(1, (now - t0) / DUR) : 1;
+    const c1 = 1.2;   // わずかに行き過ぎて戻る（弾む）イージング
+    const ease = 1 + (c1 + 1) * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
     const cur = {};
     let total = 0;
     for (const k in target) {
-      cur[k] = (snap[k] || 0) + ((target[k] || 0) - (snap[k] || 0)) * ease;
+      cur[k] = Math.max(0, (snap[k] || 0) + ((target[k] || 0) - (snap[k] || 0)) * ease);
       total += cur[k];
     }
     _livePie.anim = { ...cur };
