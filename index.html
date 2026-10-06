@@ -6100,13 +6100,11 @@ function renderMgrSummary() {
     if (ratio && ratio[a] != null && ratio[a] < 0.7 && c.n + c.ot > 16) alerts.push(['info', `${A} Folio登録率 ${Math.round(ratio[a] * 100)}%（登録漏れの可能性）`]);
     return {a, c, pv, pj, fyOT, over, curLv, pjLv};
   });
-  // チーム平均を下げてくれているメンバーに感謝: 残業（期の途中は月末見込）がチーム平均より少ない人にマーク
-  // 入力が半分以下しかない人は、残業が少なく見えるだけなので対象外
+  // 残業（期の途中は月末見込）がチーム平均より少ない人に「平均以下」マーク
   const basis = r => (r.pj != null ? r.pj : r.c.ot);
   const active = rows.filter(r => r.c.n + r.c.ot > 0);
   const teamAvg = active.length ? active.reduce((t, r) => t + basis(r), 0) / active.length : 0;
-  const elapsed = (ec && ec.workElapsed) || 0;
-  active.forEach(r => { if (basis(r) < teamAvg - 0.05 && (missing[r.a] || 0) <= elapsed / 2) r.thanks = true; });
+  active.forEach(r => { if (basis(r) < teamAvg - 0.05) r.thanks = true; });
   const order = ['crit', 'warn', 'info'];
   alerts.sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0]));
   if (al) al.innerHTML = alerts.length
