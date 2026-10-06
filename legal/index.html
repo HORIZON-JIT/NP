@@ -1331,7 +1331,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <div class="card-body" style="flex:1;overflow-y:auto;"><div class="person-grid" id="daily-person-grid"></div></div>
       </div>
       <div class="card">
-        <div class="card-hd"><h2>残業時間集計</h2><span class="card-sub">17:30以降を残業カウント</span></div>
+        <div class="card-hd"><h2>残業時間集計</h2><span class="card-sub">破線＝平均　緑＝平均より少ない　赤＝平均より多い（斜線＝平均を超えた分）</span></div>
         <div class="card-body" style="position:relative;">
           <canvas id="daily-ot-canvas"></canvas>
           <div class="ot-empty" id="daily-ot-empty" style="display:none;">本日の残業者はいません</div>
@@ -6553,7 +6553,7 @@ async function renderMonthlyDash(silent) {
   if (!silent) setLoading(true);
   try {
     document.getElementById('period-range').textContent   =range;
-    document.getElementById('monthly-ot-sub').textContent =`${range}　— 破線 = 平均残業時間`;
+    document.getElementById('monthly-ot-sub').textContent =`${range}　— 破線＝平均　緑＝平均より少ない　赤＝平均より多い（斜線＝平均を超えた分）`;
     syncPeriodSelectors();
 
     let byAuthor;
@@ -7303,7 +7303,8 @@ const PIE_SIZE=180; // 個人円グラフの描画サイズ(px)
 // ── Canvasチャート用テーマカラー（ライト/ダークで切替。applyTheme()で更新）──
 let CHT_GRID='#eee8dd', CHT_AXIS='#a39a8c', CHT_TEXT='#2a241d',
     CHT_MUTED='#6b6358', CHT_FAINT='#b8ae9f', CHT_FILL='#f4f0e8',
-    CHT_OT='#d03b3b', CHT_OT_INK='#b42318', CHT_OK_INK='#11743a', CHT_PREV='#e4ddd0';
+    CHT_OT='#d03b3b', CHT_OT_INK='#b42318', CHT_OK_INK='#11743a', CHT_PREV='#e4ddd0',
+    CHT_OK='#1f9d55', CHT_OT_DK='#8f1d1d';
 // ダッシュボードのデザイントークン(--st-*, --dx-*)と揃えた配色。ライト/ダークで個別に選定。
 function applyChartTheme(dark){
   CHT_GRID = dark ? '#262a33' : '#eee8dd';
@@ -7316,6 +7317,8 @@ function applyChartTheme(dark){
   CHT_OT_INK = dark ? '#ff9b94' : '#b42318';
   CHT_OK_INK = dark ? '#7be0a2' : '#11743a';
   CHT_PREV = dark ? '#2c313b' : '#e4ddd0';
+  CHT_OK   = dark ? '#3ec97a' : '#1f9d55';
+  CHT_OT_DK= dark ? '#9b2626' : '#8f1d1d';
 }
 // 親要素の内容幅（clientWidth はパディングを含むため差し引く。含めるとグラフが右にはみ出す）
 function _contentW(el, def) {
@@ -7643,85 +7646,127 @@ function renderOTBarEnhanced(byAuthor, canvasId, emptyId, avgPerPerson=0, avgTot
   const H = data.length*(BH+GAP)+PT+PB;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
-  ctx.clearRect(0,0,W,H);
   const cW = W-PL-PR;
   const maxOT = Math.max(...data.map(d=>d.ot), ...(hasPrev?data.map(d=>d.prevOT||0):[]), avgPerPerson, 1)*1.15;
+  const avgX = avgPerPerson > 0 ? PL+(avgPerPerson/maxOT)*cW : null;
+  // 平均を超えた分の斜線パターン（濃い赤）
+  const hatch = (() => {
+    const pc = document.createElement('canvas'); pc.width = pc.height = 8;
+    const c = pc.getContext('2d'); c.fillStyle = CHT_OT; c.fillRect(0, 0, 8, 8);
+    c.strokeStyle = CHT_OT_DK; c.lineWidth = 2.2; c.beginPath(); c.moveTo(-2, 10); c.lineTo(10, -2); c.moveTo(-2, 2); c.lineTo(2, -2); c.moveTo(6, 10); c.lineTo(10, 6); c.stroke();
+    return ctx.createPattern(pc, 'repeat');
+  })();
 
-  // グリッド
-  const steps = [];
-  for(let h=0; h<=Math.ceil(maxOT); h++) steps.push(h);
-  ctx.strokeStyle=CHT_GRID; ctx.lineWidth=1;
-  steps.forEach(h=>{
-    const x=PL+(h/maxOT)*cW;
-    if(x>=PL&&x<=PL+cW+1){ ctx.beginPath(); ctx.moveTo(x,PT-3); ctx.lineTo(x,H-PB+3); ctx.stroke(); }
-  });
+  // frac: 棒の伸び具合（0〜1）。初回表示だけ 0→1 で伸ばし、再描画では 1 で即描く
+  const draw = frac => {
+    ctx.clearRect(0,0,W,H);
+    // グリッド
+    const steps = [];
+    for(let h=0; h<=Math.ceil(maxOT); h++) steps.push(h);
+    ctx.strokeStyle=CHT_GRID; ctx.lineWidth=1;
+    steps.forEach(h=>{
+      const x=PL+(h/maxOT)*cW;
+      if(x>=PL&&x<=PL+cW+1){ ctx.beginPath(); ctx.moveTo(x,PT-3); ctx.lineTo(x,H-PB+3); ctx.stroke(); }
+    });
 
-  // バー
-  data.forEach((d,i)=>{
-    const y = PT + i*(BH+GAP);
-    const bW = (d.ot/maxOT)*cW;
-    // 背景
-    ctx.fillStyle=CHT_FILL; _rr(ctx,PL,y+6,cW,hasPrev?BH/2-8:BH-12,5,'right');
-    // 当期バー
-    if(d.ot>0){
-      ctx.fillStyle=CHT_OT;
-      _rr(ctx, PL, y+6, Math.max(bW,3), (hasPrev?BH/2-8:BH-12), 5, 'right');
-    }
-    // 前期バー（薄い）
-    if(hasPrev && d.prevOT!==null){
-      const pW=(d.prevOT/maxOT)*cW;
-      ctx.fillStyle=CHT_FILL; _rr(ctx,PL,y+BH/2+1,cW,BH/2-6,4,'right');
-      if(d.prevOT>0){
-        ctx.fillStyle=CHT_PREV;
-        _rr(ctx,PL,y+BH/2+1,Math.max(pW,3),BH/2-6,4,'right');
+    data.forEach((d,i)=>{
+      const y = PT + i*(BH+GAP);
+      const bH = hasPrev?BH/2-8:BH-12;
+      const bW = (d.ot/maxOT)*cW*frac;
+      const below = avgPerPerson > 0 ? d.ot < avgPerPerson - 0.005 : false;   // 平均より少ない＝平均を下げている
+      const above = avgPerPerson > 0 && d.ot > avgPerPerson + 0.005;
+      // 背景
+      ctx.fillStyle=CHT_FILL; _rr(ctx,PL,y+6,cW,bH,5,'right');
+      // 当期バー: 平均より少なければ緑、多ければ赤（平均を超えた分は斜線）
+      if(d.ot>0){
+        ctx.fillStyle = below ? CHT_OK : CHT_OT;
+        _rr(ctx, PL, y+6, Math.max(bW,3), bH, 5, 'right');
+        if (above && avgX != null && PL+bW > avgX) {
+          ctx.save(); ctx.beginPath(); ctx.rect(avgX, y+6, PL+bW-avgX, bH); ctx.clip();
+          ctx.fillStyle = hatch; _rr(ctx, PL, y+6, Math.max(bW,3), bH, 5, 'right');
+          ctx.restore();
+        }
       }
-    }
-    // 担当者名
-    ctx.fillStyle=CHT_TEXT; ctx.font='bold 12px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
-    ctx.fillText(d.name.length>5?d.name.slice(0,5)+'…':d.name, PL-6, y+BH*0.5);
-    // 残業値ラベル（当期）
-    if(d.ot>0){
-      ctx.fillStyle=CHT_OT_INK; ctx.font='700 12px Inter, sans-serif'; ctx.textAlign='left';
-      ctx.fillText(`+${d.ot.toFixed(2)}h`, PL+bW+6, y+(hasPrev?BH*0.25:BH*0.5));
-    } else {
-      ctx.fillStyle=CHT_OK_INK; ctx.font='600 11px Inter, sans-serif'; ctx.textAlign='left';
-      ctx.fillText('定時内', PL+10, y+(hasPrev?BH*0.25:BH*0.5));
-    }
-    // 前期ラベル
-    if(hasPrev && d.prevOT!==null && d.prevOT>0){
-      const pW=(d.prevOT/maxOT)*cW;
-      ctx.fillStyle=CHT_MUTED; ctx.font='10px sans-serif'; ctx.textAlign='left';
-      ctx.fillText(`前${d.prevOT.toFixed(2)}h`, PL+pW+5, y+BH*0.76);
-      // 前年比
-      if(d.prevOT>0){
-        const ratio = Math.round(d.ot/d.prevOT*100);
-        const col = ratio>100?CHT_OT_INK:ratio<100?CHT_OK_INK:CHT_MUTED;
-        ctx.fillStyle=col; ctx.font='bold 10px sans-serif';
-        ctx.fillText(`${ratio}%`, PL+cW+4, y+BH*0.76);
+      // 前期バー（薄い）
+      if(hasPrev && d.prevOT!==null){
+        const pW=(d.prevOT/maxOT)*cW*frac;
+        ctx.fillStyle=CHT_FILL; _rr(ctx,PL,y+BH/2+1,cW,BH/2-6,4,'right');
+        if(d.prevOT>0){
+          ctx.fillStyle=CHT_PREV;
+          _rr(ctx,PL,y+BH/2+1,Math.max(pW,3),BH/2-6,4,'right');
+        }
       }
+      // 担当者名
+      ctx.fillStyle=CHT_TEXT; ctx.font='bold 12px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
+      ctx.fillText(d.name.length>5?d.name.slice(0,5)+'…':d.name, PL-6, y+BH*0.5);
+      // 残業値ラベル（当期）＋ 平均との差
+      const ly = y+(hasPrev?BH*0.25:BH*0.5);
+      if(d.ot>0){
+        const lab = `+${d.ot.toFixed(2)}h`;
+        const diff = d.ot - avgPerPerson;
+        const sub = (avgPerPerson > 0 && frac >= 1) ? `平均${diff < 0 ? '−' : '+'}${Math.abs(diff).toFixed(1)}h` : '';
+        ctx.font='700 12px Inter, sans-serif'; const wLab = ctx.measureText(lab).width;
+        ctx.font='600 10px Inter, sans-serif'; const wSub = sub ? ctx.measureText(sub).width + 8 : 0;
+        // 右端に収まらないときは棒の内側に白文字で描く
+        const inside = PL+bW+6+wLab+wSub > W-2;
+        let x = inside ? PL+bW-6-wLab-wSub : PL+bW+6;
+        ctx.textAlign='left';
+        ctx.fillStyle = inside ? '#fff' : below ? CHT_OK_INK : CHT_OT_INK; ctx.font='700 12px Inter, sans-serif';
+        ctx.fillText(lab, x, ly);
+        if (sub) {
+          ctx.fillStyle = inside ? 'rgba(255,255,255,.85)' : below ? CHT_OK_INK : above ? CHT_OT_INK : CHT_MUTED; ctx.font='600 10px Inter, sans-serif';
+          ctx.fillText(sub, x+wLab+8, ly);
+        }
+      } else {
+        ctx.fillStyle=CHT_OK_INK; ctx.font='600 11px Inter, sans-serif'; ctx.textAlign='left';
+        ctx.fillText('定時内', PL+10, ly);
+      }
+      // 前期ラベル
+      if(hasPrev && d.prevOT!==null && d.prevOT>0){
+        const pW=(d.prevOT/maxOT)*cW*frac;
+        ctx.fillStyle=CHT_MUTED; ctx.font='10px sans-serif'; ctx.textAlign='left';
+        ctx.fillText(`前${d.prevOT.toFixed(2)}h`, PL+pW+5, y+BH*0.76);
+        // 前年比
+        if(d.prevOT>0){
+          const ratio = Math.round(d.ot/d.prevOT*100);
+          const col = ratio>100?CHT_OT_INK:ratio<100?CHT_OK_INK:CHT_MUTED;
+          ctx.fillStyle=col; ctx.font='bold 10px sans-serif';
+          ctx.fillText(`${ratio}%`, PL+cW+4, y+BH*0.76);
+        }
+      }
+    });
+
+    // 平均破線（最初から表示）
+    if (avgX != null) {
+      ctx.save(); ctx.strokeStyle='#f59e0b'; ctx.lineWidth=1.8; ctx.setLineDash([5,4]);
+      ctx.beginPath(); ctx.moveTo(avgX,PT-10); ctx.lineTo(avgX,H-PB+3); ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle='#d97706'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(`平均 ${avgPerPerson.toFixed(2)}h`, avgX, PT-14);
     }
-  });
 
-  // 平均破線2本
-  function drawDash(val, color, label, yOff=0) {
-    if(val<=0) return;
-    const x = PL+(val/maxOT)*cW;
-    ctx.save(); ctx.strokeStyle=color; ctx.lineWidth=1.8; ctx.setLineDash([5,4]);
-    ctx.beginPath(); ctx.moveTo(x,PT-10+yOff); ctx.lineTo(x,H-PB+3); ctx.stroke();
-    ctx.restore();
-    ctx.fillStyle=color; ctx.font='bold 9px sans-serif'; ctx.textAlign='center';
-    ctx.fillText(label, x, PT-14+yOff);
-  }
-  drawDash(avgPerPerson,'#f59e0b',`個人avg ${avgPerPerson.toFixed(2)}h`, 0);
-  // 全員avg破線は非表示
+    // X軸ラベル（適切な間隔で表示）
+    const tickStep = maxOT<=10?1:maxOT<=30?5:maxOT<=60?10:maxOT<=120?20:30;
+    ctx.fillStyle=CHT_AXIS; ctx.font='10px sans-serif'; ctx.textAlign='center';
+    for(let h=0;h<=Math.ceil(maxOT);h+=tickStep){
+      const x=PL+(h/maxOT)*cW;
+      if(x>=PL&&x<=PL+cW+1) ctx.fillText(h===0?'0h':`${h}h`,x,H-PB+12);
+    }
+  };
 
-  // X軸ラベル（適切な間隔で表示）
-  const tickStep = maxOT<=10?1:maxOT<=30?5:maxOT<=60?10:maxOT<=120?20:30;
-  ctx.fillStyle=CHT_AXIS; ctx.font='10px sans-serif'; ctx.textAlign='center';
-  for(let h=0;h<=Math.ceil(maxOT);h+=tickStep){
-    const x=PL+(h/maxOT)*cW;
-    if(x>=PL&&x<=PL+cW+1) ctx.fillText(h===0?'0h':`${h}h`,x,H-PB+12);
-  }
+  // 初回表示だけ 0→1 で伸ばす（同じデータの再描画・PDF・reduced-motion では即座に最終形）
+  const key = data.map(d => `${d.name}:${d.ot.toFixed(2)}:${d.prevOT == null ? '' : d.prevOT.toFixed(2)}`).join('|');
+  if (canvas._otRaf) { cancelAnimationFrame(canvas._otRaf); canvas._otRaf = 0; }
+  if (canvas._grownKey === key || _dxReduce()) { canvas._grownKey = key; draw(1); return; }
+  canvas._grownKey = key;
+  const t0 = performance.now(), DUR = 650;
+  const step = now => {
+    const k = Math.min(1, (now - t0) / DUR);
+    draw(1 - Math.pow(1 - k, 3));
+    canvas._otRaf = k < 1 ? requestAnimationFrame(step) : 0;
+  };
+  draw(0);
+  canvas._otRaf = requestAnimationFrame(step);
 }
 
 // ═══════════════════════════════════════════
