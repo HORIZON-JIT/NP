@@ -112,7 +112,7 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
 .input-live-pie .leave-row{border-top:none;background:transparent;padding:0;flex-wrap:wrap;}
 /* ── 入力演出 ── */
 #entry-tbody tr.hit td{animation:rowHit .6s ease-out;}
-@keyframes rowHit{0%{background:color-mix(in srgb,var(--cat-color,#6b7280) 42%,var(--surface));}100%{background:transparent;}}
+@keyframes rowHit{0%{background:color-mix(in srgb,var(--cat-color,#6b7280) 60%,var(--surface));}100%{background:transparent;}}
 #entry-tbody tr.hit td.td-main{animation:none;}
 .td-name{position:relative;overflow:hidden;}
 .td-ripple{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:color-mix(in srgb,var(--cat-color,#6b7280) 45%,transparent);pointer-events:none;animation:tdRipple .6s ease-out forwards;}
@@ -120,8 +120,8 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
 .hours-wrap{position:relative;}
 .hours-wrap input.bump{animation:cellBump .42s cubic-bezier(.2,1.4,.4,1);}
 .hours-wrap input.bump-ot{animation:cellBumpOT .42s cubic-bezier(.2,1.4,.4,1);}
-@keyframes cellBump{0%{transform:scale(1);box-shadow:0 0 0 0 color-mix(in srgb,var(--primary) 55%,transparent);}40%{transform:scale(1.22);}100%{transform:scale(1);box-shadow:0 0 0 14px transparent;}}
-@keyframes cellBumpOT{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(244,63,94,.6);}40%{transform:scale(1.22);}100%{transform:scale(1);box-shadow:0 0 0 14px transparent;}}
+@keyframes cellBump{0%{transform:scale(1);box-shadow:0 0 0 0 color-mix(in srgb,var(--primary) 65%,transparent);}40%{transform:scale(1.35);}100%{transform:scale(1);box-shadow:0 0 0 20px transparent;}}
+@keyframes cellBumpOT{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(244,63,94,.7);}40%{transform:scale(1.35);}100%{transform:scale(1);box-shadow:0 0 0 20px transparent;}}
 .add-chip{position:absolute;left:50%;top:-4px;transform:translate(-50%,0);font-size:11px;font-weight:800;color:var(--primary-dk);background:var(--surface);border:1px solid var(--primary);border-radius:999px;padding:1px 7px;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.12);animation:addChip .8s cubic-bezier(.2,.8,.2,1) forwards;}
 .add-chip.ot{color:#be123c;border-color:#f43f5e;}
 @keyframes addChip{0%{opacity:0;transform:translate(-50%,6px) scale(.8);}20%{opacity:1;transform:translate(-50%,-6px) scale(1.05);}70%{opacity:1;}100%{opacity:0;transform:translate(-50%,-26px) scale(1);}}
@@ -132,12 +132,23 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
 .row-sweep{position:absolute;left:0;right:0;pointer-events:none;overflow:hidden;z-index:2;}
 .row-sweep::before{content:'';position:absolute;top:0;bottom:0;left:-40%;width:40%;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--cat-color,#6b7280) 55%,#fff) 50%,transparent);animation:rowSweep .55s cubic-bezier(.2,.8,.2,1) forwards;}
 @keyframes rowSweep{to{left:110%;}}
-.fx-spark{position:fixed;width:7px;height:7px;border-radius:50%;pointer-events:none;z-index:999;animation:fxSpark .7s cubic-bezier(.1,.8,.3,1) forwards;}
-@keyframes fxSpark{0%{opacity:1;transform:translate(0,0) scale(1);}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.2);}}
-.fx-fly{position:fixed;z-index:999;pointer-events:none;font-size:15px;font-weight:900;color:#fff;background:var(--cat-color,var(--primary));padding:3px 11px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.25);transition:transform .55s cubic-bezier(.5,0,.3,1),opacity .55s ease-in;will-change:transform;}
+.fx-spark{position:fixed;width:9px;height:9px;border-radius:50%;pointer-events:none;z-index:999;box-shadow:0 0 8px currentColor;animation:fxSpark .85s cubic-bezier(.1,.8,.3,1) forwards;}
+.fx-spark.streak{width:4px;height:18px;border-radius:3px;transform-origin:center;}
+@keyframes fxSpark{0%{opacity:1;transform:translate(0,0) rotate(var(--rot,0deg)) scale(1.2);}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--rot,0deg)) scale(.15);}}
+.fx-ring{position:fixed;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;border:3px solid var(--cat-color,#6b7280);pointer-events:none;z-index:998;animation:fxRing .6s cubic-bezier(.1,.8,.2,1) forwards;}
+.fx-ring.r2{animation-delay:.08s;border-width:2px;opacity:.7;}
+@keyframes fxRing{0%{transform:scale(.3);opacity:1;}100%{transform:scale(9);opacity:0;}}
+.table-flash{position:absolute;inset:0;pointer-events:none;z-index:1;background:color-mix(in srgb,var(--cat-color,#6b7280) 22%,transparent);animation:tblFlash .45s ease-out forwards;}
+@keyframes tblFlash{from{opacity:1;}to{opacity:0;}}
+.fx-combo{position:fixed;pointer-events:none;z-index:1000;font-weight:900;letter-spacing:-.02em;color:#fff;-webkit-text-stroke:1.5px var(--cat-color,#6b7280);text-shadow:0 4px 14px rgba(0,0,0,.25),0 0 18px color-mix(in srgb,var(--cat-color,#6b7280) 70%,transparent);transform:translate(-50%,-50%);animation:fxCombo .9s cubic-bezier(.2,1.6,.4,1) forwards;font-family:Inter,sans-serif;white-space:nowrap;}
+.fx-combo small{font-size:.5em;margin-left:4px;-webkit-text-stroke:1px var(--cat-color,#6b7280);}
+@keyframes fxCombo{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(-8deg);}25%{opacity:1;transform:translate(-50%,-60%) scale(1.25) rotate(3deg);}60%{opacity:1;transform:translate(-50%,-70%) scale(1) rotate(0);}100%{opacity:0;transform:translate(-50%,-130%) scale(1.1);}}
+.live-pie-canvas.glow{animation:pieGlow .7s ease-out;}
+@keyframes pieGlow{0%{filter:drop-shadow(0 0 0 var(--cat-color,#6b7280)) drop-shadow(0 0 18px color-mix(in srgb,var(--cat-color,#6b7280) 80%,transparent));transform:scale(1.04);}100%{filter:none;transform:scale(1);}}
+.fx-fly{position:fixed;z-index:999;pointer-events:none;font-size:19px;font-weight:900;color:#fff;background:var(--cat-color,var(--primary));padding:3px 11px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.25);transition:transform .55s cubic-bezier(.5,0,.3,1),opacity .55s ease-in;will-change:transform;}
 .fx-fly.ot{background:#e11d48;}
 .side-totals.hit{animation:totalsHit .5s cubic-bezier(.2,1.4,.4,1);}
-@keyframes totalsHit{0%{transform:scale(1);}35%{transform:scale(1.04);}100%{transform:scale(1);}}
+@keyframes totalsHit{0%{transform:scale(1);}35%{transform:scale(1.09);}100%{transform:scale(1);}}
 .side-totals{position:relative;overflow:hidden;}
 .side-totals.hit::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at var(--hx,50%) 50%,color-mix(in srgb,var(--cat-color,var(--primary)) 35%,transparent),transparent 60%);animation:totalsGlow .6s ease-out forwards;pointer-events:none;}
 @keyframes totalsGlow{from{opacity:1;}to{opacity:0;}}
@@ -152,7 +163,7 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
 [data-theme="dark"] .input-live-pie.saved-flash::after{background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.14) 50%,transparent 70%);background-size:250% 100%;}
 @keyframes savedSweep{from{background-position:120% 0;}to{background-position:-30% 0;}}
 .input-live-pie.saved-flash .live-pie-canvas{animation:numPop .6s cubic-bezier(.2,1.4,.4,1);}
-@media (prefers-reduced-motion:reduce){#entry-tbody tr.hit td,.td-ripple,.add-chip,.num-pop,.hours-wrap input.bump,.hours-wrap input.bump-ot,.input-live-pie.saved-flash::after,.input-live-pie.saved-flash .live-pie-canvas,.row-sweep::before,.fx-spark,.side-totals.hit,.side-totals.hit::after{animation:none!important;}.fx-fly{transition:none!important;}}
+@media (prefers-reduced-motion:reduce){#entry-tbody tr.hit td,.td-ripple,.add-chip,.num-pop,.hours-wrap input.bump,.hours-wrap input.bump-ot,.input-live-pie.saved-flash::after,.input-live-pie.saved-flash .live-pie-canvas,.row-sweep::before,.fx-spark,.fx-ring,.table-flash,.fx-combo,.live-pie-canvas.glow,.side-totals.hit,.side-totals.hit::after{animation:none!important;}.fx-fly{transition:none!important;}}
 /* ── 右パネル合計ストリップ ── */
 .side-totals{display:flex;gap:0;width:100%;border-radius:8px;overflow:hidden;border:1px solid var(--g200);background:var(--panel);}
 .side-totals .st-cell{flex:1;text-align:center;padding:11px 6px 9px;display:flex;flex-direction:column;gap:2px;}
@@ -4626,6 +4637,7 @@ function addQuarter(cdSub, ev) {
 
 // ── 入力時の演出: 行の色フラッシュ、クリック位置からの波紋、セルのポップ、「+0.25h」の浮き上がり ──
 function _fxReduce() { return window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches; }
+const _fxCombo = {n: 0, t: 0};
 function _inpFx(cdSub, inp, added, isOT, ev) {
   if (!inp || _fxReduce()) return;
   const tr = inp.closest('tr');
@@ -4641,21 +4653,41 @@ function _inpFx(cdSub, inp, added, isOT, ev) {
       wrap.appendChild(sw); setTimeout(() => sw.remove(), 600);
     }
   }
-  // クリック位置から波紋 ＋ 火花
+  // 連続クリックでコンボ（1.3秒以内）。コンボが続くほど火花が増える
+  const now = performance.now();
+  _fxCombo.n = (now - _fxCombo.t < 1300) ? _fxCombo.n + 1 : 1; _fxCombo.t = now;
+  const combo = _fxCombo.n;
+  // 表全体のフラッシュ
+  const twrap = tr && tr.closest('.table-wrap');
+  if (twrap) { const fl = document.createElement('div'); fl.className = 'table-flash'; fl.style.setProperty('--cat-color', isOT ? '#e11d48' : color); twrap.appendChild(fl); setTimeout(() => fl.remove(), 500); }
+  // クリック位置から波紋 ＋ 衝撃波リング ＋ 火花
   const td = ev && ev.currentTarget;
   if (td && ev.clientX != null) {
     const r = td.getBoundingClientRect(), rp = document.createElement('span');
     rp.className = 'td-ripple'; rp.style.left = (ev.clientX - r.left) + 'px'; rp.style.top = (ev.clientY - r.top) + 'px';
     td.appendChild(rp); setTimeout(() => rp.remove(), 650);
-    for (let i = 0; i < 12; i++) {
-      const sp = document.createElement('i'); sp.className = 'fx-spark';
-      const ang = Math.random() * Math.PI * 2, dist = 28 + Math.random() * 46;
-      sp.style.left = ev.clientX + 'px'; sp.style.top = ev.clientY + 'px'; sp.style.background = isOT ? '#e11d48' : color;
-      sp.style.setProperty('--dx', Math.cos(ang) * dist + 'px'); sp.style.setProperty('--dy', Math.sin(ang) * dist - 10 + 'px');
-      sp.style.animationDelay = (Math.random() * 0.06) + 's';
-      document.body.appendChild(sp); setTimeout(() => sp.remove(), 800);
+    const fxColor = isOT ? '#e11d48' : color;
+    ['', 'r2'].forEach(c => { const rg = document.createElement('i'); rg.className = 'fx-ring ' + c; rg.style.left = ev.clientX + 'px'; rg.style.top = ev.clientY + 'px'; rg.style.setProperty('--cat-color', fxColor); document.body.appendChild(rg); setTimeout(() => rg.remove(), 750); });
+    const nSp = Math.min(40, 18 + combo * 4);
+    for (let i = 0; i < nSp; i++) {
+      const sp = document.createElement('i'); sp.className = 'fx-spark' + (i % 3 === 0 ? ' streak' : '');
+      const ang = Math.random() * Math.PI * 2, dist = 50 + Math.random() * (90 + combo * 10);
+      sp.style.left = ev.clientX + 'px'; sp.style.top = ev.clientY + 'px'; sp.style.background = fxColor; sp.style.color = fxColor;
+      sp.style.setProperty('--dx', Math.cos(ang) * dist + 'px'); sp.style.setProperty('--dy', (Math.sin(ang) * dist + 30) + 'px');
+      sp.style.setProperty('--rot', (ang * 180 / Math.PI + 90).toFixed(0) + 'deg');
+      sp.style.animationDelay = (Math.random() * 0.08) + 's';
+      document.body.appendChild(sp); setTimeout(() => sp.remove(), 950);
+    }
+    if (combo >= 2) {
+      const cb = document.createElement('div'); cb.className = 'fx-combo';
+      cb.style.left = (ev.clientX + 70) + 'px'; cb.style.top = (ev.clientY - 10) + 'px'; cb.style.fontSize = Math.min(64, 26 + combo * 5) + 'px'; cb.style.setProperty('--cat-color', fxColor);
+      cb.innerHTML = `×${combo}<small>${combo >= 10 ? 'FEVER!!' : combo >= 5 ? 'HOT!' : 'COMBO'}</small>`;
+      document.body.appendChild(cb); setTimeout(() => cb.remove(), 950);
     }
   }
+  // ドーナツが光る
+  const pie = document.getElementById('live-pie-cv');
+  if (pie) { pie.style.setProperty('--cat-color', isOT ? '#e11d48' : color); pie.classList.remove('glow'); void pie.offsetWidth; pie.classList.add('glow'); setTimeout(() => pie.classList.remove('glow'), 750); }
   // セルのポップ
   inp.classList.remove('bump', 'bump-ot'); void inp.offsetWidth; inp.classList.add(isOT ? 'bump-ot' : 'bump');
   setTimeout(() => inp.classList.remove('bump', 'bump-ot'), 450);
