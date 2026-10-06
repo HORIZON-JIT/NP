@@ -1033,6 +1033,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .dx-goal .ring .trk{stroke:color-mix(in srgb,var(--dx-ink-3) 22%,transparent);}
 .dx-goal .ring .bar{stroke:var(--dx-accent);stroke-linecap:round;transition:stroke-dashoffset 1s cubic-bezier(.2,.7,.2,1);}
 .dx-goal.is-ok .ring .bar{stroke:var(--st-ok);}
+.dx-goal.is-neg .ring .bar,.dx-goal.is-neg .ring .trk{stroke:var(--st-warn-bg);}
+.dx-goal.is-neg .ring .pct{color:var(--st-warn-ink);}
 .dx-goal .ring .pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--dx-ink-1);font-variant-numeric:tabular-nums;}
 .dx-goal.is-ok .ring .pct{font-size:20px;color:var(--st-ok-ink);}
 .dx-goal .nm{font-size:12px;font-weight:700;color:var(--dx-ink-2);margin-bottom:2px;}
@@ -5725,9 +5727,9 @@ function _effStats(d) {
   Object.keys(lm).forEach(a => {
     if (a === 'ヘルプ') return;
     Object.keys(lm[a] || {}).forEach(dt => {
+      personDays++;
       const dow = new Date(dt + 'T00:00:00').getDay();
-      if (dow === 0 || dow === 6) return;
-      days.add(dt); personDays++;
+      if (dow !== 0 && dow !== 6) days.add(dt);
     });
   });
   const all = _otByAuthor(d), bySub = {};
@@ -5749,14 +5751,15 @@ function _effCompute() {
   const ctx = _mgrCtx;
   if (!ctx || !ctx.curRaw || !ctx.prevRaw) return null;
   const cur = _effStats(ctx.curRaw), prev = _effStats(ctx.prevRaw);
-  if (!cur.days || !prev.days) return {empty: true, cur, prev};
+  // 1人1日あたりで比較（休み・入力人数の差に左右されない）。浮いた時間 = 差 × 今月期の人日
+  if (!cur.personDays || !prev.personDays) return {empty: true, cur, prev};
   const subs = new Set([...Object.keys(cur.bySub), ...Object.keys(prev.bySub)]);
   const items = [...subs].map(cd => {
-    const p = (prev.bySub[cd] || 0) / prev.days, c = (cur.bySub[cd] || 0) / cur.days;
-    return {cd, p, c, saved: (p - c) * cur.days, pct: p > 0 ? (c - p) / p : null};
+    const p = (prev.bySub[cd] || 0) / prev.personDays, c = (cur.bySub[cd] || 0) / cur.personDays;
+    return {cd, p, c, saved: (p - c) * cur.personDays, pct: p > 0 ? (c - p) / p : null};
   });
-  const saved = (prev.total / prev.days - cur.total / cur.days) * cur.days;
-  const ppdPrev = prev.personDays ? prev.total / prev.personDays : 0, ppdCur = cur.personDays ? cur.total / cur.personDays : 0;
+  const ppdPrev = prev.total / prev.personDays, ppdCur = cur.total / cur.personDays;
+  const saved = (ppdPrev - ppdCur) * cur.personDays;
   return {cur, prev, items, saved, ppdPrev, ppdCur};
 }
 
@@ -5778,7 +5781,7 @@ function renderEfficiency() {
       <div class="big"><span class="dx-eff-num" data-v="${Math.abs(e.saved).toFixed(1)}">${Math.abs(e.saved).toFixed(1)}</span><span class="u">h</span><span class="tag">${good ? '削減' : '増加'}</span></div>
       <div class="sub">1人1日あたり <b>${e.ppdPrev.toFixed(2)}h → ${e.ppdCur.toFixed(2)}h</b>
         <span class="${dPpd < -0.005 ? 't-ok' : dPpd > 0.005 ? 't-warn' : 't-muted'}">（${dPpd > 0 ? '+' : ''}${dPpd.toFixed(2)}h）</span></div>
-      <div class="sub t-muted">稼働日 前月期 ${e.prev.days}日／今月期 ${e.cur.days}日で比較</div>
+      <div class="sub t-muted">入力人日 前月期 ${e.prev.personDays}／今月期 ${e.cur.personDays}で比較</div>
     </div>
     <div class="dx-eff-list">
       <div class="dx-eff-hd">時間を減らせた作業 ${top.length ? `TOP${top.length}` : ''}</div>
@@ -5786,9 +5789,9 @@ function renderEfficiency() {
         const sb = SUB_MAP[x.cd] || {}, color = CAT_COLOR[sb.mainCd] || '#8C8377';
         return `<div class="dx-hbar"><span class="lb" title="${escHtml(x.cd)}"><i class="dx-sw" style="background:${color}"></i>${escHtml(sb.label || x.cd)}</span>
           <div class="tr"><i style="background:var(--st-ok)" data-w="${(x.saved / maxS * 100).toFixed(1)}"></i></div>
-          <span class="vv">−${x.saved.toFixed(1)}h<small>1日 ${x.p.toFixed(2)}→${x.c.toFixed(2)}h${x.pct != null ? `（${Math.round(x.pct * 100)}%）` : ''}</small></span></div>`;
+          <span class="vv">−${x.saved.toFixed(1)}h<small>1人1日 ${x.p.toFixed(2)}→${x.c.toFixed(2)}h${x.pct != null ? `（${Math.round(x.pct * 100)}%）` : ''}</small></span></div>`;
       }).join('')}</div>` : '<p class="dx-empty" style="padding:12px 0">今月期はまだ前月期より減った作業がありません</p>'}
-      <p class="dx-note">${upCount ? `時間が増えた作業 ${upCount}件。` : ''}業務量の増減も含みます（同じ作業に1稼働日あたり何時間かけたかの比較）。</p>
+      <p class="dx-note">${upCount ? `時間が増えた作業 ${upCount}件。` : ''}業務量の増減も含みます（同じ作業に1人1日あたり何時間かけたかの比較）。</p>
     </div>
   </div>`;
   const first = !ctx._effGrown; ctx._effGrown = true;
@@ -5800,7 +5803,7 @@ function renderEfficiency() {
     requestAnimationFrame(st);
   }
   const sub = document.getElementById('eff-sub');
-  if (sub) sub.textContent = '1稼働日あたりの作業時間（チーム合計）を前月期と比較';
+  if (sub) sub.textContent = '1人1日あたりの作業時間を前月期と比較';
   renderGoals();
 }
 
@@ -5844,14 +5847,16 @@ function renderGoals() {
     const ok = d.dir === 'le' ? val <= tgt : val >= tgt;
     const frac = d.dir === 'le' ? (val <= 0 ? 1 : Math.min(1, tgt / val)) : (tgt <= 0 ? 1 : Math.max(0, Math.min(1, val / tgt)));
     const pct = Math.round(frac * 100);
-    const remain = d.dir === 'le' ? `あと ${d.fmt(val - tgt)}${d.unit} 減らせば達成` : `あと ${d.fmt(tgt - val)}${d.unit} で達成`;
+    const neg = d.k === 'saved' && val < 0;
+    const remain = d.dir === 'le' ? `あと ${d.fmt(val - tgt)}${d.unit} 減らせば達成`
+      : neg ? `目標まで あと ${d.fmt(tgt - val)}${d.unit} 削減` : `あと ${d.fmt(tgt - val)}${d.unit} で達成`;
     if (ok) achievedAll++;
-    return `<div class="dx-goal ${ok ? 'is-ok' : ''}">
+    return `<div class="dx-goal ${ok ? 'is-ok' : neg ? 'is-neg' : ''}">
       <div class="ring"><svg viewBox="0 0 80 80"><circle class="trk" cx="40" cy="40" r="34"/>
         <circle class="bar" cx="40" cy="40" r="34" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${C.toFixed(1)}" data-off="${(C * (1 - frac)).toFixed(1)}"/></svg>
         <span class="pct">${ok ? '✓' : pct + '%'}</span></div>
       <div class="txt"><div class="nm">${d.name}</div>
-        <div class="vl"><b>${d.fmt(Math.max(0, val))}</b>${d.unit} <span class="t-muted">／ 目標 ${d.fmt(tgt)}${d.unit}${d.dir === 'le' ? '以下' : '以上'}</span></div>
+        <div class="vl">${neg ? `<b class="t-warn">+${d.fmt(-val)}</b>${d.unit} <span class="t-warn" style="font-weight:700">増</span>` : `<b>${d.fmt(val)}</b>${d.unit}`} <span class="t-muted">／ 目標 ${d.fmt(tgt)}${d.unit}${d.dir === 'le' ? '以下' : '以上'}</span></div>
         <div class="gl ${ok ? 't-ok' : ''}">${ok ? '達成！' : remain}${d.note ? `<span class="t-muted">・${d.note}</span>` : ''}</div></div></div>`;
   }).join('');
   const sub = document.getElementById('goal-sub');
