@@ -1057,15 +1057,31 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .dx-eff-hero .big .tag{margin-left:6px;font-size:13px;font-weight:800;padding:2px 9px;border-radius:999px;background:var(--surface);}
 .dx-eff-hero .sub{font-size:12px;color:var(--dx-ink-2);margin-top:3px;}
 .dx-eff-hd{font-size:12px;font-weight:700;color:var(--dx-ink-2);margin-bottom:10px;}
-.dx-eff .dx-hbar{grid-template-columns:minmax(0,170px) minmax(0,1fr) auto;}
-.dx-eff .dx-hbar .vv{color:var(--st-ok-ink);}
+.dx-eff-hero.is-bad{background:var(--st-warn-bg);}
+.dx-eff-hero.is-bad .big{color:var(--st-warn-ink);}
+.dx-eff-hero .cmp{font-size:13px;font-weight:700;color:var(--dx-ink-1);margin-top:6px;}
+.dx-eff-hero .cmp .arr{margin:0 4px;color:var(--dx-ink-3);}
+.dx-eff-hero .cmp b{font-size:15px;}
+.dx-eff-rows{display:grid;gap:8px;}
+.dx-eff-row{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr) auto;gap:12px;align-items:center;font-size:13px;}
+.dx-eff-row .lb{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dx-ink-1);}
+.dx-eff-row .bars{display:grid;gap:2px;}
+.dx-eff-row .bars i{display:block;height:6px;border-radius:999px;width:0;transition:width .7s cubic-bezier(.2,.7,.2,1);}
+.dx-eff-row .bars .p{background:var(--dx-ink-3);opacity:.45;}
+.dx-eff-row.is-down .bars .c{background:var(--st-ok);}
+.dx-eff-row.is-up .bars .c{background:var(--st-warn);}
+.dx-eff-row .vv{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--dx-ink-2);}
+.dx-eff-row .vv b{color:var(--dx-ink-1);}
+.dx-eff-row .vv em{font-style:normal;font-weight:800;margin-left:8px;}
+.dx-eff-row.is-down .vv em{color:var(--st-ok-ink);}
+.dx-eff-row.is-up .vv em{color:var(--st-warn-ink);}
 /* 管理: 目標設定 */
 .dx-goal-admin{display:flex;flex-direction:column;gap:8px;margin-bottom:6px;}
 .dx-goal-adm{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--g800);}
 .dx-goal-adm .nm{min-width:220px;font-weight:700;}
 .dx-goal-adm input[type=number]{width:84px;height:32px;border:1.5px solid var(--g200);border-radius:7px;padding:0 8px;background:var(--panel);color:var(--g800);font:inherit;}
 .dx-goal-adm .u{color:var(--g500);}
-@media(max-width:768px){.dx-eff{grid-template-columns:1fr;gap:14px;}.dx-eff .dx-hbar{grid-template-columns:minmax(0,110px) minmax(0,1fr) auto;}.dx-eff .dx-hbar .vv small{display:block;margin-left:0;font-size:10px;text-align:right;}.dx-goal-adm .nm{min-width:0;flex:1;}}
+@media(max-width:768px){.dx-eff{grid-template-columns:1fr;gap:14px;}.dx-eff-row{grid-template-columns:minmax(0,96px) minmax(0,1fr) auto;gap:8px;font-size:12px;}.dx-eff-row .vv em{display:block;margin-left:0;text-align:right;}.dx-goal-adm .nm{min-width:0;flex:1;}}
 @media (prefers-reduced-motion:reduce){.dx-confetti{display:none;}.dx-goal .ring .bar{transition:none;}}
 @media print{.dx-confetti{display:none!important;}.dx-goal,.dx-eff-hero{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .dx-goals{grid-template-columns:repeat(3,1fr)!important;gap:6px!important;}.dx-goal{padding:6px 8px!important;}
@@ -1321,7 +1337,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     </div>
     <!-- 効率化ハイライト（前月期比・日報ベース） -->
     <div class="card" id="eff-card">
-      <div class="card-hd"><h2>効率化ハイライト</h2><span class="card-sub" id="eff-sub">1稼働日あたりの作業時間を前月期と比較</span></div>
+      <div class="card-hd"><h2>効率化ハイライト</h2><span class="card-sub" id="eff-sub">前月期と今月期で、1人が1日にかけた時間を比べます</span></div>
       <div class="card-body"><div id="eff-body"><p class="dx-empty">前月期のデータを読み込み中…</p></div></div>
     </div>
     <!-- 管理者サマリー（アラート＋担当別 残業・稼働一覧） -->
@@ -5763,6 +5779,8 @@ function _effCompute() {
   return {cur, prev, items, saved, ppdPrev, ppdCur};
 }
 
+function _effMin(h) { return Math.round(h * 60); }
+function _effHm(h) { const m = _effMin(h); return m >= 60 ? `${Math.floor(m / 60)}時間${String(m % 60).padStart(2, '0')}分` : `${m}分`; }
 function renderEfficiency() {
   const el = document.getElementById('eff-body'), ctx = _mgrCtx;
   if (!el || !ctx) return;
@@ -5770,40 +5788,46 @@ function renderEfficiency() {
   const e = _effCompute();
   ctx.eff = e;
   if (!e || e.empty) { el.innerHTML = '<p class="dx-empty">比較できる前月期・今月期のデータがありません</p>'; renderGoals(); return; }
-  const good = e.saved > 0.05;
-  const top = e.items.filter(x => x.saved > 0.05 && x.p > 0).sort((a, b) => b.saved - a.saved).slice(0, 5);
-  const upCount = e.items.filter(x => x.saved < -0.05).length;
-  const maxS = Math.max(0.01, ...top.map(x => x.saved));
-  const dPpd = e.ppdCur - e.ppdPrev;
+  // すべて「1人1日あたりの分数」で表現する（前月期 → 今月期）
+  const dMin = _effMin(e.ppdCur) - _effMin(e.ppdPrev);
+  const good = dMin < 0, same = dMin === 0;
+  const rowOf = x => ({...x, dm: _effMin(x.c) - _effMin(x.p)});
+  const down = e.items.map(rowOf).filter(x => x.dm < 0).sort((a, b) => a.dm - b.dm).slice(0, 5);
+  const up = e.items.map(rowOf).filter(x => x.dm > 0).sort((a, b) => b.dm - a.dm).slice(0, 3);
+  const maxM = Math.max(1, ...[...down, ...up].flatMap(x => [_effMin(x.p), _effMin(x.c)]));
+  const list = (rows, cls) => `<div class="dx-eff-rows">${rows.map(x => {
+    const sb = SUB_MAP[x.cd] || {}, color = CAT_COLOR[sb.mainCd] || '#8C8377';
+    return `<div class="dx-eff-row ${cls}">
+      <span class="lb" title="${escHtml(x.cd)}"><i class="dx-sw" style="background:${color}"></i>${escHtml(sb.label || x.cd)}</span>
+      <div class="bars"><i class="p" data-w="${(_effMin(x.p) / maxM * 100).toFixed(1)}"></i><i class="c" data-w="${(_effMin(x.c) / maxM * 100).toFixed(1)}"></i></div>
+      <span class="vv">${_effMin(x.p)}分 → <b>${_effMin(x.c)}分</b><em>${x.dm > 0 ? '+' : ''}${x.dm}分</em></span></div>`;
+  }).join('')}</div>`;
   el.innerHTML = `<div class="dx-eff">
-    <div class="dx-eff-hero ${good ? 'is-good' : ''}">
-      <div class="lbl">${good ? '前月期のペースと比べて' : '前月期のペースと比べて'}</div>
-      <div class="big"><span class="dx-eff-num" data-v="${Math.abs(e.saved).toFixed(1)}">${Math.abs(e.saved).toFixed(1)}</span><span class="u">h</span><span class="tag">${good ? '削減' : '増加'}</span></div>
-      <div class="sub">1人1日あたり <b>${e.ppdPrev.toFixed(2)}h → ${e.ppdCur.toFixed(2)}h</b>
-        <span class="${dPpd < -0.005 ? 't-ok' : dPpd > 0.005 ? 't-warn' : 't-muted'}">（${dPpd > 0 ? '+' : ''}${dPpd.toFixed(2)}h）</span></div>
-      <div class="sub t-muted">入力人日 前月期 ${e.prev.personDays}／今月期 ${e.cur.personDays}で比較</div>
+    <div class="dx-eff-hero ${good ? 'is-good' : same ? '' : 'is-bad'}">
+      <div class="lbl">1人が1日にかけた作業時間</div>
+      <div class="cmp"><span class="t-muted">前月期</span> ${_effHm(e.ppdPrev)} <span class="arr">→</span> <span class="t-muted">今月期</span> <b>${_effHm(e.ppdCur)}</b></div>
+      <div class="big">${Math.abs(dMin) < 60 ? `<span class="dx-eff-num" data-v="${Math.abs(dMin)}">${Math.abs(dMin)}</span><span class="u">分</span>` : `<span class="dx-eff-num">${_effHm(Math.abs(dMin) / 60)}</span>`}<span class="tag">${good ? '短縮' : same ? '変わらず' : '増加'}</span></div>
+      <div class="sub">今月期の合計では <b>${Math.abs(e.saved).toFixed(1)}h</b> ${good ? '浮きました' : same ? '' : '増えました'}<span class="t-muted">（${Math.abs(dMin)}分 × 日報 ${e.cur.personDays}人日）</span></div>
     </div>
     <div class="dx-eff-list">
-      <div class="dx-eff-hd">時間を減らせた作業 ${top.length ? `TOP${top.length}` : ''}</div>
-      ${top.length ? `<div class="dx-hbars">${top.map((x, i) => {
-        const sb = SUB_MAP[x.cd] || {}, color = CAT_COLOR[sb.mainCd] || '#8C8377';
-        return `<div class="dx-hbar"><span class="lb" title="${escHtml(x.cd)}"><i class="dx-sw" style="background:${color}"></i>${escHtml(sb.label || x.cd)}</span>
-          <div class="tr"><i style="background:var(--st-ok)" data-w="${(x.saved / maxS * 100).toFixed(1)}"></i></div>
-          <span class="vv">−${x.saved.toFixed(1)}h<small>1人1日 ${x.p.toFixed(2)}→${x.c.toFixed(2)}h${x.pct != null ? `（${Math.round(x.pct * 100)}%）` : ''}</small></span></div>`;
-      }).join('')}</div>` : '<p class="dx-empty" style="padding:12px 0">今月期はまだ前月期より減った作業がありません</p>'}
-      <p class="dx-note">${upCount ? `時間が増えた作業 ${upCount}件。` : ''}業務量の増減も含みます（同じ作業に1人1日あたり何時間かけたかの比較）。</p>
+      <div class="dx-eff-hd t-ok">減った作業</div>
+      ${down.length ? list(down, 'is-down') : '<p class="dx-empty" style="padding:6px 0 12px">減った作業はまだありません</p>'}
+      <div class="dx-eff-hd t-warn" style="margin-top:14px">増えた作業</div>
+      ${up.length ? list(up, 'is-up') : '<p class="dx-empty" style="padding:6px 0">増えた作業はありません</p>'}
+      <div class="dx-legend" style="margin-top:12px"><span><i class="dx-sw" style="background:var(--dx-ink-3);opacity:.45"></i>前月期</span><span><i class="dx-sw" style="background:var(--st-ok)"></i>今月期（減）</span><span><i class="dx-sw" style="background:var(--st-warn)"></i>今月期（増）</span></div>
+      <p class="dx-note">数字は「1人が1日にその作業へかけた時間」です。仕事の量が減った場合も含みます。</p>
     </div>
   </div>`;
   const first = !ctx._effGrown; ctx._effGrown = true;
   dxGrow(el, !first);
   const num = el.querySelector('.dx-eff-num');
-  if (num && first && !_dxReduce()) {
+  if (num && num.dataset.v && first && !_dxReduce()) {
     const target = parseFloat(num.dataset.v), t0 = performance.now();
-    const st = now => { const k = Math.min(1, (now - t0) / 700), v = target * (1 - Math.pow(1 - k, 3)); num.textContent = v.toFixed(1); if (k < 1 && num.isConnected) requestAnimationFrame(st); };
+    const st = now => { const k = Math.min(1, (now - t0) / 700), v = target * (1 - Math.pow(1 - k, 3)); num.textContent = Math.round(v); if (k < 1 && num.isConnected) requestAnimationFrame(st); };
     requestAnimationFrame(st);
   }
   const sub = document.getElementById('eff-sub');
-  if (sub) sub.textContent = '1人1日あたりの作業時間を前月期と比較';
+  if (sub) sub.textContent = '前月期と今月期で、1人が1日にかけた時間を比べます';
   renderGoals();
 }
 
@@ -5832,7 +5856,7 @@ function renderGoals() {
   const defs = [
     {k: 'otAvg', name: '残業 平均/人', unit: 'h', dir: 'le', fmt: x => x.toFixed(1), note: v && v.projected ? '月末見込で判定' : ''},
     {k: 'entryRate', name: '日報 入力率', unit: '%', dir: 'ge', fmt: x => x.toFixed(0)},
-    {k: 'saved', name: '効率化で浮いた時間', unit: 'h', dir: 'ge', fmt: x => x.toFixed(1), note: '前月期のペース比'}
+    {k: 'saved', name: '効率化で浮いた時間', unit: 'h', dir: 'ge', fmt: x => x.toFixed(1), note: '1人1日の短縮分 × 今月期の人日'}
   ].filter(d => G[d.k] && G[d.k].on);
   if (!defs.length || !v) { card.style.display = 'none'; return; }
   card.style.display = '';
