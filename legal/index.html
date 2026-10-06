@@ -1734,6 +1734,7 @@ const DEPARTMENT_CONFIG = (function(){
     allowedDomains: ['horizon.co.jp', 'bp.horizon.co.jp'],
     // 担当者選択の初期リスト（部署固有）。新規ブラウザで表示される既定の担当者。
     defaultAuthors: ['ヘルプ','秋永','吉永','山田','須藤','平山','小野','田村','谷'],
+    authorsLast: ['谷'],   // どの表・グラフ・選択肢でも常に最後に並べる担当者
     // 上部ナビの外部アプリリンク（黒板/手順書/資料検索）を表示するか。
     // これらは生産管理課専用の外部システムのため、他部署は config.js で false にして非表示化。
     showAppLinks: true,
@@ -2552,13 +2553,18 @@ function openSettings() {
 // 担当者リストキャッシュキー
 const AUTHOR_LIST_KEY = LS_NS + '__authorList__';
 
+// authorsLast に挙げた担当者を末尾へ回す（それ以外の順序は保つ）
+function _authorsLast(list) {
+  const last = (DEPARTMENT_CONFIG.authorsLast || []).filter(a => list.includes(a));
+  return last.length ? [...list.filter(a => !last.includes(a)), ...last] : list;
+}
 function getAuthorList() {
   try {
     const raw = localStorage.getItem(AUTHOR_LIST_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) return _authorsLast(JSON.parse(raw));
   } catch(e) {}
   // フォールバック：AUTHOR_ORDERをデフォルトリストとして使用
-  return [...AUTHOR_ORDER];
+  return _authorsLast([...AUTHOR_ORDER]);
 }
 function saveAuthorList(list) {
   localStorage.setItem(AUTHOR_LIST_KEY, JSON.stringify(list));
@@ -5625,7 +5631,7 @@ function _folioHoursFor(ctx, author, date) {
 function _entryAuthors(leaveMap) {
   const list = getAuthorList().filter(a => a && a !== 'ヘルプ');
   Object.keys(leaveMap || {}).forEach(a => { if (a !== 'ヘルプ' && !list.includes(a)) list.push(a); });
-  return list;
+  return _authorsLast(list);
 }
 
 function renderEntryMatrix() {
@@ -6055,7 +6061,7 @@ function renderMgrSummary() {
     <tbody>${rows.map(r => {
       return `<tr><td class="name">${escHtml(r.a)}</td>
         <td class="num">${r.c.n.toFixed(1)}h</td>
-        <td class="num">${otCell(r.c.ot, r.curLv)}${r.thanks ? `<span class="dx-rank is-1" title="残業${proj ? '（月末見込）' : ''} ${basis(r).toFixed(1)}h はチーム平均 ${teamAvg.toFixed(1)}h より少なく、平均を下げてくれています">ありがとう</span>` : ''}</td>
+        <td class="num">${otCell(r.c.ot, r.curLv)}${r.thanks ? `<span class="dx-rank is-1" title="残業${proj ? '（月末見込）' : ''} ${basis(r).toFixed(1)}h はチーム平均 ${teamAvg.toFixed(1)}h より少ない">◎ 平均以下</span>` : ''}</td>
         ${proj ? `<td class="num">${otCell(r.pj, r.pjLv)}</td>` : ''}
         ${remainDays ? (() => {
           const left = limit - r.c.ot, per = left / remainDays;
@@ -6071,7 +6077,7 @@ function renderMgrSummary() {
         <td class="num ${(missing[r.a] || 0) ? 't-crit' : 't-muted'}">${missing[r.a] ? missing[r.a] + '日' : '—'}</td>
         ${showRatio ? `<td class="num">${!ratio ? '<span class="t-muted">…</span>' : ratio[r.a] == null ? '—' : Math.round(ratio[r.a] * 100) + '%'}</td>` : ''}</tr>`;
     }).join('')}</tbody></table></div>
-    <div class="dx-legend"><span><i class="dx-sw" style="background:var(--st-ok)"></i>${warn}h未満</span><span><i class="dx-sw" style="background:var(--st-warn)"></i>警告 ${warn}h以上</span><span><i class="dx-sw" style="background:var(--st-crit)"></i>上限 ${limit}h超</span><span><i class="dx-rank is-1" style="margin:0 6px 0 0">ありがとう</i>残業がチーム平均（${proj ? '月末見込 ' : ''}${teamAvg.toFixed(1)}h）より少なく、平均を下げてくれているメンバー</span>${proj ? '<span><i class="dx-sw" style="background:repeating-linear-gradient(135deg,var(--dx-ink-3) 0 2px,transparent 2px 4px)"></i>月末見込までの伸び</span>' : ''}</div>`
+    <div class="dx-legend"><span><i class="dx-sw" style="background:var(--st-ok)"></i>${warn}h未満</span><span><i class="dx-sw" style="background:var(--st-warn)"></i>警告 ${warn}h以上</span><span><i class="dx-sw" style="background:var(--st-crit)"></i>上限 ${limit}h超</span><span><i class="dx-rank is-1" style="margin:0 6px 0 0">◎ 平均以下</i>残業がチーム平均（${proj ? '月末見込 ' : ''}${teamAvg.toFixed(1)}h）より少ない</span>${proj ? '<span><i class="dx-sw" style="background:repeating-linear-gradient(135deg,var(--dx-ink-3) 0 2px,transparent 2px 4px)"></i>月末見込までの伸び</span>' : ''}</div>`
     : '<p class="dx-empty">この期間のデータがありません</p>';
   dxGrow(tbl, !!ctx._grown);   // 伸長アニメは最初の1回だけ
   ctx._grown = true;
@@ -6339,7 +6345,7 @@ function renderSkillMap(byAuthorRows) {
     return {cd, tot, top, people, share, lv};
   }).filter(x => x.tot >= 1).sort((x, y) => rank(x.lv) - rank(y.lv) || y.tot - x.tot);
   if (!subs.length) { el.innerHTML = '<p class="dx-empty">この年度のデータがありません</p>'; return; }
-  const ordA = authors.sort((x, y) => getAuthorList().indexOf(x) - getAuthorList().indexOf(y));
+  const ordA = _authorsLast(authors.sort((x, y) => getAuthorList().indexOf(x) - getAuthorList().indexOf(y)));
   const nCrit = subs.filter(x => x.lv === 'crit').length, nWarn = subs.filter(x => x.lv === 'warn').length;
   const sub = document.getElementById('skill-map-sub');
   if (sub) sub.innerHTML = `属人化 <b class="${nCrit ? 't-crit' : ''}">${nCrit}件</b>・集中 <b class="${nWarn ? 't-warn' : ''}">${nWarn}件</b>（年度20h以上の業務）`;
@@ -6416,8 +6422,8 @@ function render36Check(periods, personMonth) {
   if (!el) return;
   const R = DEPARTMENT_CONFIG.rules;
   const warn = R.otMonthWarn || 36, limit = R.otMonthLimit || 45, yLimit = R.otYearLimit || 360, maxOver = R.otOverMonthsMax || 6;
-  const authors = Object.keys(personMonth).filter(a => personMonth[a].some(v => v > 0))
-    .sort((a, b) => personMonth[b].reduce((t, v) => t + v, 0) - personMonth[a].reduce((t, v) => t + v, 0));
+  const authors = _authorsLast(Object.keys(personMonth).filter(a => personMonth[a].some(v => v > 0))
+    .sort((a, b) => personMonth[b].reduce((t, v) => t + v, 0) - personMonth[a].reduce((t, v) => t + v, 0)));
   if (!authors.length) { el.innerHTML = '<p class="dx-empty">この年度の残業データがありません</p>'; return; }
   const cellCls = v => v > limit ? 'crit' : v >= warn ? 'warn' : '';
   el.innerHTML = `<table class="dx-table dx-heat">
@@ -7187,7 +7193,7 @@ function sortedAuthors(obj) {
   const keys = Object.keys(obj);
   const ordered = AUTHOR_ORDER.filter(a => keys.includes(a));
   const others  = keys.filter(a => !AUTHOR_ORDER.includes(a)).sort();
-  return [...ordered, ...others];
+  return _authorsLast([...ordered, ...others]);
 }
 
 // leaveNormal: {author: normalH}, leaveOT: {author: otH} → 退勤ログ由来の時間
