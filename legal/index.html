@@ -1072,7 +1072,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .dx-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2;}
 .dx-confetti i{position:absolute;top:-12px;width:7px;height:11px;border-radius:2px;opacity:0;animation:dxConf var(--d,1.8s) cubic-bezier(.2,.6,.4,1) forwards;}
 @keyframes dxConf{0%{opacity:1;transform:translate(0,0) rotate(0);}100%{opacity:0;transform:translate(var(--dx,0),260px) rotate(var(--r,360deg));}}
-.dx-rank{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:800;line-height:1.6;vertical-align:1px;white-space:nowrap;font-style:normal;}
+.dx-rank{display:inline-block;margin-right:6px;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:800;line-height:1.6;vertical-align:1px;white-space:nowrap;font-style:normal;}
 .dx-rank.is-1{background:var(--st-ok);color:#fff;}
 .dx-rank.is-2,.dx-rank.is-3{background:var(--st-ok-bg);color:var(--st-ok-ink);}
 .dx-table td .dx-rank{float:none;}
@@ -6131,7 +6131,7 @@ function renderMgrSummary() {
     <tbody>${rows.map(r => {
       return `<tr><td class="name">${escHtml(r.a)}</td>
         <td class="num">${r.c.n.toFixed(1)}h</td>
-        <td class="num">${otCell(r.c.ot, r.curLv)}${r.thanks ? `<span class="dx-rank is-1" title="残業${proj ? '（月末見込）' : ''} ${basis(r).toFixed(1)}h はチーム平均 ${teamAvg.toFixed(1)}h より少ない">◎ 平均以下</span>` : ''}</td>
+        <td class="num">${r.thanks ? `<span class="dx-rank is-1" title="残業${proj ? '（月末見込）' : ''} ${basis(r).toFixed(1)}h はチーム平均 ${teamAvg.toFixed(1)}h より少ない">◎ 平均以下</span>` : ''}${otCell(r.c.ot, r.curLv)}</td>
         ${proj ? `<td class="num">${otCell(r.pj, r.pjLv)}</td>` : ''}
         ${remainDays ? (() => {
           const left = limit - r.c.ot, per = left / remainDays;
