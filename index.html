@@ -217,12 +217,14 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
 
 /* ─── ENTRY TABLE ────────────────────── */
 .table-wrap{overflow-x:auto;}
-table.entry-tbl{width:100%;border-collapse:collapse;font-size:13px;}
+table.entry-tbl{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;}   /* 列幅固定: 入力や演出で列が動かない */
 table.entry-tbl thead th{background:#F0E9DB;color:var(--g700);padding:9px 10px;text-align:center;font-weight:800;font-size:12px;white-space:nowrap;letter-spacing:0;border-bottom:1px solid var(--g200);}
 table.entry-tbl th.th-main{width:80px;}
 table.entry-tbl th.th-cd{width:50px;}
 table.entry-tbl th.th-name{text-align:left;}
-table.entry-tbl th.th-hours{width:100px;}
+table.entry-tbl th.th-hours{width:110px;}
+.hours-wrap{width:62px;margin:0 auto;}
+tfoot .ft-total .ft-num{display:inline-block;}
 table.entry-tbl td{border-bottom:1px solid var(--g100);padding:4px 8px;vertical-align:middle;}
 table.entry-tbl tr:hover td{background:#FAF7F1;}
 table.entry-tbl tr.row-focus td{background:rgba(37,99,235,.07);}
@@ -460,16 +462,18 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   /* ── 入力テーブル：CD列を非表示・大分類圧縮・時間列を詰める ── */
   table.entry-tbl{font-size:12px;}
   table.entry-tbl thead th{padding:5px 3px;font-size:10px;white-space:normal;line-height:1.2;}
-  table.entry-tbl th.th-cd{display:none;}
-  table.entry-tbl td.td-cd{display:none;}
+  /* コード列は幅0にして隠す（display:none だと固定レイアウトで列の対応がずれる） */
+  table.entry-tbl col.col-cd{width:0;}
+  table.entry-tbl th.th-cd,table.entry-tbl td.td-cd{padding:0!important;font-size:0;overflow:hidden;border-right:none;}
   table.entry-tbl th.th-main{width:36px;padding:5px 2px;}
   table.entry-tbl th.th-hours{width:58px;padding:5px 2px;}
   table.entry-tbl td{padding:4px 3px;}
   .td-main{padding:3px 2px!important;}
   .td-main .main-cd{font-size:13px;line-height:1.1;}
   .td-main .main-lbl{display:none;}
-  .hours-wrap{gap:2px;}
+  .hours-wrap{gap:2px;width:44px;}
   .hours-wrap input{width:44px;font-size:12px;padding:3px 1px;border-radius:5px;}
+  table.entry-tbl th.th-hours{width:80px;}
 
   /* ── 入力カードヘッダー ── */
   .submit-header{padding:8px 10px;flex-wrap:wrap;gap:4px;}
@@ -552,8 +556,9 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   table.entry-tbl{font-size:11px;}
   table.entry-tbl thead th{font-size:9px;}
   table.entry-tbl th.th-main{width:28px;}
-  table.entry-tbl th.th-hours{width:48px;}
+  table.entry-tbl th.th-hours{width:64px;}
   table.entry-tbl td{padding:3px 2px;}
+  .hours-wrap{width:36px;}
   .hours-wrap input{width:36px;font-size:11px;padding:2px 0;}
   .td-main .main-cd{font-size:11px;}
   tfoot td{padding:6px 4px;font-size:12px;}
@@ -1243,6 +1248,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     </div>
     <div class="table-wrap">
       <table class="entry-tbl">
+        <colgroup><col class="col-main"><col class="col-cd"><col class="col-name"><col class="col-hours"><col class="col-hours"></colgroup>
         <thead>
           <tr>
             <th class="th-main">大分類</th>
@@ -1256,8 +1262,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <tfoot>
           <tr>
             <td colspan="3" class="ft-label">合　計</td>
-            <td class="ft-total" id="total-normal">0.0</td>
-            <td class="ft-total" id="total-ot">0.0</td>
+            <td class="ft-total" id="total-normal"><span class="ft-num">0.0</span></td>
+            <td class="ft-total" id="total-ot"><span class="ft-num">0.0</span></td>
           </tr>
         </tfoot>
       </table>
@@ -4492,6 +4498,7 @@ const _U = () => _unit === 'min' ? 60 : 1;                // value = hours * _U
 function getH(inp){ return inp ? (parseFloat(inp.value)||0) / _U() : 0; }   // value → 時間(h)
 function setHV(inp, hours){                                // 時間(h) → 現単位の表示値
   if (!inp) return;
+  inp._pv = Math.round(hours * 100) / 100;                   // プログラムからの設定は演出の差分に含めない
   inp.value = _unit === 'min'
     ? String(Math.round(hours * 60))                       // 分（整数）
     : (Math.round(hours * 100) / 100).toFixed(2);          // h（従来形式）
@@ -4572,10 +4579,17 @@ function makeHoursCell(id, cdSub, isOT) {
   const wrap=document.createElement('div'); wrap.className='hours-wrap';
   const inp=document.createElement('input');
   inp.type='number'; inp.id=id; inp.value='0'; applyStepAttr(inp);
+  // 上下ボタン・キーボード入力でも、増えた分だけクリックと同じ演出を出す
+  inp._pv = 0;
+  const fxDiff = () => {
+    const v = getH(inp), d = Math.round((v - inp._pv) * 100) / 100; inp._pv = v;
+    if (d > 0) _inpFx(cdSub, inp, d, isOT, null);
+    else if (d < 0) { inp.classList.remove('bump', 'bump-ot'); void inp.offsetWidth; inp.classList.add(isOT ? 'bump-ot' : 'bump'); setTimeout(() => inp.classList.remove('bump', 'bump-ot'), 450); }
+  };
   if (isOT) {
-    inp.oninput=()=>{ refreshCellStyle(inp); scheduleUpdateTotals(); };
+    inp.oninput=()=>{ refreshCellStyle(inp); fxDiff(); scheduleUpdateTotals(); };
   } else {
-    inp.oninput=()=>{ clampNormal(cdSub); scheduleUpdateTotals(); };
+    inp.oninput=()=>{ fxDiff(); clampNormal(cdSub); scheduleUpdateTotals(); };
   }
   inp.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); navMove(this, e.shiftKey ? 'up' : 'down'); }
@@ -4660,19 +4674,24 @@ function _inpFx(cdSub, inp, added, isOT, ev) {
   // 表全体のフラッシュ
   const twrap = tr && tr.closest('.table-wrap');
   if (twrap) { const fl = document.createElement('div'); fl.className = 'table-flash'; fl.style.setProperty('--cat-color', isOT ? '#e11d48' : color); twrap.appendChild(fl); setTimeout(() => fl.remove(), 500); }
-  // クリック位置から波紋 ＋ 衝撃波リング ＋ 火花
+  // クリック位置（上下ボタン・キー入力のときは入力欄の中心）から波紋 ＋ 衝撃波リング ＋ 火花
   const td = ev && ev.currentTarget;
-  if (td && ev.clientX != null) {
-    const r = td.getBoundingClientRect(), rp = document.createElement('span');
-    rp.className = 'td-ripple'; rp.style.left = (ev.clientX - r.left) + 'px'; rp.style.top = (ev.clientY - r.top) + 'px';
-    td.appendChild(rp); setTimeout(() => rp.remove(), 650);
+  const ir0 = inp.getBoundingClientRect();
+  const px = (ev && ev.clientX != null) ? ev.clientX : ir0.left + ir0.width / 2;
+  const py = (ev && ev.clientX != null) ? ev.clientY : ir0.top + ir0.height / 2;
+  {
+    if (td && ev.clientX != null) {
+      const r = td.getBoundingClientRect(), rp = document.createElement('span');
+      rp.className = 'td-ripple'; rp.style.left = (ev.clientX - r.left) + 'px'; rp.style.top = (ev.clientY - r.top) + 'px';
+      td.appendChild(rp); setTimeout(() => rp.remove(), 650);
+    }
     const fxColor = isOT ? '#e11d48' : color;
-    ['', 'r2'].forEach(c => { const rg = document.createElement('i'); rg.className = 'fx-ring ' + c; rg.style.left = ev.clientX + 'px'; rg.style.top = ev.clientY + 'px'; rg.style.setProperty('--cat-color', fxColor); document.body.appendChild(rg); setTimeout(() => rg.remove(), 750); });
+    ['', 'r2'].forEach(c => { const rg = document.createElement('i'); rg.className = 'fx-ring ' + c; rg.style.left = px + 'px'; rg.style.top = py + 'px'; rg.style.setProperty('--cat-color', fxColor); document.body.appendChild(rg); setTimeout(() => rg.remove(), 750); });
     const nSp = Math.min(40, 18 + combo * 4);
     for (let i = 0; i < nSp; i++) {
       const sp = document.createElement('i'); sp.className = 'fx-spark' + (i % 3 === 0 ? ' streak' : '');
       const ang = Math.random() * Math.PI * 2, dist = 50 + Math.random() * (90 + combo * 10);
-      sp.style.left = ev.clientX + 'px'; sp.style.top = ev.clientY + 'px'; sp.style.background = fxColor; sp.style.color = fxColor;
+      sp.style.left = px + 'px'; sp.style.top = py + 'px'; sp.style.background = fxColor; sp.style.color = fxColor;
       sp.style.setProperty('--dx', Math.cos(ang) * dist + 'px'); sp.style.setProperty('--dy', (Math.sin(ang) * dist + 30) + 'px');
       sp.style.setProperty('--rot', (ang * 180 / Math.PI + 90).toFixed(0) + 'deg');
       sp.style.animationDelay = (Math.random() * 0.08) + 's';
@@ -4680,7 +4699,7 @@ function _inpFx(cdSub, inp, added, isOT, ev) {
     }
     if (combo >= 2) {
       const cb = document.createElement('div'); cb.className = 'fx-combo';
-      cb.style.left = (ev.clientX + 70) + 'px'; cb.style.top = (ev.clientY - 10) + 'px'; cb.style.fontSize = Math.min(64, 26 + combo * 5) + 'px'; cb.style.setProperty('--cat-color', fxColor);
+      cb.style.left = (px + 70) + 'px'; cb.style.top = (py - 10) + 'px'; cb.style.fontSize = Math.min(64, 26 + combo * 5) + 'px'; cb.style.setProperty('--cat-color', fxColor);
       cb.innerHTML = `×${combo}<small>${combo >= 10 ? 'FEVER!!' : combo >= 5 ? 'HOT!' : 'COMBO'}</small>`;
       document.body.appendChild(cb); setTimeout(() => cb.remove(), 950);
     }
@@ -4760,10 +4779,11 @@ function clampNormal(cdSub) {
   const cap = Math.max(0, Math.round((REGULAR_H - otherNormal) * 100) / 100);
   if (v > cap) {
     const excess = Math.round((v - cap) * 100) / 100;
-    setHV(inp, cap);
+    setHV(inp, cap); inp._pv = cap;
     const ov = getH(otInp);
-    setHV(otInp, Math.round((ov + excess) * 100) / 100);
+    setHV(otInp, Math.round((ov + excess) * 100) / 100); otInp._pv = getH(otInp);
     refreshCellStyle(otInp);
+    _inpFx(cdSub, otInp, excess, true, null);   // 残業へ振り替わった分は赤の演出
   }
   refreshCellStyle(inp);
 }
@@ -4795,7 +4815,8 @@ function updateTotals() {
   const tnEl = document.getElementById('total-normal');
   const toEl = document.getElementById('total-ot');
   const f2 = v => v.toFixed(2);
-  _tweenNum(tnEl, normal, f2); _tweenNum(toEl, ot, f2);
+  // 合計セル(td)自体は動かさず、中の span だけを弾ませる（表の列が揺れないように）
+  _tweenNum(tnEl.querySelector('.ft-num') || tnEl, normal, f2); _tweenNum(toEl.querySelector('.ft-num') || toEl, ot, f2);
   tnEl.classList.toggle('at-max', atMax);
   toEl.classList.toggle('has-ot', ot > 0);
   _tweenNum(document.getElementById('side-normal'), normal, f2);
