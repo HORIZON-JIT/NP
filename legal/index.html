@@ -1115,6 +1115,12 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .cat-back:hover{background:var(--panel);border-color:var(--g300);}
 .dx-table tr.is-selected td{background:color-mix(in srgb,var(--st-info) 10%,transparent);}
 .dx-tag.is-info{background:var(--st-info-bg);color:var(--st-info-ink);}
+/* 高さの異なるカードを2列に流し込み、左右の高さを自動でそろえる */
+#view-dash .dash-masonry{column-count:2;column-gap:16px;margin-bottom:16px;}
+#view-dash .dash-masonry > .card{display:inline-block;width:100%;break-inside:avoid;margin:0 0 16px;vertical-align:top;}
+@media(max-width:900px){#view-dash .dash-masonry{column-count:1;}}
+.pdf-mode #view-dash .dash-masonry{column-count:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start;margin-bottom:8px;}
+.pdf-mode #view-dash .dash-masonry > .card{display:block;margin:0;}
 /* ── 効率化ハイライト ── */
 .dx-eff{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:24px;align-items:start;}
 .dx-eff-hero{padding:14px 16px;border-radius:12px;background:var(--dx-track);}
@@ -1559,24 +1565,23 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <button class="btn-refresh no-print" onclick="renderPersonDash(true)">再読込</button>
     </div>
     <div class="dash-stats dash-stats-7" id="person-kpi"></div>
-    <div class="dash-layout">
+    <!-- 上段: 4枚のカードを2列に自動で高さがそろうよう流し込む（データ量で左右の高さが変わっても空きが出ない） -->
+    <div class="dash-masonry">
       <div class="card">
         <div class="card-hd"><h2>月期別 推移</h2><span class="card-sub" id="person-trend-sub">残業バー: 黄=36h以上・赤=45h超</span></div>
         <div class="card-body"><div id="person-trend" style="overflow-x:auto;"></div></div>
       </div>
-      <div class="dash-col">
-        <div class="card">
-          <div class="card-hd"><h2 data-scope-title="業務構成">業務構成（年度）</h2><span class="card-sub">大分類の比率 本人／チーム平均</span></div>
-          <div class="card-body"><div id="person-mix"></div></div>
-        </div>
-        <div class="card">
-          <div class="card-hd"><h2 data-scope-title="退勤時刻の傾向">退勤時刻の傾向（年度）</h2><span class="card-sub">曜日別の平均退勤と残業日の割合</span></div>
-          <div class="card-body"><div id="person-dow"></div></div>
-        </div>
-        <div class="card">
-          <div class="card-hd"><h2 data-scope-title="中分類別 作業時間">中分類別 作業時間（年度）</h2><span class="card-sub">上位の業務</span></div>
-          <div class="card-body"><div id="person-subs"></div></div>
-        </div>
+      <div class="card">
+        <div class="card-hd"><h2 data-scope-title="業務構成">業務構成（年度）</h2><span class="card-sub">大分類の比率 本人／チーム平均</span></div>
+        <div class="card-body"><div id="person-mix"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><h2 data-scope-title="退勤時刻の傾向">退勤時刻の傾向（年度）</h2><span class="card-sub">曜日別の平均退勤と残業日の割合</span></div>
+        <div class="card-body"><div id="person-dow"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><h2 data-scope-title="中分類別 作業時間">中分類別 作業時間（年度）</h2><span class="card-sub">上位の業務</span></div>
+        <div class="card-body"><div id="person-subs"></div></div>
       </div>
     </div>
     <!-- 下段: 日別明細 → Folio完了タスク をそれぞれ全幅に（データ量に関係なく空きが出ないように） -->
