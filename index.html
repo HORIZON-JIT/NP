@@ -1428,6 +1428,10 @@ tfoot .ft-total{text-align:center;font-size:16px;}
           </div>
         </div>
         <div class="card">
+          <div class="card-hd"><h2>全担当 作業内訳（中分類別）</h2><span class="card-sub">作業時間合計（定時＋残業）・多い順</span></div>
+          <div class="card-body"><div id="monthly-sub-list"></div></div>
+        </div>
+        <div class="card">
           <div class="card-hd"><h2>残業時間集計</h2><span class="card-sub" id="monthly-ot-sub">破線=全員平均</span></div>
           <div class="card-body" style="position:relative;">
             <canvas id="monthly-ot-canvas"></canvas>
@@ -1502,6 +1506,10 @@ tfoot .ft-total{text-align:center;font-size:16px;}
             <canvas id="yearly-cat-canvas"></canvas>
             <div class="ot-empty" id="yearly-cat-empty" style="display:none;">この年のデータがありません</div>
           </div>
+        </div>
+        <div>
+          <div class="card-hd"><h2>全担当 作業内訳（中分類別）</h2><span class="card-sub">作業時間合計（定時＋残業）・多い順</span></div>
+          <div class="card-body"><div id="yearly-sub-list"></div></div>
         </div>
         <div>
           <div class="card-hd"><h2>担当別 作業時間比率</h2><span class="card-sub" id="yearly-stack-sub">大分類100%積み上げ（定時＋残業）</span></div>
@@ -6745,7 +6753,7 @@ async function renderMonthlyDash(silent) {
     });
     renderPersonPies(filtered,'monthly-person-grid',leaveNormalM,leaveOTM);
     // 全担当集計縦棒グラフ
-    requestAnimationFrame(()=>renderCatBar(filtered,'monthly-cat-canvas','monthly-cat-empty'));
+    requestAnimationFrame(()=>{ renderCatBar(filtered,'monthly-cat-canvas','monthly-cat-empty'); renderSubList(filtered,'monthly-sub-list'); });
     // 残業棒グラフ（強化版）：ヘルプを除外
     const otData={};
     allAuthors.forEach(a=>{
@@ -7003,7 +7011,7 @@ async function renderYearlyDash(silent) {
     const avgMonthOTperson = (activeMonths>0&&persons>0) ? totalOT/activeMonths/persons : 0;
     requestAnimationFrame(()=>renderYearlyOTLine(monthOTperson,'yearly-ot-person-canvas','yearly-ot-person-empty',avgMonthOTperson,prevMonthOTperson,10));
     // 全担当集計縦棒グラフ（大分類別）
-    requestAnimationFrame(()=>renderCatBar(yearByAuthorFlat,'yearly-cat-canvas','yearly-cat-empty'));
+    requestAnimationFrame(()=>{ renderCatBar(yearByAuthorFlat,'yearly-cat-canvas','yearly-cat-empty'); renderSubList(yearByAuthorFlat,'yearly-sub-list'); });
     // 担当別積み上げ棒グラフ
     requestAnimationFrame(()=>renderStackBar(yearByAuthorFlat,'yearly-stack-canvas','yearly-stack-empty'));
     _subTrendCtx = {periods: fiscalPeriods, periodSub};
@@ -7406,6 +7414,31 @@ function renderCatBar(byAuthor, canvasId, emptyId) {
       canvas._drill = b.cd; canvas._animNext = true; renderCatBar(canvas._data, canvasId, emptyId);
     });
   }
+}
+// 全担当 作業内訳（中分類別）: 全中分類を多い順の横棒で一覧（色は大分類）
+function renderSubList(byAuthor, elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const map = {};
+  let grand = 0;
+  Object.values(byAuthor).forEach(rows => rows.forEach(r => {
+    const h = (r.hoursNormal||0) + (r.hoursOT||0);
+    if (h <= 0) return;
+    const s = SUB_MAP[r.cdSub]||{};
+    if (!map[r.cdSub]) map[r.cdSub] = {cd:r.cdSub, mainCd:s.mainCd||'O', label:s.label||r.cdSub, total:0};
+    map[r.cdSub].total += h; grand += h;
+  }));
+  const subs = Object.values(map).sort((a,b)=>b.total-a.total);
+  if (!subs.length) { el.innerHTML = '<p class="dx-empty">この期間のデータがありません</p>'; return; }
+  const max = subs[0].total;
+  el.innerHTML = `<div class="dx-hbars cols">${subs.map(x => {
+    const color = CAT_COLOR[x.mainCd]||'#8C8377';
+    return `<div class="dx-hbar"><span class="lb" title="${escHtml(x.cd)} ${escHtml(CAT_LABEL[x.mainCd]||x.mainCd)}"><i class="dx-sw" style="background:${color}"></i>${escHtml(x.label)}</span>
+      <div class="tr"><i style="background:${color}" data-w="${(x.total/max*100).toFixed(1)}"></i></div>
+      <span class="vv">${x.total.toFixed(1)}h<small>${Math.round(x.total/grand*100)}%</small></span></div>`;
+  }).join('')}</div>
+  <div class="dx-legend">${[...new Set(subs.map(x=>x.mainCd))].map(cd=>`<span><i class="dx-sw" style="background:${CAT_COLOR[cd]||'#8C8377'}"></i>${escHtml(CAT_LABEL[cd]||cd)}</span>`).join('')}<span class="t-muted">合計 ${grand.toFixed(1)}h・${subs.length}件</span></div>`;
+  dxGrow(el, !!el._grown); el._grown = true;
 }
 // 作業内訳カードの見出し・副題・戻るボタンを掘り下げ状態に合わせる
 function _catBarChrome(canvas, drill) {
