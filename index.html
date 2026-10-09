@@ -1108,6 +1108,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .dx-rank.is-1{background:var(--st-ok);color:#fff;}
 .dx-rank.is-2,.dx-rank.is-3{background:var(--st-ok-bg);color:var(--st-ok-ink);}
 .dx-table td .dx-rank{float:none;}
+.cat-back{position:absolute;top:8px;right:14px;z-index:3;font:700 11px/1 Inter,sans-serif;padding:6px 10px;border-radius:999px;border:1px solid var(--g200);background:var(--surface);color:var(--g700);cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.08);}
+.cat-back:hover{background:var(--panel);border-color:var(--g300);}
 /* ── 効率化ハイライト ── */
 .dx-eff{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:24px;align-items:start;}
 .dx-eff-hero{padding:14px 16px;border-radius:12px;background:var(--dx-track);}
@@ -7293,77 +7295,128 @@ function renderCatBar(byAuthor, canvasId, emptyId) {
   const canvas=document.getElementById(canvasId);
   const emptyEl=document.getElementById(emptyId);
   if(!canvas||!emptyEl) return;
+  canvas._data = byAuthor;
 
-  // 大分類別に全担当を集計
-  const mainTotalsMap = {}; // {mainCd: {label, mainCd, total}}
+  // 集計: 大分類別、または掘り下げ中の大分類に属する中分類別
+  const drill = canvas._drill || null;
+  const map = {};
   Object.values(byAuthor).forEach(rows=>{
     rows.forEach(r=>{
       const h = (r.hoursNormal||0) + (r.hoursOT||0);
       if (h <= 0) return;
       const s = SUB_MAP[r.cdSub]||{};
-      const k = s.mainCd||'O';
-      if (!mainTotalsMap[k]) mainTotalsMap[k] = { mainCd:k, label:CAT_LABEL[k]||k, total:0 };
-      mainTotalsMap[k].total += h;
+      const mainCd = s.mainCd||'O';
+      if (drill) {
+        if (mainCd !== drill) return;
+        const k = r.cdSub;
+        if (!map[k]) map[k] = { cd:k, mainCd, label:s.label||k, total:0 };
+        map[k].total += h;
+      } else {
+        if (!map[mainCd]) map[mainCd] = { cd:mainCd, mainCd, label:CAT_LABEL[mainCd]||mainCd, total:0 };
+        map[mainCd].total += h;
+      }
     });
   });
-  const cats = Object.values(mainTotalsMap).filter(c=>c.total>0).sort((a,b)=>b.total-a.total);
-  if (!cats.length){ canvas.style.display='none'; emptyEl.style.display='block'; return; }
+  const cats = Object.values(map).filter(c=>c.total>0).sort((a,b)=>b.total-a.total);
+  if (!cats.length){
+    if (drill) { canvas._drill = null; return renderCatBar(byAuthor, canvasId, emptyId); }   // 掘り下げ先が空なら大分類へ戻す
+    canvas.style.display='none'; emptyEl.style.display='block'; _catBarChrome(canvas, null); return;
+  }
   canvas.style.display='block'; emptyEl.style.display='none';
+  _catBarChrome(canvas, drill);
 
   const W=_contentW(canvas.parentElement, 640) - 2;
-  const PL=44, PR=20, PT=16, PB=80; // PB大きめ：ラベル用
+  const PL=44, PR=20, PT=16, PB=drill?100:80; // PB大きめ：ラベル用（中分類は名前が長いのでさらに広く）
   const barCount=cats.length;
-  const H=Math.max(180, barCount*40+PT+PB);
+  const H=Math.max(280, barCount*40+PT+PB);
   canvas.width=W; canvas.height=H;
   const ctx=canvas.getContext('2d');
-  ctx.clearRect(0,0,W,H);
   const cW=W-PL-PR, cH=H-PT-PB;
   const barW=Math.max(8, Math.min(50, cW/barCount*0.7));
   const maxVal=cats[0].total*1.1||1;
+  const grand = cats.reduce((t,c)=>t+c.total,0);
 
-  // グリッド線
-  ctx.strokeStyle=CHT_GRID; ctx.lineWidth=1;
-  for(let i=0;i<=4;i++){
-    const y=PT+cH*(1-i/4);
-    ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(PL+cW,y); ctx.stroke();
-    ctx.fillStyle=CHT_FAINT; ctx.font='9px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
-    ctx.fillText((maxVal*i/4).toFixed(2)+'h',PL-4,y);
+  const draw = frac => {
+    ctx.clearRect(0,0,W,H);
+    // グリッド線
+    ctx.strokeStyle=CHT_GRID; ctx.lineWidth=1;
+    for(let i=0;i<=4;i++){
+      const y=PT+cH*(1-i/4);
+      ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(PL+cW,y); ctx.stroke();
+      ctx.fillStyle=CHT_FAINT; ctx.font='9px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle';
+      ctx.fillText((maxVal*i/4).toFixed(2)+'h',PL-4,y);
+    }
+    // バー（当たり判定用の矩形も記録）
+    canvas._bars = [];
+    cats.forEach((c,i)=>{
+      const x = PL + cW*(i+0.5)/barCount;
+      const bH = (c.total/maxVal)*cH*frac;
+      const col = CAT_COLOR[c.mainCd]||CHT_FAINT;
+      ctx.fillStyle=col;
+      _rr(ctx, x-barW/2, PT+cH-bH, barW, bH, 4, 'up');
+      canvas._bars.push({x0:x-barW/2-6, x1:x+barW/2+6, y0:PT, y1:PT+cH, cd:c.cd});
+      // 値ラベル（バー上部）。掘り下げ中は大分類内の比率も
+      ctx.fillStyle=CHT_MUTED; ctx.font='600 10px Inter, sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ctx.fillText(c.total.toFixed(2)+'h' + (drill ? `（${Math.round(c.total/grand*100)}%）` : ''), x, PT+cH-bH-2);
+      // X軸ラベル（斜め表示）
+      ctx.save();
+      ctx.translate(x, PT+cH+6);
+      ctx.rotate(-Math.PI/4);
+      ctx.fillStyle=CHT_TEXT; ctx.font='10px sans-serif';
+      ctx.textAlign='right'; ctx.textBaseline='middle';
+      ctx.fillText(c.label.length>10?c.label.slice(0,10)+'…':c.label, 0, 0);
+      ctx.restore();
+    });
+    // 凡例: 大分類ビューは色凡例、掘り下げ中は合計
+    const legY=H-16;
+    if (drill) {
+      ctx.fillStyle=CAT_COLOR[drill]||CHT_FAINT; ctx.fillRect(PL,legY-6,10,10);
+      ctx.fillStyle=CHT_TEXT; ctx.font='10px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillText(`${CAT_LABEL[drill]||drill} 合計 ${grand.toFixed(2)}h（${cats.length}件の中分類）`, PL+13, legY);
+    } else {
+      let lx=PL;
+      [...new Set(cats.map(c=>c.mainCd))].forEach(cd=>{
+        const col=CAT_COLOR[cd]||CHT_FAINT, lbl=CAT_LABEL[cd]||cd;
+        ctx.fillStyle=col; ctx.fillRect(lx,legY-6,10,10);
+        ctx.fillStyle=CHT_TEXT; ctx.font='10px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
+        ctx.fillText(lbl,lx+13,legY);
+        lx+=ctx.measureText(lbl).width+28;
+      });
+    }
+  };
+
+  // 掘り下げ／戻るの切替時だけ棒を伸ばす（データ更新の再描画では即描く）
+  if (canvas._raf) { cancelAnimationFrame(canvas._raf); canvas._raf = 0; }
+  if (canvas._animNext && !_dxReduce()) {
+    canvas._animNext = false;
+    const t0 = performance.now(), DUR = 420;
+    const step = now => { const k = Math.min(1, (now - t0) / DUR); draw(1 - Math.pow(1 - k, 3)); canvas._raf = k < 1 ? requestAnimationFrame(step) : 0; };
+    draw(0); canvas._raf = requestAnimationFrame(step);
+  } else { canvas._animNext = false; draw(1); }
+
+  // クリックで掘り下げ／戻る（1回だけ登録）
+  if (!canvas._drillBound) {
+    canvas._drillBound = true;
+    const hit = ev => { const r = canvas.getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top; return (canvas._bars||[]).find(b => x>=b.x0 && x<=b.x1 && y>=b.y0 && y<=b.y1); };
+    canvas.addEventListener('mousemove', ev => { canvas.style.cursor = (canvas._drill || hit(ev)) ? 'pointer' : ''; });
+    canvas.addEventListener('click', ev => {
+      if (canvas._drill) { canvas._drill = null; canvas._animNext = true; renderCatBar(canvas._data, canvasId, emptyId); return; }
+      const b = hit(ev); if (!b) return;
+      canvas._drill = b.cd; canvas._animNext = true; renderCatBar(canvas._data, canvasId, emptyId);
+    });
   }
-
-  // バー
-  cats.forEach((c,i)=>{
-    const x = PL + cW*(i+0.5)/barCount;
-    const bH = (c.total/maxVal)*cH;
-    const col = CAT_COLOR[c.mainCd]||CHT_FAINT;
-    // バー描画（グラデーション）
-    ctx.fillStyle=col;
-    _rr(ctx, x-barW/2, PT+cH-bH, barW, bH, 4, 'up');
-    // 値ラベル（バー上部）
-    ctx.fillStyle=CHT_MUTED; ctx.font='600 10px Inter, sans-serif';
-    ctx.textAlign='center'; ctx.textBaseline='bottom';
-    ctx.fillText(c.total.toFixed(2)+'h', x, PT+cH-bH-2);
-    // X軸ラベル（斜め表示）
-    ctx.save();
-    ctx.translate(x, PT+cH+6);
-    ctx.rotate(-Math.PI/4);
-    ctx.fillStyle=CHT_TEXT; ctx.font='10px sans-serif';
-    ctx.textAlign='right'; ctx.textBaseline='middle';
-    ctx.fillText(c.label.length>8?c.label.slice(0,8)+'…':c.label, 0, 0);
-    ctx.restore();
-  });
-
-  // 大分類カラー凡例
-  const usedMain=[...new Set(cats.map(c=>c.mainCd))];
-  const legX=PL, legY=H-16;
-  let lx=legX;
-  usedMain.forEach(cd=>{
-    const col=CAT_COLOR[cd]||CHT_FAINT;
-    const lbl=CAT_LABEL[cd]||cd;
-    ctx.fillStyle=col; ctx.fillRect(lx,legY-6,10,10);
-    ctx.fillStyle=CHT_TEXT; ctx.font='10px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
-    ctx.fillText(lbl,lx+13,legY);
-    lx+=ctx.measureText(lbl).width+28;
-  });
+}
+// 作業内訳カードの見出し・副題・戻るボタンを掘り下げ状態に合わせる
+function _catBarChrome(canvas, drill) {
+  const card = canvas.closest('.card') || canvas.parentElement.parentElement;
+  const hd = card && card.querySelector('.card-hd h2'), sub = card && card.querySelector('.card-sub');
+  const body = canvas.parentElement;
+  let btn = body.querySelector('.cat-back');
+  if (!btn) { btn = document.createElement('button'); btn.type = 'button'; btn.className = 'cat-back no-print'; btn.textContent = '← 大分類へ戻る'; btn.onclick = () => { canvas._drill = null; canvas._animNext = true; renderCatBar(canvas._data, canvas.id, canvas.id.replace('-canvas','-empty')); }; body.appendChild(btn); }
+  btn.style.display = drill ? '' : 'none';
+  if (hd) { if (!hd.dataset.base) hd.dataset.base = hd.textContent; hd.textContent = drill ? `${hd.dataset.base.replace('（大分類別）','')}（${CAT_LABEL[drill]||drill} の中分類）` : hd.dataset.base; }
+  if (sub) sub.textContent = drill ? '作業時間合計（定時＋残業）・グラフをクリックで大分類へ戻る' : '作業時間合計（定時＋残業）・棒をクリックで中分類へ';
 }
 
 // ═══════════════════════════════════════════
