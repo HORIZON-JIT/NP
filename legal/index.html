@@ -608,7 +608,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
   #view-dash .dash-layout{ display:block!important; }
   #view-dash .dash-col{ display:grid!important; grid-template-columns:1fr 1fr!important; gap:8px!important; margin-bottom:8px!important; }
   #view-dash .dash-col > .card{ margin-bottom:0!important; }
-  #dash-yearly .dash-layout > .card:last-child{ display:grid!important; grid-template-columns:1fr 1fr!important; gap:8px!important; }
+  #view-dash .dash-layout-eq{ display:grid!important; grid-template-columns:1fr 1fr!important; gap:8px!important; margin-bottom:8px!important; }
+  #view-dash .dash-layout-eq > .card{ margin-bottom:0!important; }
   #view-dash .dash-layout > .card,#view-dash .dash-col > .card,#view-dash .d-stat,#view-dash .person-card{ break-inside:avoid; }
 
   /* 表 */
@@ -863,6 +864,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 #view-dash .card .card{box-shadow:none;}
 #view-dash .person-grid{gap:12px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));}
 #view-dash .dash-layout{align-items:start;}
+#view-dash .dash-layout-eq{align-items:stretch;}
+#view-dash .dash-layout-eq > .card{margin-bottom:0;}
 #view-dash .person-card{border-radius:var(--dx-radius-sm);border:1px solid var(--dx-line);box-shadow:none;background:var(--surface);}
 #view-dash .person-card:hover{box-shadow:var(--dx-sh-hover);}
 #view-dash .person-card h3{font-size:14px;color:var(--dx-ink-1);}
@@ -1110,6 +1113,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .dx-table td .dx-rank{float:none;}
 .cat-back{position:absolute;top:8px;right:14px;z-index:3;font:700 11px/1 Inter,sans-serif;padding:6px 10px;border-radius:999px;border:1px solid var(--g200);background:var(--surface);color:var(--g700);cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.08);}
 .cat-back:hover{background:var(--panel);border-color:var(--g300);}
+.dx-table tr.is-selected td{background:color-mix(in srgb,var(--st-info) 10%,transparent);}
+.dx-tag.is-info{background:var(--st-info-bg);color:var(--st-info-ink);}
 /* ── 効率化ハイライト ── */
 .dx-eff{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:24px;align-items:start;}
 .dx-eff-hero{padding:14px 16px;border-radius:12px;background:var(--dx-track);}
@@ -1413,31 +1418,29 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <div id="mgr-table" style="overflow-x:auto;"></div>
       </div>
     </div>
-    <!-- メイングラフ2カラム -->
-    <div class="dash-layout">
-      <div class="card" style="display:flex;flex-direction:column;">
-        <div class="card-hd"><h2>担当別 作業内訳</h2><span class="card-sub" id="monthly-period-sub">作業時間合計（定時＋残業）</span></div>
-        <div class="card-body" style="flex:1;overflow-y:auto;"><div class="person-grid" id="monthly-person-grid"></div></div>
+    <!-- 担当別（全幅・列数は人数に合わせて均等）→ 大分類｜中分類（2列）→ 残業（全幅）。空きが出ないように -->
+    <div class="card">
+      <div class="card-hd"><h2>担当別 作業内訳</h2><span class="card-sub" id="monthly-period-sub">作業時間合計（定時＋残業）</span></div>
+      <div class="card-body"><div class="person-grid" id="monthly-person-grid"></div></div>
+    </div>
+    <div class="dash-layout dash-layout-eq">
+      <div class="card">
+        <div class="card-hd"><h2>全担当 作業内訳（大分類別）</h2><span class="card-sub" id="monthly-cat-sub">作業時間合計（定時＋残業）</span></div>
+        <div class="card-body" style="position:relative;">
+          <canvas id="monthly-cat-canvas"></canvas>
+          <div class="ot-empty" id="monthly-cat-empty" style="display:none;">この期間のデータがありません</div>
+        </div>
       </div>
-      <div class="dash-col">
-        <div class="card">
-          <div class="card-hd"><h2>全担当 作業内訳（大分類別）</h2><span class="card-sub" id="monthly-cat-sub">作業時間合計（定時＋残業）</span></div>
-          <div class="card-body" style="position:relative;">
-            <canvas id="monthly-cat-canvas"></canvas>
-            <div class="ot-empty" id="monthly-cat-empty" style="display:none;">この期間のデータがありません</div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-hd"><h2>全担当 作業内訳（中分類別）</h2><span class="card-sub">作業時間合計（定時＋残業）・多い順</span></div>
-          <div class="card-body"><div id="monthly-sub-list"></div></div>
-        </div>
-        <div class="card">
-          <div class="card-hd"><h2>残業時間集計</h2><span class="card-sub" id="monthly-ot-sub">破線=全員平均</span></div>
-          <div class="card-body" style="position:relative;">
-            <canvas id="monthly-ot-canvas"></canvas>
-            <div class="ot-empty" id="monthly-ot-empty" style="display:none;">この期間に残業はありません</div>
-          </div>
-        </div>
+      <div class="card">
+        <div class="card-hd"><h2>全担当 作業内訳（中分類別）</h2><span class="card-sub">作業時間合計（定時＋残業）・多い順</span></div>
+        <div class="card-body"><div id="monthly-sub-list"></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><h2>残業時間集計</h2><span class="card-sub" id="monthly-ot-sub">破線=全員平均</span></div>
+      <div class="card-body" style="position:relative;">
+        <canvas id="monthly-ot-canvas"></canvas>
+        <div class="ot-empty" id="monthly-ot-empty" style="display:none;">この期間に残業はありません</div>
       </div>
     </div>
     <!-- 日報 入力状況（未入力チェック）＋ Folio 併記 -->
@@ -1493,24 +1496,25 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <div class="ot-empty" id="yearly-ot-person-empty" style="display:none;">この年のデータがありません</div>
       </div>
     </div>
-    <!-- 下段：2カラム -->
-    <div class="dash-layout">
-      <div class="card" style="display:flex;flex-direction:column;">
-        <div class="card-hd"><h2>担当別 作業内訳</h2><span class="card-sub" id="yearly-person-sub">作業時間合計（定時＋残業）</span></div>
-        <div class="card-body" style="flex:1;overflow-y:auto;"><div class="person-grid" id="yearly-person-grid"></div></div>
+    <!-- 下段：担当別（全幅）→ 大分類｜中分類（2列）→ 作業時間比率 -->
+    <div class="card">
+      <div class="card-hd"><h2>担当別 作業内訳</h2><span class="card-sub" id="yearly-person-sub">作業時間合計（定時＋残業）</span></div>
+      <div class="card-body"><div class="person-grid" id="yearly-person-grid"></div></div>
+    </div>
+    <div class="dash-layout dash-layout-eq">
+      <div class="card">
+        <div class="card-hd"><h2>全担当 作業内訳（大分類別）</h2><span class="card-sub" id="yearly-cat-sub">作業時間合計（定時＋残業）</span></div>
+        <div class="card-body" style="position:relative;">
+          <canvas id="yearly-cat-canvas"></canvas>
+          <div class="ot-empty" id="yearly-cat-empty" style="display:none;">この年のデータがありません</div>
+        </div>
       </div>
-      <div class="card" style="display:flex;flex-direction:column;gap:14px;">
-        <div>
-          <div class="card-hd"><h2>全担当 作業内訳（大分類別）</h2><span class="card-sub" id="yearly-cat-sub">作業時間合計（定時＋残業）</span></div>
-          <div class="card-body" style="position:relative;">
-            <canvas id="yearly-cat-canvas"></canvas>
-            <div class="ot-empty" id="yearly-cat-empty" style="display:none;">この年のデータがありません</div>
-          </div>
-        </div>
-        <div>
-          <div class="card-hd"><h2>全担当 作業内訳（中分類別）</h2><span class="card-sub">作業時間合計（定時＋残業）・多い順</span></div>
-          <div class="card-body"><div id="yearly-sub-list"></div></div>
-        </div>
+      <div class="card">
+        <div class="card-hd"><h2>全担当 作業内訳（中分類別）</h2><span class="card-sub">作業時間合計（定時＋残業）・多い順</span></div>
+        <div class="card-body"><div id="yearly-sub-list"></div></div>
+      </div>
+    </div>
+    <div class="card">
         <div>
           <div class="card-hd"><h2>担当別 作業時間比率</h2><span class="card-sub" id="yearly-stack-sub">大分類100%積み上げ（定時＋残業）</span></div>
           <div class="card-body" style="position:relative;">
@@ -1518,7 +1522,6 @@ tfoot .ft-total{text-align:center;font-size:16px;}
             <div class="ot-empty" id="yearly-stack-empty" style="display:none;">この年のデータがありません</div>
           </div>
         </div>
-      </div>
     </div>
     <!-- 中分類別 工数推移 -->
     <div class="card">
@@ -1550,6 +1553,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <div class="period-nav">
         <select id="person-sel-author" class="period-sel" onchange="renderPersonDash()" style="min-width:90px;"></select>
         <select id="person-sel-fy" class="period-sel" onchange="renderPersonDash()" style="min-width:120px;"></select>
+        <select id="person-sel-scope" class="period-sel" onchange="renderPersonDash()" style="min-width:100px;" title="年度全体か、1つの月期かを選びます"></select>
       </div>
       <span class="period-range-label" id="person-range">—</span>
       <button class="btn-refresh no-print" onclick="renderPersonDash(true)">再読込</button>
@@ -1562,30 +1566,29 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       </div>
       <div class="dash-col">
         <div class="card">
-          <div class="card-hd"><h2>業務構成（年度）</h2><span class="card-sub">大分類の比率 本人／チーム平均</span></div>
+          <div class="card-hd"><h2 data-scope-title="業務構成">業務構成（年度）</h2><span class="card-sub">大分類の比率 本人／チーム平均</span></div>
           <div class="card-body"><div id="person-mix"></div></div>
         </div>
         <div class="card">
-          <div class="card-hd"><h2>退勤時刻の傾向（年度）</h2><span class="card-sub">曜日別の平均退勤と残業日の割合</span></div>
+          <div class="card-hd"><h2 data-scope-title="退勤時刻の傾向">退勤時刻の傾向（年度）</h2><span class="card-sub">曜日別の平均退勤と残業日の割合</span></div>
           <div class="card-body"><div id="person-dow"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><h2 data-scope-title="中分類別 作業時間">中分類別 作業時間（年度）</h2><span class="card-sub">上位の業務</span></div>
+          <div class="card-body"><div id="person-subs"></div></div>
         </div>
       </div>
     </div>
+    <!-- 下段: 日別明細 → Folio完了タスク をそれぞれ全幅に（データ量に関係なく空きが出ないように） -->
     <div class="card">
-      <div class="card-hd"><h2>中分類別 作業時間（年度）</h2><span class="card-sub">上位の業務</span></div>
-      <div class="card-body"><div id="person-subs"></div></div>
+      <div class="card-hd"><h2>日別明細</h2>
+        <span class="card-sub" style="display:flex;align-items:center;gap:8px;"><span id="person-days-sub"></span>
+          <select id="person-sel-period" class="period-sel" onchange="renderPersonDetail()"></select></span></div>
+      <div class="card-body"><div id="person-days" style="overflow-x:auto;"></div></div>
     </div>
-    <div class="dash-layout">
-      <div class="card">
-        <div class="card-hd"><h2>日別明細</h2>
-          <span class="card-sub" style="display:flex;align-items:center;gap:8px;"><span id="person-days-sub"></span>
-            <select id="person-sel-period" class="period-sel" onchange="renderPersonDetail()"></select></span></div>
-        <div class="card-body"><div id="person-days" style="overflow-x:auto;"></div></div>
-      </div>
-      <div class="card" id="person-tasks-card">
-        <div class="card-hd"><h2>Folio 完了タスク</h2><span class="card-sub" id="person-tasks-sub">選択した月期・時間の多い順</span></div>
-        <div class="card-body"><div id="person-tasks"></div></div>
-      </div>
+    <div class="card" id="person-tasks-card">
+      <div class="card-hd"><h2>Folio 完了タスク</h2><span class="card-sub" id="person-tasks-sub">選択した月期・時間の多い順</span></div>
+      <div class="card-body"><div id="person-tasks"></div></div>
     </div>
   </div><!-- /dash-person -->
 </div><!-- /view-dash -->
@@ -6305,6 +6308,12 @@ function initPersonSelectors() {
   let opts = '';
   for (let fy = thisFY - 4; fy <= thisFY; fy++) opts += `<option value="${fy}"${fy === curFY ? ' selected' : ''}>${fy + 1}年度（${fy - 1952}期）</option>`;
   sf.innerHTML = opts;
+  // 年度全体／月期（10月期〜9月期）
+  const ss = document.getElementById('person-sel-scope');
+  if (ss && !ss.options.length) {
+    const months = getFiscalPeriods(thisFY).map(p => p.month);
+    ss.innerHTML = `<option value="-1">年度全体</option>` + months.map((m, i) => `<option value="${i}">${m}月期</option>`).join('');
+  }
 }
 
 // 期データ(loadRangeDataの結果)から、本人の作業ログを退勤時刻ベースの通常時間で補正（年次と同じ考え方）
@@ -6324,20 +6333,25 @@ function _avgHm(mins) {
 async function renderPersonDash(force) {
   const a = (document.getElementById('person-sel-author') || {}).value || getAuthor();
   const fy = Number((document.getElementById('person-sel-fy') || {}).value) || getCurrentFiscalYear();
+  const scope = Number((document.getElementById('person-sel-scope') || {value: -1}).value);   // -1=年度全体, 0..11=月期
   if (!a) return;
   const periods = getFiscalPeriods(fy);
-  const ctx = {a, fy, periods, data: null};
+  // 同じ担当・年度なら読み込み済みデータを使い回す（月期の切替で待たせない）
+  const reuse = !force && _personCtx && _personCtx.a === a && _personCtx.fy === fy && _personCtx.data;
+  const ctx = {a, fy, periods, scope, data: reuse ? _personCtx.data : null};
   _personCtx = ctx;
   { const f = getPeriodDates(periods[0].year, periods[0].month), l = getPeriodDates(periods[11].year, periods[11].month);
     document.getElementById('person-range').textContent = `${f.startDate.replace(/-/g,'/')} 〜 ${l.endDate.replace(/-/g,'/')}`; }
-  setLoading(true);
-  try {
-    if (force) { _cache.clear(); }
-    ctx.data = await mapPool(periods, 4, ({year, month}) => {
-      const {startDate, endDate} = getPeriodDates(year, month);
-      return withTimeout(loadRangeData(startDate, endDate, year, month), 15000, 'timeout').catch(() => null);
-    });
-  } finally { setLoading(false); }
+  if (!ctx.data) {
+    setLoading(true);
+    try {
+      if (force) { _cache.clear(); }
+      ctx.data = await mapPool(periods, 4, ({year, month}) => {
+        const {startDate, endDate} = getPeriodDates(year, month);
+        return withTimeout(loadRangeData(startDate, endDate, year, month), 15000, 'timeout').catch(() => null);
+      });
+    } finally { setLoading(false); }
+  }
   if (_personCtx !== ctx) return;
   const R = DEPARTMENT_CONFIG.rules;
   const warn = R.otMonthWarn || 36, limit = R.otMonthLimit || 45, yLimit = R.otYearLimit || 360, maxOver = R.otOverMonthsMax || 6;
@@ -6359,7 +6373,14 @@ async function renderPersonDash(force) {
   const over = per.filter(x => x.me.ot > limit).length;
   const curIdx = per.findIndex(x => { const {startDate, endDate} = getPeriodDates(x.p.year, x.p.month); return startDate <= today && today <= endDate; });
   const cur = curIdx >= 0 ? per[curIdx] : null;
-  const allLeave = per.flatMap(x => x.leaveMins);
+  // 表示範囲: 年度全体 or 選んだ月期（業務構成・退勤傾向・中分類・KPIの一部）
+  const selIdx = scope >= 0 && scope < per.length ? scope : -1;
+  const selPer = selIdx >= 0 ? [per[selIdx]] : per;
+  const selData = selIdx >= 0 ? [ctx.data[selIdx]] : ctx.data;
+  const selName = selIdx >= 0 ? `${per[selIdx].p.month}月期` : '年度';
+  const focus = selIdx >= 0 ? per[selIdx] : cur;
+  document.querySelectorAll('#dash-person [data-scope-title]').forEach(h => { h.textContent = `${h.dataset.scopeTitle}（${selName}）`; });
+  const allLeave = selPer.flatMap(x => x.leaveMins);
   const lvOf = (v, l) => v >= l ? 'crit' : v >= l * 0.8 ? 'warn' : 'ok';
 
   // KPI（年度/今期は進捗メーター付き）
@@ -6367,12 +6388,12 @@ async function renderPersonDash(force) {
   const prog = (v, l) => `<div class="dx-meter thin is-${lvOf(v, l)}" style="margin-top:2px"><span class="f" data-w="${Math.min(100, v / l * 100).toFixed(1)}"></span></div><div style="margin-top:6px">${Math.round(v / l * 100)}% <span class="t-muted">／ 上限 ${l}h</span></div>`;
   document.getElementById('person-kpi').innerHTML =
     tile(totOT.toFixed(1) + 'h', '年度 残業累計', totOT >= yLimit * 0.8 ? 'ot' : '', prog(totOT, yLimit)) +
-    tile(cur ? cur.me.ot.toFixed(1) + 'h' : '—', '今期 残業', cur && cur.me.ot >= warn ? 'ot' : '', cur ? prog(cur.me.ot, limit) : '') +
+    tile(focus ? focus.me.ot.toFixed(1) + 'h' : '—', selIdx >= 0 ? `${selName} 残業` : '今期 残業', focus && focus.me.ot >= warn ? 'ot' : '', focus ? prog(focus.me.ot, limit) : '') +
     tile((active.length ? totOT / active.length : 0).toFixed(1) + 'h', '残業 月平均') +
     tile(`${over}/${maxOver}`, `月${limit}h超の回数`, over >= maxOver - 2 ? 'ot' : '') +
-    tile(_avgHm(allLeave), '平均退勤時刻') +
-    tile(totN.toFixed(0) + 'h', '年度 通常時間') +
-    tile(String(active.reduce((t, x) => t + x.days, 0)) + '日', '日報 入力日数');
+    tile(_avgHm(allLeave), `平均退勤時刻${selIdx >= 0 ? `（${selName}）` : ''}`) +
+    tile(selPer.reduce((t, x) => t + x.me.n, 0).toFixed(0) + 'h', `${selName} 通常時間`) +
+    tile(String(selPer.reduce((t, x) => t + x.days, 0)) + '日', `日報 入力日数${selIdx >= 0 ? `（${selName}）` : ''}`);
 
   // 月期別 推移
   const maxOT = Math.max(limit * 1.1, ...per.map(x => x.me.ot));
@@ -6381,8 +6402,8 @@ async function renderPersonDash(force) {
     <tbody>${per.map((x, i) => {
       const lv = x.me.ot > limit ? 'crit' : x.me.ot >= warn ? 'warn' : 'info';
       const future = x.days === 0 && (i > curIdx && curIdx >= 0);
-      return `<tr class="${i === curIdx ? 'is-current' : ''}${future ? ' dim' : ''}">
-        <td class="name">${x.p.month}月期${i === curIdx ? '<span class="dx-tag">今期</span>' : ''}</td>
+      return `<tr class="${i === curIdx ? 'is-current' : ''}${future ? ' dim' : ''}${i === selIdx ? ' is-selected' : ''}" style="cursor:pointer" title="クリックでこの月期の内訳を表示" onclick="_personPickMonth(${i})">
+        <td class="name">${x.p.month}月期${i === curIdx ? '<span class="dx-tag">今期</span>' : ''}${i === selIdx ? '<span class="dx-tag is-info">表示中</span>' : ''}</td>
         <td class="num">${x.me.n ? x.me.n.toFixed(1) + 'h' : ''}</td>
         <td><div class="dx-meter-row"><div class="dx-meter is-${lv}"><span class="f" data-w="${(x.me.ot / maxOT * 100).toFixed(1)}"></span>
             ${x.teamAvgOT != null && x.days ? `<span class="avg" title="チーム平均 ${x.teamAvgOT.toFixed(1)}h" style="left:${Math.min(100, x.teamAvgOT / maxOT * 100).toFixed(1)}%"></span>` : ''}
@@ -6392,15 +6413,15 @@ async function renderPersonDash(force) {
         <td class="num">${x.days || ''}</td>
         <td class="num">${x.leaveMins.length ? _avgHm(x.leaveMins) : ''}</td></tr>`;
     }).join('')}</tbody></table>
-    <div class="dx-legend"><span><i class="dx-sw" style="width:2px;border-radius:0;background:var(--dx-ink-1)"></i>チーム平均</span><span><i class="dx-sw" style="width:2px;border-radius:0;background:var(--st-crit)"></i>上限 ${limit}h</span></div>`;
+    <div class="dx-legend"><span><i class="dx-sw" style="width:2px;border-radius:0;background:var(--dx-ink-1)"></i>チーム平均</span><span><i class="dx-sw" style="width:2px;border-radius:0;background:var(--st-crit)"></i>上限 ${limit}h</span><span class="t-muted">行をクリックするとその月期の内訳に切り替わります</span></div>`;
 
   // 業務構成（大分類 本人 vs チーム）
   const mainOf = cd => (SUB_MAP[cd] && SUB_MAP[cd].mainCd) || 'O';
   const meMain = {}, teamMain = {}, meSub = {};
   let meTot = 0, teamTot = 0;
-  per.forEach((x, i) => {
+  selPer.forEach((x, i) => {
     x.rows.forEach(r => { const h = r.hoursNormal + (r.hoursOT || 0); meMain[mainOf(r.cdSub)] = (meMain[mainOf(r.cdSub)] || 0) + h; meSub[r.cdSub] = (meSub[r.cdSub] || 0) + h; meTot += h; });
-    const d = ctx.data[i]; if (!d) return;
+    const d = selData[i]; if (!d) return;
     const all = _otByAuthor(d);
     Object.keys(all).forEach(x2 => _scaledRows(d, x2, all[x2].n).forEach(r => { const h = r.hoursNormal + (r.hoursOT || 0); teamMain[mainOf(r.cdSub)] = (teamMain[mainOf(r.cdSub)] || 0) + h; teamTot += h; }));
   });
@@ -6413,22 +6434,22 @@ async function renderPersonDash(force) {
         <div class="tr"><i style="background:${c.color}" data-w="${(m / mixMax * 100).toFixed(1)}"></i><i class="team" data-w="${(t / mixMax * 100).toFixed(1)}"></i></div>
         <span class="vv">${Math.round(m * 100)}%<small>チーム ${Math.round(t * 100)}%</small></span></div>`).join('')}</div>
       <div class="dx-legend"><span><i class="dx-sw" style="background:var(--dx-ink-2)"></i>本人</span><span><i class="dx-sw" style="height:3px;background:var(--dx-ink-3)"></i>チーム全体</span></div>`
-    : '<p class="dx-empty">この年度のデータがありません</p>';
+    : `<p class="dx-empty">この${selName}のデータがありません</p>`;
 
   // 中分類 上位
   const subList = Object.keys(meSub).filter(cd => meSub[cd] > 0.05).sort((x, y) => meSub[y] - meSub[x]);
   const maxSub = subList.length ? meSub[subList[0]] : 1;
-  document.getElementById('person-subs').innerHTML = subList.length ? `<div class="dx-hbars cols">` + subList.map(cd => {
+  document.getElementById('person-subs').innerHTML = subList.length ? `<div class="dx-hbars">` + subList.map(cd => {
     const sb = SUB_MAP[cd] || {}, color = CAT_COLOR[sb.mainCd] || '#6b7280';
     return `<div class="dx-hbar"><span class="lb" title="${escHtml(cd + ' ' + (sb.label || ''))}"><i class="dx-sw" style="background:${color}"></i>${escHtml(sb.label || cd)}</span>
       <div class="tr"><i style="background:${color}" data-w="${(meSub[cd] / maxSub * 100).toFixed(1)}"></i></div>
       <span class="vv">${meSub[cd].toFixed(1)}h<small>${Math.round(meSub[cd] / meTot * 100)}%</small></span></div>`;
-  }).join('') + '</div>' : '<p class="dx-empty">この年度のデータがありません</p>';
+  }).join('') + '</div>' : `<p class="dx-empty">この${selName}のデータがありません</p>`;
 
   // 曜日別 退勤
   const wd = ['日','月','火','水','木','金','土'];
   const byDow = wd.map(() => ({mins: [], otDays: 0, n: 0}));
-  per.forEach(x => Object.entries(x.lm).forEach(([date, t]) => {
+  selPer.forEach(x => Object.entries(x.lm).forEach(([date, t]) => {
     const dow = new Date(date + 'T00:00:00').getDay(), m = _hmToMin(t), c = calcFromLeave(t, date);
     if (m > 0) byDow[dow].mins.push(m);
     byDow[dow].n++; if (c && c.ot > 0) byDow[dow].otDays++;
@@ -6440,17 +6461,24 @@ async function renderPersonDash(force) {
       return `<tr><td class="name">${wd[i]}曜</td><td class="num"><b>${_avgHm(byDow[i].mins)}</b></td>
         <td><div class="dx-meter-row"><div class="dx-meter is-${lv}"><span class="f" data-w="${(r * 100).toFixed(0)}"></span></div><span class="v">${Math.round(r * 100)}%</span></div></td>
         <td class="num t-muted">${byDow[i].n}</td></tr>`; }).join('')}</tbody></table>`
-    : '<p class="dx-empty">この年度のデータがありません</p>';
+    : `<p class="dx-empty">この${selName}のデータがありません</p>`;
 
   // 日別明細の月期セレクト（既定=今期、無ければデータのある最後の期）
   const sp = document.getElementById('person-sel-period');
-  const defIdx = curIdx >= 0 ? curIdx : Math.max(0, per.map(x => x.days > 0).lastIndexOf(true));
+  const defIdx = selIdx >= 0 ? selIdx : curIdx >= 0 ? curIdx : Math.max(0, per.map(x => x.days > 0).lastIndexOf(true));
   sp.innerHTML = periods.map((p, i) => `<option value="${i}"${i === defIdx ? ' selected' : ''}>${p.month}月期</option>`).join('');
   ctx.per = per;
   dxGrow(document.getElementById('dash-person'));
   renderPersonDetail();
 }
 
+// 月期別推移の行クリック → その月期の内訳に切り替え
+function _personPickMonth(i) {
+  const ss = document.getElementById('person-sel-scope');
+  if (!ss) return;
+  ss.value = String(Number(ss.value) === i ? -1 : i);   // 同じ行をもう一度押すと年度全体へ
+  renderPersonDash();
+}
 async function renderPersonDetail() {
   const ctx = _personCtx;
   if (!ctx || !ctx.per) return;
@@ -6588,7 +6616,7 @@ function renderTaskStats(d) {
     return {...t, base, ratio, excess};
   }).sort((x, y) => (y.n >= 3) - (x.n >= 3) || Math.abs(y.excess || 0) - Math.abs(x.excess || 0));
   const sub = document.getElementById('task-stats-sub');
-  if (sub) sub.textContent = `${d.start} 〜 ${d.end}・実績工数が入力された完了タスク`;
+  if (sub) sub.textContent = `${d.start && d.end ? `${d.start} 〜 ${d.end}・` : ''}実績工数が入力された完了タスク`;
   if (!rows.length) { el.innerHTML = '<p class="dx-empty">実績工数が入力された完了タスクがありません</p>'; return; }
   const fmt = h => h == null ? '—' : (h >= 1 ? h.toFixed(2) + 'h' : Math.round(h * 60) + '分');
   el.innerHTML = `<table class="dx-table">
@@ -7466,6 +7494,16 @@ function sortedAuthors(obj) {
 
 // leaveNormal: {author: normalH}, leaveOT: {author: otH} → 退勤ログ由来の時間
 // 省略時は作業ログから計算（日別ヘルプ等）
+// 担当別カードの列数を人数に合わせて均等にする（8人なら 4×2 など。最終行だけ空くのを防ぐ）
+function _balancePersonGrid(grid) {
+  if (!grid) return;
+  const n = grid.querySelectorAll('.person-card').length, w = grid.clientWidth;
+  if (!n || w < 700 || document.documentElement.classList.contains('pdf-mode')) { grid.style.gridTemplateColumns = ''; return; }
+  const maxCols = Math.max(1, Math.floor((w + 12) / 222));
+  const rows = Math.ceil(n / maxCols), cols = Math.ceil(n / rows);
+  grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0,1fr))`;
+}
+window.addEventListener('resize', () => { clearTimeout(window._pgT); window._pgT = setTimeout(() => document.querySelectorAll('.person-grid').forEach(_balancePersonGrid), 150); });
 function renderPersonPies(byAuthor, gridId, leaveNormal=null, leaveOT=null) {
   const grid=document.getElementById(gridId);
   grid.innerHTML='';
@@ -7493,6 +7531,7 @@ function renderPersonPies(byAuthor, gridId, leaveNormal=null, leaveOT=null) {
     grid.appendChild(card);
     requestAnimationFrame(()=>drawPie(uid,rows));
   });
+  _balancePersonGrid(grid);
 }
 
 // CAT_COLOR / CAT_LABEL は上部(rebuildCatMaps)でCATSから動的生成（生産管理課固定を廃止）
