@@ -1579,17 +1579,16 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         </div>
       </div>
     </div>
-    <div class="dash-layout">
-      <div class="card">
-        <div class="card-hd"><h2>日別明細</h2>
-          <span class="card-sub" style="display:flex;align-items:center;gap:8px;"><span id="person-days-sub"></span>
-            <select id="person-sel-period" class="period-sel" onchange="renderPersonDetail()"></select></span></div>
-        <div class="card-body"><div id="person-days" style="overflow-x:auto;"></div></div>
-      </div>
-      <div class="card" id="person-tasks-card">
-        <div class="card-hd"><h2>Folio 完了タスク</h2><span class="card-sub" id="person-tasks-sub">選択した月期・時間の多い順</span></div>
-        <div class="card-body"><div id="person-tasks"></div></div>
-      </div>
+    <!-- 下段: 日別明細 → Folio完了タスク をそれぞれ全幅に（データ量に関係なく空きが出ないように） -->
+    <div class="card">
+      <div class="card-hd"><h2>日別明細</h2>
+        <span class="card-sub" style="display:flex;align-items:center;gap:8px;"><span id="person-days-sub"></span>
+          <select id="person-sel-period" class="period-sel" onchange="renderPersonDetail()"></select></span></div>
+      <div class="card-body"><div id="person-days" style="overflow-x:auto;"></div></div>
+    </div>
+    <div class="card" id="person-tasks-card">
+      <div class="card-hd"><h2>Folio 完了タスク</h2><span class="card-sub" id="person-tasks-sub">選択した月期・時間の多い順</span></div>
+      <div class="card-body"><div id="person-tasks"></div></div>
     </div>
   </div><!-- /dash-person -->
 </div><!-- /view-dash -->
