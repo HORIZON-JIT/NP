@@ -1121,6 +1121,14 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 @media(max-width:900px){#view-dash .dash-masonry{column-count:1;}}
 .pdf-mode #view-dash .dash-masonry{column-count:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start;margin-bottom:8px;}
 .pdf-mode #view-dash .dash-masonry > .card{display:block;margin:0;}
+.fx-switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;user-select:none;}
+.fx-switch input{position:absolute;opacity:0;width:0;height:0;}
+.fx-switch .fx-track{position:relative;width:44px;height:24px;border-radius:999px;background:var(--g300);transition:background .2s;}
+.fx-switch .fx-knob{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s;}
+.fx-switch input:checked + .fx-track{background:var(--primary);}
+.fx-switch input:checked + .fx-track .fx-knob{transform:translateX(20px);}
+.fx-switch input:focus-visible + .fx-track{box-shadow:0 0 0 3px var(--focus);}
+.fx-switch .fx-lbl{font-size:13px;font-weight:800;color:var(--g700);min-width:30px;}
 /* ── 効率化ハイライト ── */
 .dx-eff{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:24px;align-items:start;}
 .dx-eff-hero{padding:14px 16px;border-radius:12px;background:var(--dx-track);}
@@ -1685,6 +1693,15 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <button class="btn btn-sm btn-primary" onclick="addNewAuthor()">追加</button>
         <button class="btn btn-sm btn-outline" onclick="cancelNewAuthor()">×</button>
       </div>
+    </div>
+    <div class="modal-sec">
+      <h4>入力時の演出</h4>
+      <label class="fx-switch">
+        <input type="checkbox" id="s-input-fx" onchange="setInputFx(this.checked)">
+        <span class="fx-track"><span class="fx-knob"></span></span>
+        <span class="fx-lbl" id="s-input-fx-lbl">ON</span>
+      </label>
+      <div style="font-size:11px;color:var(--g500);margin-top:6px;line-height:1.6;">クリックや保存時のアニメーション（火花・コンボ・紙吹雪など）。切り替えるとすぐ反映され、この端末だけの設定です。</div>
     </div>
     <div class="modal-sec">
       <h4>Google Apps Script URL</h4>
@@ -2625,6 +2642,8 @@ function openSettings() {
   document.getElementById('preload-status').textContent='';
   document.getElementById('preload-timer').textContent='';
   cancelNewAuthor();
+  const fx = document.getElementById('s-input-fx');
+  if (fx) { fx.checked = inputFxOn(); const l = document.getElementById('s-input-fx-lbl'); if (l) l.textContent = fx.checked ? 'ON' : 'OFF'; }
   document.getElementById('settings-modal').classList.add('open');
 }
 
@@ -4668,7 +4687,14 @@ function addQuarter(cdSub, ev) {
 }
 
 // ── 入力時の演出: 行の色フラッシュ、クリック位置からの波紋、セルのポップ、「+0.25h」の浮き上がり ──
-function _fxReduce() { return window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches; }
+// 入力時の演出: 設定で OFF、または OS の「視差効果を減らす」が ON なら全部止める
+const INPUT_FX_KEY = LS_NS + '__inputFx__';
+function inputFxOn() { try { return localStorage.getItem(INPUT_FX_KEY) !== 'off'; } catch(e) { return true; } }
+function setInputFx(on) {
+  try { if (on) localStorage.removeItem(INPUT_FX_KEY); else localStorage.setItem(INPUT_FX_KEY, 'off'); } catch(e) {}
+  const lbl = document.getElementById('s-input-fx-lbl'); if (lbl) lbl.textContent = on ? 'ON' : 'OFF';
+}
+function _fxReduce() { return !inputFxOn() || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }
 const _fxCombo = {n: 0, t: 0};
 function _inpFx(cdSub, inp, added, isOT, ev) {
   if (!inp || _fxReduce()) return;
