@@ -6765,7 +6765,7 @@ async function renderKpiDash(force) {
       return `<div class="kpi-bd ${lv ? 'is-' + lv : ''} ${empty || !k.subs.length ? 'is-quiet' : ''}">
         <div class="kpi-bd-hd"><span class="kb-dot"></span><b>${escHtml(k.name)}</b><span class="kb-v">${k.subs.length ? `<em>${b.total.toFixed(1)}h</em>/ ${k.target}h` : `/ ${k.target}h`}</span>${lv ? `<span class="dx-tag is-${lv}">${lv === 'ok' ? '達成' : lv === 'warn' ? '超過' : '大幅超過'}</span>` : '<span class="dx-tag is-warn">未設定</span>'}</div>
         ${!k.subs.length ? '<p class="dx-empty">管理タブ「KPI」で中分類を紐づけてください</p>' : empty ? '<p class="dx-empty">この月期は該当の作業がありません</p>' :
-        `<div class="kpi-bd-sec">中分類</div><div class="dx-hbars">${subs.map(cd => { const sb = SUB_MAP[cd] || {}; return bar(`<i class="dx-sw" style="background:${CAT_COLOR[sb.mainCd] || '#8C8377'}"></i>${escHtml(sb.label || cd)}`, b.bySub[cd], maxS, CAT_COLOR[sb.mainCd] || '#8C8377'); }).join('')}</div>
+        `<div class="kpi-bd-sec">中分類</div><div class="dx-hbars">${subs.map(cd => { const sb = SUB_MAP[cd] || {}; return bar(escHtml(sb.label || cd), b.bySub[cd], maxS, 'var(--k)'); }).join('')}</div>
         <div class="kpi-bd-sec">担当者</div><div class="dx-hbars">${auth.map(a => bar(`<i class="dx-sw" style="background:${authColor(a)}"></i>${escHtml(a)}`, b.byAuthor[a], maxA, authColor(a))).join('')}</div>`}
       </div>`;
     }).join('')}</div>`;
