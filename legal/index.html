@@ -2164,7 +2164,8 @@ function _normKpis(list) {
   return defs.map(d => {
     const v = saved.find(x => x && x.key === d.key) || {};
     return {key: d.key, name: d.name, kind: d.kind || 'hours', target: Number.isFinite(Number(v.target)) && v.target !== '' ? Number(v.target) : d.target,
-            subs: d.kind === 'ot' ? [] : (Array.isArray(v.subs) ? v.subs.filter(cd => typeof cd === 'string') : (d.subs || []))};
+            // 保存値の subs が空なら既定の紐づけを使う（空のままでは集計できないため）
+            subs: d.kind === 'ot' ? [] : ((Array.isArray(v.subs) && v.subs.length) ? v.subs.filter(cd => typeof cd === 'string') : (d.subs || []))};
   });
 }
 // 工数KPI（中分類の紐づけで集計するもの）と、残業時間KPI
@@ -6425,7 +6426,6 @@ async function renderKpiDash(force) {
   const authColor = a => AUTH_COLORS[otAuthors.indexOf(a) % AUTH_COLORS.length];
   const wd = curIdx >= 0 && data[curIdx] ? _kpiWorkdays(data[curIdx], ranges[curIdx].startDate, ranges[curIdx].endDate) : null;
   const proj = wd && wd.elapsed > 0 && wd.total > wd.elapsed ? wd.total / wd.elapsed : 1;
-  const mapped = HK.filter(k => k.subs.length).length;
   const calFirst = ranges.findIndex(r => !r.calendar);
   const calNote = ranges.some(r => r.calendar) ? (calFirst >= 0 ? `${periods[calFirst].month}月期から15日締め、それ以前は月末締め` : '全月期とも月末締め') : '15日締め';
 
@@ -6450,7 +6450,8 @@ async function renderKpiDash(force) {
 
   // ── ヒートマップ ──
   const el = document.getElementById('kpi-heat'), sub = document.getElementById('kpi-sub');
-  if (sub) sub.textContent = `${fy + 1}年度（${fiscalKi(fy)}期）・${calNote}${mapped < KPIS.length ? `・中分類の紐づけが未設定のKPIが${KPIS.length - mapped}件（管理タブで設定）` : ''}`;
+  const unmapped = HK.filter(k => !k.subs.length).map(k => k.name);
+  if (sub) sub.textContent = `${fy + 1}年度（${fiscalKi(fy)}期）・${calNote}${unmapped.length ? `・中分類が未設定: ${unmapped.join('、')}（管理タブ「KPI」で紐づけてください）` : ''}`;
   const cell = (h, target, i) => {
     const isCur = i === curIdx, isSel = i === ctx.sel;
     if (h == null) return `<td class="h ${isSel ? 'is-sel' : ''}" onclick="_kpiPick(${i})"><span class="t-muted">·</span></td>`;
