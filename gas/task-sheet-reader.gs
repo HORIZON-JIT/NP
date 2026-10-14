@@ -36,6 +36,8 @@
  * getCompletedTasks / getPersonTasks の各行には予実（plan=予定工数, actual=実績工数／planSum, actualSum, actN, overN）も含む
  * 個人ページ用: ?action=getPersonTasks&name=苗字&start=&end=（最大62日）
  *   → {ok, tasks:[{taskId, name, n, hours, unplaced}]}  … その人の完了タスクをタスク別に集計
+ * 早見表用: ?action=getTaskMaster[&nocache=1]
+ *   → {ok, tasks:[{taskId, name, std, cdSub}], cached}  … タスクマスタ全行（シート順）と日報中分類CDの対応
  */
 
 var SPREADSHEET_ID = '1IHxotYypyQkGyskunDMrN2i_v_GU2brQvGlZeAS0UgM';
@@ -72,6 +74,7 @@ function doGet(e) {
     else if (action === 'getRangeHours') result = getRangeHours_(p.start, p.end);
     else if (action === 'getTaskStats') result = getTaskStats_(Number(p.days) || 90);
     else if (action === 'getPersonTasks') result = getPersonTasks_(p.name, p.start, p.end);
+    else if (action === 'getTaskMaster') result = getTaskMaster_(p.nocache === '1');
     else if (action === 'setTaskCd') result = setTaskCds_(singleMap_(p.taskId, p.cd), true);
     else if (action === 'setTaskCds') result = setTaskCds_(JSON.parse(p.map || '{}'), false);
     else result = {ok: false, error: 'unknown action: ' + action};
@@ -377,6 +380,43 @@ function getTaskMap_() {
   return map;
 }
 
+// タスクマスタ全行（早見表用）。シート順のまま返す。
+function readTaskMaster_(ss) {
+  var sh = ss.getSheetByName(MASTER_SHEET);
+  if (!sh) return [];
+  var lastCol = Math.max(1, sh.getLastColumn());
+  var head = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (v) { return String(v).trim(); });
+  var idCol = head.indexOf(MASTER_ID_HEADER) + 1, nmCol = head.indexOf('タスク名') + 1,
+      stdCol = head.indexOf('標準工数') + 1, cdCol = head.indexOf(MASTER_CD_HEADER) + 1;
+  var n = sh.getLastRow() - 1;
+  if (!idCol || n < 1) return [];
+  var ids = sh.getRange(2, idCol, n, 1).getValues();
+  var nms = nmCol ? sh.getRange(2, nmCol, n, 1).getValues() : [];
+  var stds = stdCol ? sh.getRange(2, stdCol, n, 1).getDisplayValues() : [];
+  var cds = cdCol ? sh.getRange(2, cdCol, n, 1).getValues() : [];
+  var out = [], seen = {};
+  for (var i = 0; i < n; i++) {
+    var id = String(ids[i][0]).trim();
+    if (!id || seen[id]) continue;
+    seen[id] = true;
+    out.push({taskId: id,
+              name: nms[i] ? String(nms[i][0]).trim() : '',
+              std: stds[i] ? durToHours_(stds[i][0]) : null,
+              cdSub: cds[i] ? String(cds[i][0]).trim() : ''});
+  }
+  return out;
+}
+
+function getTaskMaster_(nocache) {
+  var t0 = Date.now();
+  var cache = CacheService.getScriptCache();
+  var raw = nocache ? null : cache.get('tmaster');
+  if (raw) return {ok: true, tasks: JSON.parse(raw), cached: true, ms: Date.now() - t0};
+  var tasks = readTaskMaster_(SpreadsheetApp.openById(SPREADSHEET_ID));
+  try { cache.put('tmaster', JSON.stringify(tasks), CACHE_TTL); } catch (e) {}   // 100KB超なら保存しない
+  return {ok: true, tasks: tasks, cached: false, ms: Date.now() - t0};
+}
+
 function singleMap_(taskId, cd) {
   var m = {};
   m[String(taskId || '').trim()] = String(cd || '').trim();
@@ -422,6 +462,7 @@ function setTaskCds_(map, overwrite) {
     if (written.length) cdRange.setValues(cds);
     var tm = readTaskMap_(ss);
     CacheService.getScriptCache().put('tm', JSON.stringify(tm), CACHE_TTL);
+    CacheService.getScriptCache().remove('tmaster');
     return {ok: true, written: written.length, skippedExisting: skippedExisting.length, notFound: notFound};
   } finally {
     lock.releaseLock();
