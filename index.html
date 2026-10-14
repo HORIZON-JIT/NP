@@ -1168,6 +1168,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .kpi-adm-row .pk{font-size:12px;color:var(--g600);flex:1;min-width:200px;}
 #kpi-ot-legend{font-size:13px;gap:8px 18px;}
 #kpi-ot-legend .dx-sw{width:12px;height:12px;}
+#person-tasks .dx-hbar .vv .pv{display:block;margin-left:0;font-size:10.5px;font-weight:600;text-align:right;}
+#person-tasks .dx-hbar{align-items:start;}
 /* ── 効率化ハイライト ── */
 .dx-eff{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:24px;align-items:start;}
 .dx-eff-hero{padding:14px 16px;border-radius:12px;background:var(--dx-track);}
@@ -5449,6 +5451,7 @@ function renderTaskImport() {
   const applyBtn = document.getElementById('btn-task-import-apply');
   const sums = {};   // cdSub -> {normal, ot}
   let warn = 0, unplaced = 0;
+  const hasPv = _taskImportRows.some(x => 'plan' in x.r || 'actual' in x.r);   // 旧GASは予実を返さない
   const lines = _taskImportRows.map((x, i) => {
     const {r, cd, ok, reason, start, placed, sp, checked} = x;
     if (!ok) warn++;
@@ -5468,17 +5471,20 @@ function renderTaskImport() {
         : `<div style="color:var(--danger);font-size:11px;">${escHtml(reason)}</div>
            <select id="ti-sel-${i}" style="font-size:11px;max-width:150px;"><option value="">中分類を選択</option>${_activeSubOptions()}</select>
            <button id="ti-btn-${i}" class="btn btn-primary btn-sm" style="font-size:11px;padding:2px 8px;" onclick="registerTaskCd(${i})">登録</button>`}</td>
+      ${hasPv ? `<td style="padding:4px 6px;white-space:nowrap;font-size:11px;">${_tiPvCell(r)}</td>` : ''}
       <td style="padding:4px 6px;text-align:right;white-space:nowrap;">${sp.normal ? sp.normal.toFixed(2) : ''}</td>
       <td style="padding:4px 6px;text-align:right;white-space:nowrap;color:var(--danger);">${sp.ot ? sp.ot.toFixed(2) : ''}</td>
     </tr>`;
   });
+  // 予実の集計（GAS が plan/actual を返すときだけ）
+  const pv = hasPv ? _taskImportRows.reduce((t, x) => { const r = x.r; if (r.plan != null) { t.plan += r.plan; t.planN++; } if (r.actual != null) { t.actual += r.actual; t.actN++; if (r.plan != null) { t.both += 1; t.planB += r.plan; if (r.actual > r.plan * 1.2) t.over++; } } else t.noAct++; return t; }, {plan: 0, planN: 0, actual: 0, actN: 0, both: 0, planB: 0, over: 0, noAct: 0}) : null;
   const plan = Object.keys(sums).map(cd => ({cdSub:cd, hoursNormal:_roundTaskHours(sums[cd].normal), hoursOT:_roundTaskHours(sums[cd].ot)}))
     .filter(p => p.hoursNormal > 0 || p.hoursOT > 0);
   const totN = plan.reduce((a, p) => a + p.hoursNormal, 0), totO = plan.reduce((a, p) => a + p.hoursOT, 0);
   body.innerHTML = `
     <table style="width:100%;border-collapse:collapse;">
       <thead><tr style="color:var(--g500);font-size:11px;text-align:left;border-bottom:1px solid var(--g200);">
-        <th style="padding:4px 6px;"></th><th style="padding:4px 6px;">開始</th><th style="padding:4px 6px;">タスク</th><th style="padding:4px 6px;">日報の中分類</th><th style="padding:4px 6px;text-align:right;">通常</th><th style="padding:4px 6px;text-align:right;">残業</th>
+        <th style="padding:4px 6px;"></th><th style="padding:4px 6px;">開始</th><th style="padding:4px 6px;">タスク</th><th style="padding:4px 6px;">日報の中分類</th>${hasPv ? '<th style="padding:4px 6px;" title="Folioの予定工数と実績工数">予定 → 実績</th>' : ''}<th style="padding:4px 6px;text-align:right;">通常</th><th style="padding:4px 6px;text-align:right;">残業</th>
       </tr></thead>
       <tbody>${lines.join('')}</tbody>
     </table>
@@ -5486,6 +5492,7 @@ function renderTaskImport() {
       <b>反映内容</b>（チェックした行を中分類ごとに合計し ${DEPARTMENT_CONFIG.rules.roundStepHours}h 単位に丸め）：
       ${plan.map(p => `${escHtml(p.cdSub)} ${escHtml(SUB_MAP[p.cdSub].label)} 通常${p.hoursNormal}${p.hoursOT ? ` / 残業${p.hoursOT}` : ''}`).join('、') || 'なし'}
       <div style="margin-top:4px;">合計 通常 <b>${totN.toFixed(2)}h</b> ／ 残業 <b>${totO.toFixed(2)}h</b></div>
+      ${pv ? `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--g200);"><b>予実</b>（Folio）：${pv.both ? `実績のある${pv.both}件は 予定 <b>${pv.planB.toFixed(2)}h</b> → 実績 <b>${pv.actual.toFixed(2)}h</b>（差 <b class="${pv.actual - pv.planB > 0.05 ? 't-crit' : pv.actual - pv.planB < -0.05 ? 't-ok' : ''}">${pv.actual - pv.planB >= 0 ? '+' : ''}${(pv.actual - pv.planB).toFixed(2)}h</b>）` : '予定と実績がそろった行はありません'}${pv.over ? `・予定の1.2倍超 <b class="t-crit">${pv.over}件</b>` : ''}${pv.noAct ? `・実績未入力 ${pv.noAct}件（予定工数で取込）` : ''}</div>` : ''}
       ${unplaced ? `<div style="margin-top:4px;color:var(--g500);">※ 時間割(Folio)に未配置の完了タスクが ${unplaced} 件あります。既定では取込みません（必要ならチェック）</div>` : ''}
       ${warn ? `<div style="margin-top:4px;color:var(--danger);">※ 中分類が未設定のタスクが ${warn} 件あります（行の「登録」でタスクマスタに設定できます）</div>` : ''}
       <div id="task-import-note" style="margin-top:4px;color:var(--primary);"></div>
@@ -5494,6 +5501,15 @@ function renderTaskImport() {
   applyBtn.disabled = !plan.length;
 }
 
+// 取込画面の「予定 → 実績」セル（Folio の予定工数 vs 実績工数）
+function _tiPvCell(r) {
+  const p = r.plan, a = r.actual;
+  if (p == null && a == null) return '<span style="color:var(--g400);">—</span>';
+  if (a == null) return `<span style="color:var(--g500);">予定 ${p.toFixed(2)}h<span style="margin-left:4px;font-size:10px;border:1px solid var(--g300);border-radius:4px;padding:0 4px;">実績なし</span></span>`;
+  if (p == null) return `実績 <b>${a.toFixed(2)}h</b><span style="color:var(--g400);margin-left:4px;">（予定なし）</span>`;
+  const d = a - p, cls = a > p * 1.2 ? 't-crit' : d < -0.05 ? 't-ok' : 't-muted';
+  return `<span style="color:var(--g500);">${p.toFixed(2)}h</span> → <b>${a.toFixed(2)}h</b> <b class="${cls}">（${d >= 0 ? '+' : ''}${d.toFixed(2)}）</b>`;
+}
 function applyTaskImport() {
   const p = _taskImportPlan;
   if (!p) return;
@@ -7031,11 +7047,13 @@ async function renderPersonDetail() {
     const tot = ts.reduce((t, r) => t + r.hours, 0), mx = ts[0].hours || 1;
     tasksEl.innerHTML = `<div class="dx-hbars">${ts.map(r => {
       const cd = r.cdSub || TASK_MAP[r.taskId], sb = SUB_MAP[cd] || {}, color = CAT_COLOR[sb.mainCd] || '#8C8377';
+      const pvOk = r.actN > 0 && r.planN > 0, d = pvOk ? r.actualSum - r.planSum : 0;
+      const pvTxt = r.planN == null ? '' : pvOk ? `<small class="pv" title="予定工数 ${r.planSum.toFixed(1)}h → 実績工数 ${r.actualSum.toFixed(1)}h（実績入力 ${r.actN}件）">予定 ${r.planSum.toFixed(1)} → 実績 ${r.actualSum.toFixed(1)} <b class="${r.actualSum > r.planSum * 1.2 ? 't-crit' : d < -0.05 ? 't-ok' : 't-muted'}">${d >= 0 ? '+' : ''}${d.toFixed(1)}</b>${r.overN ? ` <span class="t-crit">超過${r.overN}件</span>` : ''}</small>` : r.planN ? `<small class="pv t-muted">予定 ${r.planSum.toFixed(1)}h（実績なし）</small>` : '';
       return `<div class="dx-hbar"><span class="lb" title="${escHtml(r.taskId + ' ' + r.name)}"><i class="dx-sw" style="background:${color}"></i>${escHtml(r.name || r.taskId)}${r.unplaced ? `<span class="dx-tag">未配置 ${r.unplaced}</span>` : ''}</span>
         <div class="tr"><i style="background:${color}" data-w="${(r.hours / mx * 100).toFixed(1)}"></i></div>
-        <span class="vv">${r.hours.toFixed(1)}h<small>${r.n}件</small></span></div>`;
+        <span class="vv">${r.hours.toFixed(1)}h<small>${r.n}件</small>${pvTxt}</span></div>`;
     }).join('')}</div>
-    <p class="dx-note">合計 ${tot.toFixed(1)}h・${ts.reduce((t, r) => t + r.n, 0)}件（色＝日報の大分類）</p>`;
+    <p class="dx-note">合計 ${tot.toFixed(1)}h・${ts.reduce((t, r) => t + r.n, 0)}件（色＝日報の大分類）${ts.some(r => r.planN != null) ? (() => { const P = ts.reduce((t, r) => t + (r.planSum || 0), 0), A = ts.reduce((t, r) => t + (r.actualSum || 0), 0), aN = ts.reduce((t, r) => t + (r.actN || 0), 0), oN = ts.reduce((t, r) => t + (r.overN || 0), 0), nN = ts.reduce((t, r) => t + r.n - (r.actN || 0), 0); return `<br>予実（Folio）：予定 ${P.toFixed(1)}h → 実績 ${A.toFixed(1)}h（実績入力 ${aN}件${oN ? `・予定超過 <b class="t-crit">${oN}件</b>` : ''}${nN ? `・実績未入力 ${nN}件` : ''}）`; })() : ''}</p>`;
     dxGrow(tasksEl);
   } catch(e) {
     tasksEl.innerHTML = `<p class="dx-empty">Folioデータなし（${escHtml(e.message)}）</p>`;

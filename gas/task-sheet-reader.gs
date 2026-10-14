@@ -33,6 +33,7 @@
  *   → {ok, byDate:{date:{氏名:時間}}, cached}  … 時間割に配置済み(開始時刻あり)の完了タスクの実績合計
  * ダッシュボード用: ?action=getTaskStats&days=90（最大120日）
  *   → {ok, tasks:[{taskId, name, n, std, planAvg, actAvg, actSum}]}  … タスク別の標準工数と実績
+ * getCompletedTasks / getPersonTasks の各行には予実（plan=予定工数, actual=実績工数／planSum, actualSum, actN, overN）も含む
  * 個人ページ用: ?action=getPersonTasks&name=苗字&start=&end=（最大62日）
  *   → {ok, tasks:[{taskId, name, n, hours, unplaced}]}  … その人の完了タスクをタスク別に集計
  */
@@ -112,7 +113,9 @@ function getCompletedTasks_(date, name, email, nocache, diag) {
   var rows = list.filter(function (x) {
     return (email && x.e === email) || (name && x.n.indexOf(name) === 0);
   }).map(function (x) {
-    return {taskId: x.id, taskName: x.nm, cdSub: tm[x.id] || null, hours: x.h, start: x.s, startDate: x.sd, doneDate: x.dd, note: x.note};
+    return {taskId: x.id, taskName: x.nm, cdSub: tm[x.id] || null, hours: x.h, start: x.s, startDate: x.sd, doneDate: x.dd, note: x.note,
+            plan: x.p == null ? null : x.p,            // 予定工数(J)
+            actual: x.ac ? x.h : null};                // 実績工数(O)。未入力なら null（hours は予定工数）
   });
   var res = {ok: true, rows: rows, ms: Date.now() - t0, cached: cached, builtAt: builtAt};
   if (t) res.t = t;
@@ -270,9 +273,12 @@ function getPersonTasks_(name, start, end) {
   r.dates.forEach(function (d) {
     r.lists[d].forEach(function (x) {
       if (x.n.indexOf(name) !== 0) return;
-      var a = agg[x.id] || (agg[x.id] = {taskId: x.id, name: x.nm, n: 0, hours: 0, unplaced: 0});
+      var a = agg[x.id] || (agg[x.id] = {taskId: x.id, name: x.nm, n: 0, hours: 0, unplaced: 0, planSum: 0, planN: 0, actualSum: 0, actN: 0, overN: 0});
       a.n++; a.hours = Math.round((a.hours + x.h) * 10000) / 10000;
       if (!x.s) a.unplaced++;
+      // 予実: 予定工数(J)と実績工数(O)の合計、実績入力済み件数、実績が予定を超えた件数
+      if (x.p != null) { a.planSum = Math.round((a.planSum + x.p) * 10000) / 10000; a.planN++; }
+      if (x.ac) { a.actualSum = Math.round((a.actualSum + x.h) * 10000) / 10000; a.actN++; if (x.p != null && x.h > x.p) a.overN++; }
     });
   });
   var tasks = Object.keys(agg).map(function (k) { return agg[k]; }).sort(function (x, y) { return y.hours - x.hours; });
