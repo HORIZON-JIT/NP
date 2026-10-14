@@ -1215,6 +1215,9 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .kpi-heat tbody tr:hover td{background:transparent;}
 .kpi-heat tbody tr:hover td.h:not(.is-empty){box-shadow:inset 0 0 0 1.5px var(--dx-ink-3);}
 .kpi-heat tbody tr:hover td.h.is-cur{box-shadow:inset 0 0 0 1.5px var(--dx-accent);}
+.kpi-heat td.kh-stat{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-size:13px;padding-right:10px;}
+.kpi-heat th.kh-stat{text-align:right;}
+.kpi-heat td.kh-stat:first-of-type,.kpi-heat th.kh-stat:first-of-type{border-left:1px solid var(--dx-line);}
 .kpi-heat td.kh-done{text-align:right;white-space:nowrap;padding-right:10px;}
 .kpi-heat td.kh-done b{font-size:13px;}
 .kh-dots{display:flex;gap:2px;justify-content:flex-end;margin-top:3px;}
@@ -6754,13 +6757,17 @@ async function renderKpiDash(force) {
       <b>${h.toFixed(1)}</b>${pj != null ? `<small class="${pj > target ? 't-crit' : ''}">見込 ${pj.toFixed(0)}</small>` : ''}</td>`;
   };
   if (el) el.innerHTML = `<table class="dx-table kpi-heat">
-    <thead><tr><th class="sticky">KPI</th><th class="num">目標</th>${periods.map((x, i) => `<th class="num ${i === curIdx ? 'is-cur' : ''} ${i === ctx.sel ? 'is-sel' : ''}" title="${ranges[i].range}" onclick="_kpiPick(${i})">${i === curIdx ? '<span class="kh-cur">今期</span>' : ''}${x.month}月期${ranges[i].calendar ? '<span class="kh-cal">月末締</span>' : ''}</th>`).join('')}<th class="num">達成月</th></tr></thead>
+    <thead><tr><th class="sticky">KPI</th><th class="num">目標</th>${periods.map((x, i) => `<th class="num ${i === curIdx ? 'is-cur' : ''} ${i === ctx.sel ? 'is-sel' : ''}" title="${ranges[i].range}" onclick="_kpiPick(${i})">${i === curIdx ? '<span class="kh-cur">今期</span>' : ''}${x.month}月期${ranges[i].calendar ? '<span class="kh-cal">月末締</span>' : ''}</th>`).join('')}<th class="num kh-stat" title="終わった月期の平均">平均</th><th class="num kh-stat" title="終わった月期の中央値">中央値</th><th class="num">達成月</th></tr></thead>
     <tbody>${HK.map((k, ki) => {
       const v = vals[ki];
-      const past = v.filter((x, i) => x != null && i !== curIdx).length, done = v.filter((x, i) => x != null && i !== curIdx && x <= k.target).length;
+      const pastVals = v.filter((x, i) => x != null && i !== curIdx), past = pastVals.length, done = pastVals.filter(x => x <= k.target).length;
+      const avg = past ? pastVals.reduce((t, x) => t + x, 0) / past : null;
+      const med = past ? (() => { const a = pastVals.slice().sort((x, y) => x - y), m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; })() : null;
+      const stat = x => x == null ? '<span class="t-muted">—</span>' : `<b class="${x <= k.target ? 't-ok' : 't-crit'}">${x.toFixed(1)}</b>`;
       return `<tr><td class="sticky" ${k.plan ? `title="アクションプラン: ${escHtml(k.plan)}"` : ''}><b>${escHtml(k.name)}</b>${k.owner ? `<span class="kh-owner" title="主担当">${escHtml(k.owner)}</span>` : ''}${k.subs.length ? '' : '<span class="dx-tag is-warn">未設定</span>'}</td>
         <td class="tg">≦${k.target}h</td>
         ${v.map((x, i) => cell(x, k.target, i, ki)).join('')}
+        <td class="kh-stat">${stat(avg)}</td><td class="kh-stat">${stat(med)}</td>
         <td class="kh-done">${past ? `<b class="${done === past ? 't-ok' : ''}">${done}</b><span class="t-muted">/${past}</span>` : '<span class="t-muted">—</span>'}<div class="kh-dots">${v.map((x, i) => `<i class="${i === curIdx ? 'cur' : x == null ? '' : x <= k.target ? 'ok' : 'crit'}"></i>`).join('')}</div></td></tr>`;
     }).join('')}</tbody></table>
     <div class="kpi-heat-lg"><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-ok) 20%,transparent)"></i>目標以下</span><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-warn) 20%,transparent)"></i>1.2倍まで</span><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-crit) 24%,transparent)"></i>1.2倍超</span><span class="sep"></span><span>列をクリックすると下の内訳が切り替わります</span></div>`;
