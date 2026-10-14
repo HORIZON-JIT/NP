@@ -1659,6 +1659,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <div class="card-hd"><h2>残業時間（全員合算）</h2><span class="card-sub" id="kpi-ot-sub">月期ごとの残業時間の合計 ｜ 破線＝目標</span></div>
       <div class="card-body" style="position:relative;">
         <canvas id="kpi-ot-canvas"></canvas>
+        <div class="dx-legend" id="kpi-ot-legend"></div>
       </div>
     </div>
     <div class="card">
@@ -6387,6 +6388,9 @@ async function renderKpiDash(force) {
       const got = await mapPool(periods.map((x, i) => ({x, i})).filter(o => o.i <= lastIdx), 4, ({x, i}) =>
         withTimeout(loadRangeData(ranges[i].startDate, ranges[i].endDate, x.year, x.month), 15000, 'timeout').catch(() => null));
       ctx.data = periods.map((x, i) => i <= lastIdx ? got[i] : null);
+      // 年度初めの月期の前期（前年度9月期）: 担当者別の前期比に使う
+      const p0 = periods[0], pp = p0.month === 1 ? {year: p0.year - 1, month: 12} : {year: p0.year, month: p0.month - 1}, pr = kpiPeriodDates(pp.year, pp.month);
+      ctx.prev0 = lastIdx >= 0 ? await withTimeout(loadRangeData(pr.startDate, pr.endDate, pp.year, pp.month), 15000, 'timeout').catch(() => null) : null;
     } finally { setLoading(false); }
   }
   if (_kpiCtx !== ctx) return;
@@ -6395,6 +6399,11 @@ async function renderKpiDash(force) {
   const HK = _kpiHoursItems(), OTK = _kpiOtItem();
   const vals = HK.map(k => periods.map((x, i) => (i > lastIdx || !data[i] || !k.subs.length) ? null : _kpiHoursOf(data[i], k.subs)));
   const otVals = periods.map((x, i) => (i > lastIdx || !data[i]) ? null : _kpiOtOf(data[i]));
+  // 担当者別の残業（積み上げ棒用）。年度内に残業のある人を多い順に
+  const otBy = periods.map((x, i) => (i > lastIdx || !data[i]) ? null : _otByAuthor(data[i]));
+  const otAuthors = (() => { const t = {}; otBy.forEach(m => m && Object.keys(m).forEach(a => { t[a] = (t[a] || 0) + m[a].ot; })); return Object.keys(t).filter(a => t[a] > 0).sort((a, b) => t[b] - t[a]); })();
+  const AUTH_COLORS = ['#2a78d6', '#e0a526', '#8b5cf6', '#10b981', '#f43f5e', '#0ea5e9', '#f97316', '#84cc16', '#ec4899', '#6b7280'];
+  const authColor = a => AUTH_COLORS[otAuthors.indexOf(a) % AUTH_COLORS.length];
   const wd = curIdx >= 0 && data[curIdx] ? _kpiWorkdays(data[curIdx], ranges[curIdx].startDate, ranges[curIdx].endDate) : null;
   const proj = wd && wd.elapsed > 0 && wd.total > wd.elapsed ? wd.total / wd.elapsed : 1;
   const mapped = HK.filter(k => k.subs.length).length;
@@ -6454,12 +6463,18 @@ async function renderKpiDash(force) {
     const d = si >= 0 ? data[si] : null;
     if (!d) bd.innerHTML = '<p class="dx-empty">この月期のデータがありません</p>';
     else bd.innerHTML = `<div class="kpi-bd-grid">${(OTK ? [(() => {
-      const all = _otByAuthor(d), auth = _authorsLast(Object.keys(all).filter(a => all[a].ot > 0).sort((x, y) => all[y].ot - all[x].ot));
+      const all = _otByAuthor(d), auth = Object.keys(all).filter(a => all[a].ot > 0).sort((x, y) => all[y].ot - all[x].ot);   // 多い順（要因が上に来るように）
       const total = auth.reduce((t, a) => t + all[a].ot, 0), maxA = Math.max(0.01, ...auth.map(a => all[a].ot));
       const r = OTK.target > 0 ? total / OTK.target : 0, lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
-      return `<div class="kpi-bd">
-        <div class="kpi-bd-hd"><b>${escHtml(OTK.name)}</b><span class="t-${lv}">${total.toFixed(1)}h</span><span class="t-muted">／ 目標 ≦${OTK.target}h</span><span class="dx-tag is-${lv}">${lv === 'ok' ? '達成' : lv === 'warn' ? '超過' : '大幅超過'}</span></div>
-        <div class="kpi-bd-sec">担当者</div><div class="dx-hbars">${auth.length ? auth.map(a => `<div class="dx-hbar"><span class="lb">${escHtml(a)}</span><div class="tr"><i style="background:${all[a].ot > (DEPARTMENT_CONFIG.rules.otMonthWarn || 36) ? 'var(--st-crit)' : 'var(--st-warn)'}" data-w="${(all[a].ot / maxA * 100).toFixed(1)}"></i></div><span class="vv">${all[a].ot.toFixed(1)}h<small>${total ? Math.round(all[a].ot / total * 100) : 0}%</small></span></div>`).join('') : '<p class="dx-empty" style="padding:6px 0">この月期の残業はありません</p>'}</div>
+      const prevD = si > 0 ? data[si - 1] : ctx.prev0, prevAll = prevD ? _otByAuthor(prevD) : null;
+      const over = Math.max(0, total - OTK.target), avg = auth.length ? total / auth.length : 0;
+      const isCurSel = si === curIdx;
+      return `<div class="kpi-bd kpi-bd-ot">
+        <div class="kpi-bd-hd"><b>${escHtml(OTK.name)}</b><span class="t-${lv}">${total.toFixed(1)}h</span><span class="t-muted">／ 目標 ≦${OTK.target}h</span><span class="dx-tag is-${lv}">${lv === 'ok' ? '達成' : lv === 'warn' ? '超過' : '大幅超過'}</span>${over > 0 ? `<span class="t-crit" style="font-size:12px;font-weight:700">目標超過 +${over.toFixed(1)}h</span>` : ''}</div>
+        <div class="kpi-bd-sec">担当者（多い順）・平均 ${avg.toFixed(1)}h${prevAll ? '・前期比' : ''}</div>
+        <div class="dx-hbars">${auth.length ? auth.map(a => { const v = all[a].ot, pv = prevAll ? ((prevAll[a] || {}).ot || 0) : null, dv = pv == null ? null : v - pv, hi = v > avg + 0.05;
+          return `<div class="dx-hbar"><span class="lb"><i class="dx-sw" style="background:${authColor(a)}"></i>${escHtml(a)}${hi ? '<span class="dx-tag is-crit" title="チーム平均より多い">平均超</span>' : ''}</span><div class="tr"><i style="background:${authColor(a)}" data-w="${(v / maxA * 100).toFixed(1)}"></i></div><span class="vv">${v.toFixed(1)}h<small>${total ? Math.round(v / total * 100) : 0}%</small>${dv == null ? '' : `<small class="${dv > 0.05 ? 't-crit' : dv < -0.05 ? 't-ok' : 't-muted'}" title="前期 ${pv.toFixed(1)}h">${dv > 0 ? '+' : ''}${dv.toFixed(1)}</small>`}</span></div>`; }).join('') : '<p class="dx-empty" style="padding:6px 0">この月期の残業はありません</p>'}</div>
+        ${prevAll && auth.some(a => (all[a].ot - ((prevAll[a] || {}).ot || 0)) > 0.05) ? `<p class="dx-note">前期より増えた人: ${auth.filter(a => (all[a].ot - ((prevAll[a] || {}).ot || 0)) > 0.05).map(a => `${escHtml(a)} +${(all[a].ot - ((prevAll[a] || {}).ot || 0)).toFixed(1)}h`).join('、')}</p>` : ''}
       </div>`; })()] : []).join('')}${HK.map((k, ki) => {
       const b = _kpiBreakdown(d, k.subs);
       const r = k.target > 0 ? b.total / k.target : 0, lv = !k.subs.length ? '' : r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
@@ -6481,14 +6496,17 @@ async function renderKpiDash(force) {
     if (OTK) {
       const os = document.getElementById('kpi-ot-sub');
       if (os) os.textContent = `月期ごとの全員の残業時間の合計 ｜ 破線＝目標 ${OTK.target}h ｜ 斜線＝今期の月末見込`;
-      requestAnimationFrame(() => renderKpiOtBar(document.getElementById('kpi-ot-canvas'), periods, ranges, otVals, OTK.target, curIdx, proj));
+      requestAnimationFrame(() => renderKpiOtBar(document.getElementById('kpi-ot-canvas'), periods, ranges, otVals, OTK.target, curIdx, proj, {by: otBy, authors: otAuthors, color: authColor, sel: ctx.sel}));
+      const lg = document.getElementById('kpi-ot-legend');
+      if (lg) lg.innerHTML = otAuthors.map(a => `<span><i class="dx-sw" style="background:${authColor(a)}"></i>${escHtml(a)}</span>`).join('') + `<span class="t-muted">棒は担当者ごとの積み上げ。棒をクリックすると下の内訳がその月期に切り替わります</span>`;
     }
   }
   dxGrow(document.getElementById('dash-kpi'), !!ctx._grown && reuse); ctx._grown = true;
 }
 // KPI: 残業時間（全員合算）の縦棒グラフ。目標以下は緑、超えたら赤。今期は月末見込までの伸びを斜線で
-function renderKpiOtBar(canvas, periods, ranges, vals, target, curIdx, proj) {
+function renderKpiOtBar(canvas, periods, ranges, vals, target, curIdx, proj, stack) {
   if (!canvas) return;
+  stack = stack || {by: [], authors: [], color: () => CHT_OT, sel: -1};
   const W = _contentW(canvas.parentElement, 640) - 2, H = 240;
   const PL = 44, PR = 16, PT = 26, PB = 40;
   canvas.width = W; canvas.height = H;
@@ -6513,8 +6531,17 @@ function renderKpiOtBar(canvas, periods, ranges, vals, target, curIdx, proj) {
       if (ranges[i].calendar) { ctx.fillStyle = CHT_FAINT; ctx.font = '9px sans-serif'; ctx.fillText('月末締', x, PT + cH + 19); }
       if (v == null) return;
       const h = v / maxV * cH * frac, over = v > target;
-      ctx.fillStyle = over ? CHT_OT : CHT_OK;
-      _rr(ctx, x - barW / 2, PT + cH - h, barW, h, 4, 'up');
+      // 担当者ごとの積み上げ（多い人が下）。外形を目標以下＝緑／超過＝赤の枠で示す
+      const by = stack.by[i];
+      if (by && stack.authors.length) {
+        let y0 = PT + cH;
+        stack.authors.forEach(a => { const ah = ((by[a] || {}).ot || 0) / maxV * cH * frac; if (ah <= 0) return; ctx.fillStyle = stack.color(a); ctx.fillRect(x - barW / 2, y0 - ah, barW, ah); y0 -= ah; });
+        ctx.strokeStyle = over ? CHT_OT : CHT_OK; ctx.lineWidth = i === stack.sel ? 3 : 1.5; ctx.strokeRect(x - barW / 2, PT + cH - h, barW, h);
+      } else {
+        ctx.fillStyle = over ? CHT_OT : CHT_OK;
+        _rr(ctx, x - barW / 2, PT + cH - h, barW, h, 4, 'up');
+      }
+      canvas._bars = canvas._bars || []; canvas._bars[i] = {x0: x - slot / 2, x1: x + slot / 2};
       if (i === curIdx && pj != null && pj > v) {
         const ph = pj / maxV * cH * frac;
         ctx.save(); ctx.beginPath(); ctx.rect(x - barW / 2, PT + cH - ph, barW, ph - h); ctx.clip();
@@ -6532,7 +6559,14 @@ function renderKpiOtBar(canvas, periods, ranges, vals, target, curIdx, proj) {
     ctx.save(); ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1.8; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(PL, ty); ctx.lineTo(PL + cW, ty); ctx.stroke(); ctx.restore();
     ctx.fillStyle = '#d97706'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText(`目標 ${target}h`, PL + cW, ty - 3);
   };
-  const key = vals.map(v => v == null ? '' : v.toFixed(2)).join('|') + `|${target}|${pj == null ? '' : pj.toFixed(1)}`;
+  const key = vals.map(v => v == null ? '' : v.toFixed(2)).join('|') + `|${target}|${pj == null ? '' : pj.toFixed(1)}|${stack.sel}|${stack.authors.join(',')}`;
+  if (!canvas._kpiBound) {
+    canvas._kpiBound = true;
+    canvas.style.cursor = 'pointer';
+    canvas.addEventListener('click', ev => { const r = canvas.getBoundingClientRect(), x = (ev.clientX - r.left) * (canvas.width / r.width); const i = (canvas._bars || []).findIndex(b => b && x >= b.x0 && x <= b.x1); if (i >= 0 && _kpiCtx && _kpiCtx.data[i]) { _kpiPick(i); const bd = document.getElementById('kpi-breakdown'); if (bd) bd.closest('.card').scrollIntoView({behavior: _dxReduce() ? 'auto' : 'smooth', block: 'start'}); } });
+  }
+  const prevKey = canvas._grownKey;
+  if (prevKey && prevKey !== key && prevKey.split('|').slice(0, 14).join('|') === key.split('|').slice(0, 14).join('|')) { canvas._grownKey = key; draw(1); return; }   // 選択だけ変わった
   if (canvas._raf) { cancelAnimationFrame(canvas._raf); canvas._raf = 0; }
   if (canvas._grownKey === key || _dxReduce()) { canvas._grownKey = key; draw(1); return; }
   canvas._grownKey = key;
