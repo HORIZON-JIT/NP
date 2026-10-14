@@ -1655,16 +1655,16 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <button class="btn-pdf no-print" onclick="exportPdf('kpi')">PDF出力</button>
     </div>
     <div class="dash-stats kpi-tiles" id="kpi-tiles"></div>
+    <div class="card">
+      <div class="card-hd"><h2>年度ヒートマップ</h2><span class="card-sub" id="kpi-sub">月期ごとの工数合計（全員・通常＋残業）を目標と比較</span></div>
+      <div class="card-body"><div id="kpi-heat" style="overflow-x:auto;"></div></div>
+    </div>
     <div class="card" id="kpi-ot-card" style="display:none;">
       <div class="card-hd"><h2>残業時間（全員合算）</h2><span class="card-sub" id="kpi-ot-sub">月期ごとの残業時間の合計 ｜ 破線＝目標</span></div>
       <div class="card-body" style="position:relative;">
         <canvas id="kpi-ot-canvas"></canvas>
         <div class="dx-legend" id="kpi-ot-legend"></div>
       </div>
-    </div>
-    <div class="card">
-      <div class="card-hd"><h2>年度ヒートマップ</h2><span class="card-sub" id="kpi-sub">月期ごとの工数合計（全員・通常＋残業）を目標と比較</span></div>
-      <div class="card-body"><div id="kpi-heat" style="overflow-x:auto;"></div></div>
     </div>
     <div class="card">
       <div class="card-hd"><h2 id="kpi-bd-title">内訳</h2><span class="card-sub" id="kpi-bd-sub">ヒートマップの月期をクリックで切替</span></div>
