@@ -5222,7 +5222,8 @@ async function openTaskRef(force) {
       : `<div style="padding:14px;color:var(--danger);">取得に失敗しました: ${escHtml(msg)}</div>`;
     return;
   }
-  _trData = (d.tasks || []).map(t => ({taskId: String(t.taskId || ''), name: String(t.name || ''), std: (t.std == null ? null : Number(t.std)), cdSub: String(t.cdSub || '').trim()}));
+  _trData = (d.tasks || []).map(t => ({taskId: String(t.taskId || ''), name: String(t.name || ''), std: (t.std == null ? null : Number(t.std)), cdSub: String(t.cdSub || '').trim()}))
+    .sort((x, y) => _trIdCmp(x.taskId, y.taskId));
   _trAt = Date.now();
   _trFetched = `取得 ${((Date.now() - t0)/1000).toFixed(1)}秒${d.cached ? '（キャッシュ）' : ''}`;
   renderTaskRef();
@@ -5233,6 +5234,12 @@ function setTaskRefMode(m) {
   document.getElementById('tr-mode-f2n').classList.toggle('on', m === 'f2n');
   document.getElementById('tr-mode-n2f').classList.toggle('on', m === 'n2f');
   renderTaskRef();
+}
+// タスクID順（英字部分 → 数字部分を数値で比較。K1, K2, K13, K29 の順）
+function _trIdKey(id) { const m = /^([^0-9]*)(\d*)(.*)$/.exec(String(id || '').trim()); return [m[1].toUpperCase(), m[2] === '' ? Infinity : Number(m[2]), m[3]]; }
+function _trIdCmp(a, b) {
+  const ka = _trIdKey(a), kb = _trIdKey(b);
+  return ka[0].localeCompare(kb[0], 'ja') || (ka[1] - kb[1]) || ka[2].localeCompare(kb[2], 'ja');
 }
 function _trStd(h) { return h == null || isNaN(h) ? '—' : `${(Math.round(h * 100) / 100)}h`; }
 function _trMatch(t, q) {
