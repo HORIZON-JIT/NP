@@ -1368,7 +1368,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <h1 class="dx-title" id="dx-title">月次レポート</h1>
     </div>
   <div class="dash-subtabs no-print" role="tablist">
-    <button class="dash-stab active" id="stab-monthly" onclick="showDashTab('monthly')">月次</button>
+    <button class="dash-stab active" id="stab-monthly" onclick="showDashTab('monthly')">月次（15日締め）</button>
     <button class="dash-stab"        id="stab-yearly"  onclick="showDashTab('yearly')">年次</button>
     <button class="dash-stab"        id="stab-daily"   onclick="showDashTab('daily')">日別</button>
     <button class="dash-stab"        id="stab-person"  onclick="showDashTab('person')">個人</button>
@@ -1869,8 +1869,9 @@ const DEPARTMENT_CONFIG = (function(){
       backupSheetUrl: 'https://docs.google.com/spreadsheets/d/1LlQVpi8O7RMmugpVkOlXckiNGrSzE2isS73drWsgxYk/edit'
     },
     // 勤務ルール（時刻は "HH:MM"）
-    // 月期の締め: midMonthFrom 以降の月期は「前月16日〜当月15日」、それより前は「1日〜月末」（暦月）
-    periodRule: { midMonthFrom: { year: 2026, month: 10 } },
+    // KPI（月次工数目標）だけの締めルール: midMonthFrom 以降の月期は「前月16日〜当月15日」、それより前は「1日〜月末」（暦月）。
+    // 日報アプリ本体の月期（ダッシュボード・入力）は常に15日締め
+    kpiPeriodRule: { midMonthFrom: { year: 2026, month: 10 } },
     rules: {
       workStart:      '08:30',  // 始業
       normalEnd:      '17:20',  // 定時（夕方休憩前）
@@ -2563,31 +2564,26 @@ function todayStr() {
 }
 function pad(n){ return String(n).padStart(2,'0'); }
 
-// ─── 月期の期間計算 ────────────────────
-// periodRule.midMonthFrom 以降の「YYYY年M月期」= 前月16日〜当月15日。それより前の月期 = 1日〜月末（暦月）
-function _isMidMonthPeriod(year, month) {
-  const f = (DEPARTMENT_CONFIG.periodRule || {}).midMonthFrom;
-  if (!f) return true;
-  return year * 100 + month >= f.year * 100 + f.month;
-}
-// 日付(YYYY-MM-DD)が属する月期。16日以降で翌月期が15日締めなら翌月期、それ以外は当月期
+// ─── 15日締め期間計算 ────────────────────
+// 「YYYY年M月期」= 前月16日〜当月15日
+// 日付(YYYY-MM-DD)が属する月期。16日以降は翌月期、1〜15日は当月期
 function periodOfDate(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
-  const next = m === 12 ? {year: y + 1, month: 1} : {year: y, month: m + 1};
-  if (d > 15 && _isMidMonthPeriod(next.year, next.month)) return next;
+  if (d > 15) return m === 12 ? {year: y + 1, month: 1} : {year: y, month: m + 1};
   return {year: y, month: m};
 }
 function getCurrentPeriodMonth() { return periodOfDate(todayStr()); }
-function getPeriodDates(year, month) {
-  if (!_isMidMonthPeriod(year, month)) {
+// KPI（月次工数目標）専用: kpiPeriodRule.midMonthFrom より前の月期は暦月（1日〜月末）
+function kpiPeriodDates(year, month) {
+  const f = (DEPARTMENT_CONFIG.kpiPeriodRule || {}).midMonthFrom;
+  if (f && year * 100 + month < f.year * 100 + f.month) {
     const last = new Date(year, month, 0).getDate();
-    return {
-      startDate: `${year}-${pad(month)}-01`,
-      endDate:   `${year}-${pad(month)}-${pad(last)}`,
-      label:     `${year}年${month}月期`,
-      range:     `${year}/${pad(month)}/01 〜 ${year}/${pad(month)}/${pad(last)}`
-    };
+    return {startDate: `${year}-${pad(month)}-01`, endDate: `${year}-${pad(month)}-${pad(last)}`, label: `${year}年${month}月期`,
+            range: `${year}/${pad(month)}/01 〜 ${year}/${pad(month)}/${pad(last)}`, calendar: true};
   }
+  return getPeriodDates(year, month);
+}
+function getPeriodDates(year, month) {
   const prevM = month===1?12:month-1;
   const prevY = month===1?year-1:year;
   return {
@@ -6278,13 +6274,27 @@ function renderKpiHeat() {
   card.style.display = '';
   const p = ctx.period, fy = _fiscalYearOf(p), periods = getFiscalPeriods(fy);
   const curIdx = periods.findIndex(x => x.year === p.year && x.month === p.month);
-  // 期初〜当期の生データ（loadMgrExtras 完了前は当期のみ）
-  const raw = ctx.fyRaw || periods.map((x, i) => i === curIdx ? ctx.curRaw : null);
+  const ranges = periods.map(x => kpiPeriodDates(x.year, x.month));
+  // 期初〜当期の生データ。15日締めの月期は管理者サマリー用に読んだデータを共用し、暦月の月期（KPI専用の締め）は別に読む
+  const needCal = ranges.some((r, i) => r.calendar && i <= curIdx);
+  if (needCal && !ctx.kpiCal && !ctx._kpiCalLoading) {
+    ctx._kpiCalLoading = true;
+    mapPool(ranges.map((r, i) => ({r, i})).filter(x => x.r.calendar && x.i <= curIdx), 4, ({r}) =>
+      withTimeout(loadRangeData(r.startDate, r.endDate), 15000, 'timeout').catch(() => null))
+      .then(list => { if (_mgrCtx !== ctx) return; ctx.kpiCal = {}; ranges.forEach((r, i) => { if (r.calendar && i <= curIdx) ctx.kpiCal[i] = list.shift(); }); renderKpiHeat(); });
+  }
+  const raw = periods.map((x, i) => {
+    if (i > curIdx) return null;
+    if (ranges[i].calendar) return ctx.kpiCal ? ctx.kpiCal[i] : null;
+    if (i === curIdx) return ctx.curRaw;
+    return ctx.fyRaw ? ctx.fyRaw[i] : null;
+  });
   const proj = (ec && ec.inProgress && ec.workElapsed > 0 && ec.workTotal > ec.workElapsed) ? ec.workTotal / ec.workElapsed : 1;
-  const loading = !ctx.fyRaw && curIdx > 0;
+  const loading = (!ctx.fyRaw && curIdx > 0) || (needCal && !ctx.kpiCal);
   const mapped = KPIS.filter(k => k.subs.length).length;
   const sub = document.getElementById('kpi-sub');
-  if (sub) sub.textContent = `${fy + 1}年度（${fy - 1952}期）・月期ごとの工数合計（全員・通常＋残業）を目標と比較${mapped < KPIS.length ? `・中分類の紐づけが未設定のKPIが${KPIS.length - mapped}件（管理タブで設定）` : ''}`;
+  const calN = ranges.filter((r, i) => r.calendar).length;
+  if (sub) sub.textContent = `${fy + 1}年度（${fy - 1952}期）・月期ごとの工数合計（全員・通常＋残業）を目標と比較${calN ? `・${ranges.findIndex(r => !r.calendar) >= 0 ? periods[ranges.findIndex(r => !r.calendar)].month + '月期から15日締め、それ以前は月末締め' : '月末締め'}` : ''}${mapped < KPIS.length ? `・中分類の紐づけが未設定のKPIが${KPIS.length - mapped}件（管理タブで設定）` : ''}`;
   const cell = (h, target, isCur) => {
     if (h == null) return '<td class="h"><span class="t-muted">·</span></td>';
     const r = target > 0 ? h / target : 0;
@@ -6295,7 +6305,7 @@ function renderKpiHeat() {
       <b class="${lv === 'ok' ? '' : 't-' + lv}">${h.toFixed(1)}</b>${pj != null ? `<small class="${pj > target ? 't-crit' : 't-muted'}">見込 ${pj.toFixed(0)}</small>` : ''}</td>`;
   };
   el.innerHTML = `<table class="dx-table dx-heat kpi-heat">
-    <thead><tr><th class="sticky">KPI</th><th class="num">目標</th>${periods.map((x, i) => `<th class="num ${i === curIdx ? 'is-cur' : ''}">${x.month}月期${i === curIdx ? '<span class="dx-tag">今期</span>' : ''}</th>`).join('')}<th class="num">達成月</th></tr></thead>
+    <thead><tr><th class="sticky">KPI</th><th class="num">目標</th>${periods.map((x, i) => `<th class="num ${i === curIdx ? 'is-cur' : ''}" title="${ranges[i].range}">${x.month}月期${ranges[i].calendar ? '<small class="t-muted" style="display:block;font-weight:600">月末締</small>' : ''}${i === curIdx ? '<span class="dx-tag">今期</span>' : ''}</th>`).join('')}<th class="num">達成月</th></tr></thead>
     <tbody>${KPIS.map(k => {
       const vals = periods.map((x, i) => (i > curIdx || !raw[i] || !k.subs.length) ? null : _kpiHoursOf(raw[i], k.subs));
       const done = vals.filter((v, i) => v != null && i < curIdx && v <= k.target).length, past = vals.filter((v, i) => v != null && i < curIdx).length;
