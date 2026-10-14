@@ -938,6 +938,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 /* ── タグ ── */
 .dx-tag{display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.02em;vertical-align:1px;background:var(--dx-track);color:var(--dx-ink-2);}
 .dx-tag.is-crit{background:var(--st-crit-bg);color:var(--st-crit-ink);}
+.dx-tag.is-ok{background:var(--st-ok-bg);color:var(--st-ok-ink);}
 .dx-tag.is-warn{background:var(--st-warn-bg);color:var(--st-warn-ink);}
 .dx-tag.is-info{background:var(--st-info-bg);color:var(--st-info-ink);}
 
@@ -1149,6 +1150,17 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .kpi-cat-hd{font-size:12px;font-weight:800;color:var(--g700);margin:8px 0 4px;display:flex;align-items:center;gap:6px;}
 .kpi-subs label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--g800);padding:3px 0;cursor:pointer;}
 .kpi-subs label input{margin:0;}
+.kpi-heat th.is-sel,.kpi-heat td.is-sel{outline:2px dashed var(--dx-ink-3);outline-offset:-2px;}
+.kpi-heat th{cursor:pointer;}.kpi-heat td.h{cursor:pointer;}
+.kpi-tiles .d-stat .sv small{font-size:12px;margin-left:2px;}
+.kpi-bd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;}
+.kpi-bd{border:1px solid var(--dx-line);border-radius:var(--dx-radius-sm);padding:12px 14px;background:var(--surface);}
+.kpi-bd-hd{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;font-size:13px;margin-bottom:8px;}
+.kpi-bd-hd b{font-size:14px;}
+.kpi-bd-sec{font-size:11px;font-weight:700;color:var(--dx-ink-3);margin:8px 0 6px;letter-spacing:.04em;}
+.kpi-bd .dx-hbar{grid-template-columns:minmax(0,130px) minmax(0,1fr) auto;font-size:12.5px;}
+.pdf-mode .kpi-bd-grid{grid-template-columns:repeat(3,1fr)!important;gap:8px!important;}
+.pdf-mode .kpi-tiles{grid-template-columns:repeat(7,1fr)!important;}
 /* ── 効率化ハイライト ── */
 .dx-eff{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:24px;align-items:start;}
 .dx-eff-hero{padding:14px 16px;border-radius:12px;background:var(--dx-track);}
@@ -1372,6 +1384,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <button class="dash-stab"        id="stab-yearly"  onclick="showDashTab('yearly')">年次</button>
     <button class="dash-stab"        id="stab-daily"   onclick="showDashTab('daily')">日別</button>
     <button class="dash-stab"        id="stab-person"  onclick="showDashTab('person')">個人</button>
+    <button class="dash-stab"        id="stab-kpi"     onclick="showDashTab('kpi')" style="display:none;">KPI</button>
   </div>
   </div>
 
@@ -1431,11 +1444,6 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <div class="card dx-goal-card" id="goal-card" style="display:none;">
       <div class="card-hd"><h2>チーム目標</h2><span class="card-sub" id="goal-sub">今月期の達成度</span></div>
       <div class="card-body"><div class="dx-goals" id="team-goals"></div></div>
-    </div>
-    <!-- KPI（月次工数目標）の年度ヒートマップ。kpis が空の部署では出さない -->
-    <div class="card" id="kpi-card" style="display:none;">
-      <div class="card-hd"><h2>KPI 達成状況</h2><span class="card-sub" id="kpi-sub">月期ごとの工数合計（全員・通常＋残業）を目標と比較</span></div>
-      <div class="card-body"><div id="kpi-heat" style="overflow-x:auto;"></div></div>
     </div>
     <!-- 統計カード（5枚） -->
     <div class="dash-stats">
@@ -1629,6 +1637,29 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <div class="card-body"><div id="person-tasks"></div></div>
     </div>
   </div><!-- /dash-person -->
+
+  <!-- ═══ KPI（月次工数目標）: 生産管理課のみ（KPIS が空の部署では非表示）═══ -->
+  <div id="dash-kpi" style="display:none;">
+    <div class="period-controls">
+      <div class="period-nav">
+        <button onclick="changeKpiYear(-1)" title="前年度">◀</button>
+        <select id="kpi-sel-fy" class="period-sel" onchange="renderKpiDash()" style="min-width:110px;"></select>
+        <button onclick="changeKpiYear(1)" title="翌年度">▶</button>
+      </div>
+      <span class="period-range-label" id="kpi-range">—</span>
+      <button class="btn-refresh no-print" onclick="renderKpiDash(true)">再読込</button>
+      <button class="btn-pdf no-print" onclick="exportPdf('kpi')">PDF出力</button>
+    </div>
+    <div class="dash-stats kpi-tiles" id="kpi-tiles"></div>
+    <div class="card">
+      <div class="card-hd"><h2>年度ヒートマップ</h2><span class="card-sub" id="kpi-sub">月期ごとの工数合計（全員・通常＋残業）を目標と比較</span></div>
+      <div class="card-body"><div id="kpi-heat" style="overflow-x:auto;"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><h2 id="kpi-bd-title">内訳</h2><span class="card-sub" id="kpi-bd-sub">ヒートマップの月期をクリックで切替</span></div>
+      <div class="card-body"><div id="kpi-breakdown"></div></div>
+    </div>
+  </div><!-- /dash-kpi -->
 </div><!-- /view-dash -->
 
 <div id="view-admin" class="tab-content">
@@ -2120,7 +2151,8 @@ function _normKpis(list) {
   });
 }
 let KPIS = (() => { try { return _normKpis(JSON.parse(localStorage.getItem(KPIS_STORAGE_KEY) || 'null')); } catch(e) { return _normKpis(null); } })();
-function applyKpis(list) { KPIS = _normKpis(list); try { localStorage.setItem(KPIS_STORAGE_KEY, JSON.stringify(KPIS)); } catch(e) {} }
+function applyKpis(list) { KPIS = _normKpis(list); try { localStorage.setItem(KPIS_STORAGE_KEY, JSON.stringify(KPIS)); } catch(e) {} _syncKpiTab(); }
+function _syncKpiTab() { const b = document.getElementById('stab-kpi'); if (b) b.style.display = KPIS.length ? '' : 'none'; }
 
 const TASK_MAP_STORAGE_KEY = LS_NS + '__taskMap__';
 function normalizeTaskMap(map) {
@@ -2246,7 +2278,7 @@ async function loadMasterFromFirebase(force = false) {
     const cats = Array.isArray(data.cats) ? data.cats : [];
     if (cats.length) applyMasterCats(cats);
     if (data.goals && typeof data.goals === 'object') { applyGoals(data.goals); renderAdminGoals(); }
-    if (Array.isArray(data.kpis)) { applyKpis(data.kpis); renderAdminKpis(); renderKpiHeat(); }
+    if (Array.isArray(data.kpis)) { applyKpis(data.kpis); renderAdminKpis(); if (_dashTab === 'kpi') renderKpiDash(); }
     if (data.taskMap && typeof data.taskMap === 'object' && Object.keys(data.taskMap).length) {
       applyTaskMap(data.taskMap);
     }
@@ -2643,6 +2675,7 @@ function setTheme(theme){
       if (_dashTab === 'daily') renderDash();
       else if (_dashTab === 'yearly') renderYearlyDash();
       else if (_dashTab === 'person') renderPersonDash();
+      else if (_dashTab === 'kpi') renderKpiDash();
       else renderMonthlyDash();
     } else if (_currentTab === 'input') {
       // ライブ円グラフはテーマ色をJSで描くため、強制的に再描画させる
@@ -5578,6 +5611,7 @@ async function showTab(name) {
     if (_dashTab==='daily') await renderDash();
     else if (_dashTab==='yearly') { initYearSelector(); await renderYearlyDash(); }
     else if (_dashTab==='person') { initPersonSelectors(); await renderPersonDash(); }
+    else if (_dashTab==='kpi') { initKpiSelector(); await renderKpiDash(); }
     else { initPeriodSelectors(); await renderMonthlyDash(); }
   } else if (name==='admin') {
     renderAdminMasters();
@@ -5605,17 +5639,20 @@ function openPersonDash(author, fromGrid) {
   window.scrollTo({top: 0, behavior: _dxReduce() ? 'auto' : 'smooth'});
 }
 function showDashTab(name) {
+  _syncKpiTab();
   _dashTab=name;
   dxSetHead(name);
   document.getElementById('dash-daily').style.display   =name==='daily'  ?'':'none';
   document.getElementById('dash-monthly').style.display =name==='monthly'?'':'none';
   document.getElementById('dash-yearly').style.display  =name==='yearly' ?'':'none';
   document.getElementById('dash-person').style.display  =name==='person' ?'':'none';
+  document.getElementById('dash-kpi').style.display     =name==='kpi'    ?'':'none';
   document.querySelectorAll('.dash-stab').forEach(b=>b.classList.remove('active'));
   document.getElementById('stab-'+name).classList.add('active');
   if (name==='monthly') { initPeriodSelectors(); renderMonthlyDash(); }
   else if (name==='yearly') { initYearSelector(); renderYearlyDash(); }
   else if (name==='person') { initPersonSelectors(); renderPersonDash(); }
+  else if (name==='kpi') { initKpiSelector(); renderKpiDash(); }
   else renderDash();
 }
 
@@ -5624,11 +5661,12 @@ function showDashTab(name) {
 // ═══════════════════════════════════════════
 // ─── PDF出力 ─────────────────────────────────
 async function exportPdf(tab) {
-  const titles   = { daily:'日別', monthly:'月次', yearly:'年次' };
+  const titles   = { daily:'日別', monthly:'月次', yearly:'年次', kpi:'KPI' };
   const dateEl   = {
     daily:   document.getElementById('daily-range'),
     monthly: document.getElementById('period-range'),
     yearly:  document.getElementById('yearly-range'),
+    kpi:     document.getElementById('kpi-range'),
   };
   let rangeText  = (dateEl[tab] ? dateEl[tab].textContent.trim() : '');
   if (tab === 'daily') rangeText = currentDate.replace(/-/g, '/');
@@ -5644,6 +5682,7 @@ async function exportPdf(tab) {
     _renderCache.daily = _renderCache.monthly = _renderCache.yearly = null;
     if (tab === 'daily') await renderDash(true);
     else if (tab === 'yearly') await renderYearlyDash(true);
+    else if (tab === 'kpi') await renderKpiDash();
     else await renderMonthlyDash(true);
     // canvas描画(rAF)と、後から届くデータ(前月期・年度累計・Folio等)の反映を待つ
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -5888,7 +5927,7 @@ function dxKpiFormat(el) {
 })();
 const _DX_TITLES = {
   monthly: ['Monthly report', '月次レポート'], yearly: ['Annual report', '年次レポート'],
-  daily: ['Daily report', '日別レポート'], person: ['Individual', '個人レポート']
+  daily: ['Daily report', '日別レポート'], person: ['Individual', '個人レポート'], kpi: ['KPI', 'KPI 達成状況']
 };
 function dxSetHead(name) {
   const t = _DX_TITLES[name] || _DX_TITLES.monthly;
@@ -6266,55 +6305,152 @@ function _kpiHoursOf(d, subs) {
   const by = _effStats(d).bySub;
   return subs.reduce((t, cd) => t + (by[cd] || 0), 0);
 }
-function renderKpiHeat() {
-  const card = document.getElementById('kpi-card'), el = document.getElementById('kpi-heat');
-  if (!card || !el) return;
-  const ctx = _mgrCtx, ec = _entryCtx;
-  if (!KPIS.length || !ctx) { card.style.display = 'none'; return; }
-  card.style.display = '';
-  const p = ctx.period, fy = _fiscalYearOf(p), periods = getFiscalPeriods(fy);
-  const curIdx = periods.findIndex(x => x.year === p.year && x.month === p.month);
-  const ranges = periods.map(x => kpiPeriodDates(x.year, x.month));
-  // 期初〜当期の生データ。15日締めの月期は管理者サマリー用に読んだデータを共用し、暦月の月期（KPI専用の締め）は別に読む
-  const needCal = ranges.some((r, i) => r.calendar && i <= curIdx);
-  if (needCal && !ctx.kpiCal && !ctx._kpiCalLoading) {
-    ctx._kpiCalLoading = true;
-    mapPool(ranges.map((r, i) => ({r, i})).filter(x => x.r.calendar && x.i <= curIdx), 4, ({r}) =>
-      withTimeout(loadRangeData(r.startDate, r.endDate), 15000, 'timeout').catch(() => null))
-      .then(list => { if (_mgrCtx !== ctx) return; ctx.kpiCal = {}; ranges.forEach((r, i) => { if (r.calendar && i <= curIdx) ctx.kpiCal[i] = list.shift(); }); renderKpiHeat(); });
-  }
-  const raw = periods.map((x, i) => {
-    if (i > curIdx) return null;
-    if (ranges[i].calendar) return ctx.kpiCal ? ctx.kpiCal[i] : null;
-    if (i === curIdx) return ctx.curRaw;
-    return ctx.fyRaw ? ctx.fyRaw[i] : null;
+// 期データから、指定の中分類の工数を 中分類別／担当者別 に集計（_effStats と同じ補正）
+function _kpiBreakdown(d, subs) {
+  const bySub = {}, byAuthor = {};
+  if (!d || !subs.length) return {bySub, byAuthor, total: 0};
+  const set = new Set(subs), all = _otByAuthor(d);
+  let total = 0;
+  Object.keys(all).forEach(a => {
+    const rows = _scaledRows(d, a, all[a].n + all[a].ot);
+    const logT = rows.reduce((t, r) => t + (r.hoursNormal || 0) + (r.hoursOT || 0), 0);
+    const k = logT > 0 ? (all[a].n + all[a].ot) / logT : 0;
+    rows.forEach(r => {
+      if (!set.has(r.cdSub)) return;
+      const h = ((r.hoursNormal || 0) + (r.hoursOT || 0)) * k;
+      bySub[r.cdSub] = (bySub[r.cdSub] || 0) + h; byAuthor[a] = (byAuthor[a] || 0) + h; total += h;
+    });
   });
-  const proj = (ec && ec.inProgress && ec.workElapsed > 0 && ec.workTotal > ec.workElapsed) ? ec.workTotal / ec.workElapsed : 1;
-  const loading = (!ctx.fyRaw && curIdx > 0) || (needCal && !ctx.kpiCal);
+  return {bySub, byAuthor, total};
+}
+// 月期の稼働日（入力状況と同じ判定: 平日のうち、全員未入力の過去日は休日とみなす）→ 今期の月末見込に使う
+function _kpiWorkdays(d, startDate, endDate) {
+  const today = todayStr(), lm = (d && d._leaveMap) || {};
+  const anyEntry = dt => Object.keys(lm).some(a => lm[a] && lm[a][dt]);
+  let elapsed = 0, total = 0;
+  eachDateInRange(startDate, endDate).forEach(dt => {
+    const dow = new Date(dt + 'T00:00:00').getDay();
+    if (dow === 0 || dow === 6) return;
+    if (dt < today) { if (anyEntry(dt)) { elapsed++; total++; } }
+    else if (dt === today) { total++; if (anyEntry(dt)) elapsed++; }
+    else total++;
+  });
+  return {elapsed, total};
+}
+let _kpiCtx = null;
+function initKpiSelector() {
+  const sel = document.getElementById('kpi-sel-fy');
+  if (!sel) return;
+  const thisFY = getCurrentFiscalYear(), cur = Number(sel.value) || thisFY;
+  sel.innerHTML = '';
+  for (let fy = thisFY - 4; fy <= thisFY; fy++) { const o = document.createElement('option'); o.value = fy; o.textContent = `${fy + 1}年度（${fy - 1952}期）`; sel.appendChild(o); }
+  sel.value = String(Math.min(Math.max(cur, thisFY - 4), thisFY));
+}
+function changeKpiYear(delta) {
+  const sel = document.getElementById('kpi-sel-fy'); if (!sel) return;
+  const v = Number(sel.value) + delta;
+  if ([...sel.options].some(o => Number(o.value) === v)) { sel.value = String(v); renderKpiDash(); }
+}
+function _kpiPick(i) { if (!_kpiCtx) return; _kpiCtx.sel = i; renderKpiDash(); }
+async function renderKpiDash(force) {
+  if (!KPIS.length) return;
+  const sel = document.getElementById('kpi-sel-fy');
+  const fy = Number(sel && sel.value) || getCurrentFiscalYear();
+  const periods = getFiscalPeriods(fy), ranges = periods.map(x => kpiPeriodDates(x.year, x.month));
+  const today = todayStr();
+  const curIdx = ranges.findIndex(r => r.startDate <= today && today <= r.endDate);
+  let lastIdx = -1; ranges.forEach((r, i) => { if (r.startDate <= today) lastIdx = i; });
+  const reuse = !force && _kpiCtx && _kpiCtx.fy === fy && _kpiCtx.data;
+  const ctx = {fy, periods, ranges, curIdx, lastIdx, data: reuse ? _kpiCtx.data : null, sel: reuse ? _kpiCtx.sel : (curIdx >= 0 ? curIdx : lastIdx)};
+  _kpiCtx = ctx;
+  const rl = document.getElementById('kpi-range');
+  if (rl) rl.textContent = `${ranges[0].range.split(' 〜 ')[0]} 〜 ${ranges[11].range.split(' 〜 ')[1]}`;
+  if (!ctx.data) {
+    setLoading(true);
+    try {
+      if (force) _cache.clear();
+      const got = await mapPool(periods.map((x, i) => ({x, i})).filter(o => o.i <= lastIdx), 4, ({x, i}) =>
+        withTimeout(loadRangeData(ranges[i].startDate, ranges[i].endDate, x.year, x.month), 15000, 'timeout').catch(() => null));
+      ctx.data = periods.map((x, i) => i <= lastIdx ? got[i] : null);
+    } finally { setLoading(false); }
+  }
+  if (_kpiCtx !== ctx) return;
+  const data = ctx.data;
+  // 各KPI × 月期 の工数
+  const vals = KPIS.map(k => periods.map((x, i) => (i > lastIdx || !data[i] || !k.subs.length) ? null : _kpiHoursOf(data[i], k.subs)));
+  const wd = curIdx >= 0 && data[curIdx] ? _kpiWorkdays(data[curIdx], ranges[curIdx].startDate, ranges[curIdx].endDate) : null;
+  const proj = wd && wd.elapsed > 0 && wd.total > wd.elapsed ? wd.total / wd.elapsed : 1;
   const mapped = KPIS.filter(k => k.subs.length).length;
-  const sub = document.getElementById('kpi-sub');
-  const calN = ranges.filter((r, i) => r.calendar).length;
-  if (sub) sub.textContent = `${fy + 1}年度（${fy - 1952}期）・月期ごとの工数合計（全員・通常＋残業）を目標と比較${calN ? `・${ranges.findIndex(r => !r.calendar) >= 0 ? periods[ranges.findIndex(r => !r.calendar)].month + '月期から15日締め、それ以前は月末締め' : '月末締め'}` : ''}${mapped < KPIS.length ? `・中分類の紐づけが未設定のKPIが${KPIS.length - mapped}件（管理タブで設定）` : ''}`;
-  const cell = (h, target, isCur) => {
-    if (h == null) return '<td class="h"><span class="t-muted">·</span></td>';
+  const calFirst = ranges.findIndex(r => !r.calendar);
+  const calNote = ranges.some(r => r.calendar) ? (calFirst >= 0 ? `${periods[calFirst].month}月期から15日締め、それ以前は月末締め` : '全月期とも月末締め') : '15日締め';
+
+  // ── タイル: 今期（当年度でなければ選択中の月期）──
+  const tIdx = curIdx >= 0 ? curIdx : (ctx.sel >= 0 ? ctx.sel : lastIdx);
+  const tiles = document.getElementById('kpi-tiles');
+  if (tiles) {
+    tiles.style.gridTemplateColumns = `repeat(auto-fit, minmax(150px, 1fr))`;
+    tiles.innerHTML = KPIS.map((k, ki) => {
+      const v = tIdx >= 0 ? vals[ki][tIdx] : null;
+      if (v == null) return `<div class="d-stat"><div class="sv t-muted">—</div><div class="sl">${escHtml(k.name)}</div><div class="sd">${k.subs.length ? '' : '中分類が未設定'}</div></div>`;
+      const isCur = tIdx === curIdx, pj = isCur && proj > 1 ? v * proj : v;
+      const r = k.target > 0 ? v / k.target : 0, lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
+      const judge = isCur ? (pj <= k.target ? '<span class="dx-tag is-ok">達成見込</span>' : '<span class="dx-tag is-crit">超過見込</span>') : (v <= k.target ? '<span class="dx-tag is-ok">達成</span>' : '<span class="dx-tag is-crit">超過</span>');
+      return `<div class="d-stat"><div class="sv ${lv === 'ok' ? '' : 'ot'}">${v.toFixed(1)}<small>h</small></div><div class="sl">${escHtml(k.name)} <span class="t-muted">／ 目標 ≦${k.target}h</span></div>
+        <div class="dx-meter thin is-${lv}" style="margin-top:6px"><span class="f" data-w="${Math.min(100, r * 100).toFixed(1)}"></span></div>
+        <div class="sd">${Math.round(r * 100)}%${isCur && proj > 1 ? `・見込 ${pj.toFixed(0)}h` : ''} ${judge}</div></div>`;
+    }).join('');
+  }
+  const tl = document.querySelector('#dash-kpi .kpi-tiles');
+  if (tl) tl.title = tIdx >= 0 ? `${periods[tIdx].month}月期（${ranges[tIdx].range}）` : '';
+
+  // ── ヒートマップ ──
+  const el = document.getElementById('kpi-heat'), sub = document.getElementById('kpi-sub');
+  if (sub) sub.textContent = `${fy + 1}年度（${fy - 1952}期）・${calNote}${mapped < KPIS.length ? `・中分類の紐づけが未設定のKPIが${KPIS.length - mapped}件（管理タブで設定）` : ''}`;
+  const cell = (h, target, i) => {
+    const isCur = i === curIdx, isSel = i === ctx.sel;
+    if (h == null) return `<td class="h ${isSel ? 'is-sel' : ''}" onclick="_kpiPick(${i})"><span class="t-muted">·</span></td>`;
     const r = target > 0 ? h / target : 0;
     const lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
     const str = r <= 1 ? 8 + Math.round(r * 30) : lv === 'warn' ? 30 + Math.round((r - 1) * 150) : 55;
     const pj = isCur && proj > 1 ? h * proj : null;
-    return `<td class="h ${isCur ? 'is-cur' : ''}" title="${h.toFixed(1)}h／目標${target}h（${Math.round(r * 100)}%）${pj != null ? `・月末見込 ${pj.toFixed(1)}h` : ''}" style="background:color-mix(in srgb,var(--st-${lv}) ${str}%,transparent)">
+    return `<td class="h ${isCur ? 'is-cur' : ''} ${isSel ? 'is-sel' : ''}" onclick="_kpiPick(${i})" title="${h.toFixed(1)}h／目標${target}h（${Math.round(r * 100)}%）${pj != null ? `・月末見込 ${pj.toFixed(1)}h` : ''}" style="background:color-mix(in srgb,var(--st-${lv}) ${str}%,transparent)">
       <b class="${lv === 'ok' ? '' : 't-' + lv}">${h.toFixed(1)}</b>${pj != null ? `<small class="${pj > target ? 't-crit' : 't-muted'}">見込 ${pj.toFixed(0)}</small>` : ''}</td>`;
   };
-  el.innerHTML = `<table class="dx-table dx-heat kpi-heat">
-    <thead><tr><th class="sticky">KPI</th><th class="num">目標</th>${periods.map((x, i) => `<th class="num ${i === curIdx ? 'is-cur' : ''}" title="${ranges[i].range}">${x.month}月期${ranges[i].calendar ? '<small class="t-muted" style="display:block;font-weight:600">月末締</small>' : ''}${i === curIdx ? '<span class="dx-tag">今期</span>' : ''}</th>`).join('')}<th class="num">達成月</th></tr></thead>
-    <tbody>${KPIS.map(k => {
-      const vals = periods.map((x, i) => (i > curIdx || !raw[i] || !k.subs.length) ? null : _kpiHoursOf(raw[i], k.subs));
-      const done = vals.filter((v, i) => v != null && i < curIdx && v <= k.target).length, past = vals.filter((v, i) => v != null && i < curIdx).length;
+  if (el) el.innerHTML = `<table class="dx-table dx-heat kpi-heat">
+    <thead><tr><th class="sticky">KPI</th><th class="num">目標</th>${periods.map((x, i) => `<th class="num ${i === curIdx ? 'is-cur' : ''} ${i === ctx.sel ? 'is-sel' : ''}" title="${ranges[i].range}" onclick="_kpiPick(${i})">${x.month}月期${ranges[i].calendar ? '<small class="t-muted" style="display:block;font-weight:600">月末締</small>' : ''}${i === curIdx ? '<span class="dx-tag">今期</span>' : ''}</th>`).join('')}<th class="num">達成月</th></tr></thead>
+    <tbody>${KPIS.map((k, ki) => {
+      const v = vals[ki];
+      const past = v.filter((x, i) => x != null && i !== curIdx).length, done = v.filter((x, i) => x != null && i !== curIdx && x <= k.target).length;
       return `<tr><td class="sticky" style="white-space:nowrap"><b>${escHtml(k.name)}</b>${k.subs.length ? '' : '<span class="dx-tag is-warn">未設定</span>'}</td>
         <td class="num t-muted">≦${k.target}h</td>
-        ${vals.map((v, i) => cell(v, k.target, i === curIdx)).join('')}
+        ${v.map((x, i) => cell(x, k.target, i)).join('')}
         <td class="num">${past ? `<b class="${done === past ? 't-ok' : ''}">${done}</b><span class="t-muted">/${past}</span>` : '<span class="t-muted">—</span>'}</td></tr>`;
     }).join('')}</tbody></table>
-    <div class="dx-legend"><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-ok) 30%,transparent)"></i>目標以下（濃いほど目標に近い）</span><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-warn) 45%,transparent)"></i>目標の1.2倍まで</span><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-crit) 55%,transparent)"></i>1.2倍超</span><span class="t-muted">今期の「見込」＝今のペースで締め日まで続けた場合${loading ? '・過去の月期を読み込み中…' : ''}</span></div>`;
+    <div class="dx-legend"><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-ok) 30%,transparent)"></i>目標以下（濃いほど目標に近い）</span><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-warn) 45%,transparent)"></i>目標の1.2倍まで</span><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-crit) 55%,transparent)"></i>1.2倍超</span><span class="t-muted">今期の「見込」＝今のペースで締め日まで続けた場合。列をクリックすると下の内訳が切り替わります</span></div>`;
+
+  // ── 内訳（選択中の月期）──
+  const bd = document.getElementById('kpi-breakdown'), bt = document.getElementById('kpi-bd-title'), bs = document.getElementById('kpi-bd-sub');
+  const si = ctx.sel;
+  if (bt) bt.textContent = si >= 0 ? `内訳（${periods[si].month}月期）` : '内訳';
+  if (bs) bs.textContent = si >= 0 ? `${ranges[si].range}${ranges[si].calendar ? '（月末締め）' : ''}・KPI ごとの中分類別と担当者別の工数` : 'ヒートマップの月期をクリックで切替';
+  if (bd) {
+    const d = si >= 0 ? data[si] : null;
+    if (!d) bd.innerHTML = '<p class="dx-empty">この月期のデータがありません</p>';
+    else bd.innerHTML = `<div class="kpi-bd-grid">${KPIS.map((k, ki) => {
+      const b = _kpiBreakdown(d, k.subs);
+      const r = k.target > 0 ? b.total / k.target : 0, lv = !k.subs.length ? '' : r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
+      const subs = Object.keys(b.bySub).sort((x, y) => b.bySub[y] - b.bySub[x]);
+      const auth = _authorsLast(Object.keys(b.byAuthor).sort((x, y) => b.byAuthor[y] - b.byAuthor[x]));
+      const maxS = Math.max(0.01, ...subs.map(cd => b.bySub[cd])), maxA = Math.max(0.01, ...auth.map(a => b.byAuthor[a]));
+      const bar = (label, h, max, color) => `<div class="dx-hbar"><span class="lb">${label}</span><div class="tr"><i style="background:${color}" data-w="${(h / max * 100).toFixed(1)}"></i></div><span class="vv">${h.toFixed(1)}h<small>${b.total ? Math.round(h / b.total * 100) : 0}%</small></span></div>`;
+      return `<div class="kpi-bd">
+        <div class="kpi-bd-hd"><b>${escHtml(k.name)}</b><span class="${lv ? 't-' + lv : 't-muted'}">${k.subs.length ? `${b.total.toFixed(1)}h` : '未設定'}</span><span class="t-muted">／ 目標 ≦${k.target}h</span>${lv ? `<span class="dx-tag is-${lv}">${lv === 'ok' ? '達成' : lv === 'warn' ? '超過' : '大幅超過'}</span>` : ''}</div>
+        ${k.subs.length ? `<div class="kpi-bd-sec">中分類</div><div class="dx-hbars">${subs.length ? subs.map(cd => { const sb = SUB_MAP[cd] || {}; return bar(`<i class="dx-sw" style="background:${CAT_COLOR[sb.mainCd] || '#8C8377'}"></i>${escHtml(sb.label || cd)}`, b.bySub[cd], maxS, CAT_COLOR[sb.mainCd] || '#8C8377'); }).join('') : '<p class="dx-empty" style="padding:6px 0">この月期は該当の作業がありません</p>'}</div>
+        <div class="kpi-bd-sec">担当者</div><div class="dx-hbars">${auth.map(a => bar(escHtml(a), b.byAuthor[a], maxA, 'var(--dx-accent)')).join('')}</div>` : '<p class="dx-empty" style="padding:6px 0">管理タブで中分類を紐づけてください</p>'}
+      </div>`;
+    }).join('')}</div>`;
+  }
+  dxGrow(document.getElementById('dash-kpi'), !!ctx._grown && reuse); ctx._grown = true;
 }
 // 管理タブ: KPI の目標値と中分類の紐づけ
 function renderAdminKpis() {
@@ -6338,7 +6474,7 @@ function renderAdminKpis() {
 async function _saveKpis(list) {
   applyKpis(list);
   renderAdminKpis();
-  renderKpiHeat();
+  if (_dashTab === 'kpi') { if (_kpiCtx) _kpiCtx.dirty = true; renderKpiDash(); }
   const st = document.getElementById('admin-kpis-status');
   try {
     if (firebaseConfigured()) await seedMasterToFirebase();
@@ -6405,7 +6541,6 @@ async function loadMgrExtras(ctx) {
     ctx.fy = before.map(_otByAuthor).concat([ctx.cur]);
     ctx.fyRaw = before.concat([ctx.curRaw]);
     renderMgrSummary();
-    renderKpiHeat();
   } catch(e) { console.warn('[管理者サマリー] 追加データの読込に失敗:', e.message); }
 }
 
@@ -7017,7 +7152,6 @@ async function renderMonthlyDash(silent) {
     _mgrCtx = {key: renderKey, startDate, endDate, period: {...currentPeriod},
                cur: _otByAuthor(byAuthor), curRaw: byAuthor, prev: null, prevRaw: null, fy: null, fyPeriods: null, fyIdx: -1};
     renderEfficiency();
-    renderKpiHeat();
     renderEntryMatrix();
     renderFolioCompare();
     loadFolioRangeInto(_entryCtx);
