@@ -1133,6 +1133,22 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .fx-switch input:checked + .fx-track .fx-knob{transform:translateX(20px);}
 .fx-switch input:focus-visible + .fx-track{box-shadow:0 0 0 3px var(--focus);}
 .fx-switch .fx-lbl{font-size:13px;font-weight:800;color:var(--g700);min-width:30px;}
+.kpi-heat th.is-cur,.kpi-heat td.is-cur{box-shadow:inset 0 0 0 2px var(--dx-accent);}
+.kpi-heat td.h small{display:block;font-size:10px;font-weight:600;}
+.kpi-heat td.h{min-width:62px;}
+.kpi-admin{display:flex;flex-direction:column;gap:8px;}
+.kpi-adm{border:1px solid var(--g200);border-radius:8px;background:var(--panel);}
+.kpi-adm summary{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:9px 12px;cursor:pointer;font-size:13px;color:var(--g800);list-style:none;}
+.kpi-adm summary::-webkit-details-marker{display:none;}
+.kpi-adm summary::before{content:'▸';color:var(--g400);font-size:12px;}
+.kpi-adm[open] summary::before{content:'▾';}
+.kpi-adm summary .nm{font-weight:800;min-width:120px;}
+.kpi-adm summary .tg input{width:70px;height:28px;border:1.5px solid var(--g200);border-radius:6px;padding:0 6px;background:var(--surface);color:var(--g800);font:inherit;margin:0 2px;}
+.kpi-adm summary .pk{font-size:12px;color:var(--g600);flex:1;min-width:200px;}
+.kpi-subs{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px 18px;padding:4px 12px 12px;border-top:1px solid var(--g200);}
+.kpi-cat-hd{font-size:12px;font-weight:800;color:var(--g700);margin:8px 0 4px;display:flex;align-items:center;gap:6px;}
+.kpi-subs label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--g800);padding:3px 0;cursor:pointer;}
+.kpi-subs label input{margin:0;}
 /* ── 効率化ハイライト ── */
 .dx-eff{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:24px;align-items:start;}
 .dx-eff-hero{padding:14px 16px;border-radius:12px;background:var(--dx-track);}
@@ -1416,6 +1432,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <div class="card-hd"><h2>チーム目標</h2><span class="card-sub" id="goal-sub">今月期の達成度</span></div>
       <div class="card-body"><div class="dx-goals" id="team-goals"></div></div>
     </div>
+    <!-- KPI（月次工数目標）の年度ヒートマップ。kpis が空の部署では出さない -->
+    <div class="card" id="kpi-card" style="display:none;">
+      <div class="card-hd"><h2>KPI 達成状況</h2><span class="card-sub" id="kpi-sub">月期ごとの工数合計（全員・通常＋残業）を目標と比較</span></div>
+      <div class="card-body"><div id="kpi-heat" style="overflow-x:auto;"></div></div>
+    </div>
     <!-- 統計カード（5枚） -->
     <div class="dash-stats">
       <div class="d-stat"><div class="sv"    id="ms-persons">—</div><div class="sl">記録者数</div></div>
@@ -1651,6 +1672,12 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <div id="admin-goals" class="dx-goal-admin"></div>
     <span class="admin-status" id="admin-goals-status"></span>
   </section>
+  <section class="admin-card" id="admin-kpi-section" style="margin-top:14px;display:none;">
+    <h2>KPI（月次の工数目標）</h2>
+    <div class="admin-note" style="margin-bottom:10px;">ダッシュボード（月次）の「KPI 達成状況」に表示します。全員の1か月（月期）の工数合計（通常＋残業）を目標以下に収めるのが狙いです。各KPIに紐づける中分類を選んでください。変更すると即保存されます。</div>
+    <div id="admin-kpis" class="kpi-admin"></div>
+    <span class="admin-status" id="admin-kpis-status"></span>
+  </section>
 
 </div>
 
@@ -1878,6 +1905,17 @@ const DEPARTMENT_CONFIG = (function(){
       entryRate: { on: true, target: 80 },    // 日報入力率(%) 以上
       saved:     { on: true, target: 10  }    // 効率化で浮いた時間(h) 以上
     },
+    // KPI（月次の工数目標）。全員の1か月（月期）の工数合計（通常＋残業）を目標以下に収める。
+    // subs = 紐づける中分類CD。管理タブで変更→Firebaseマスタ(kpis)に保存。空配列の部署はカードを出さない
+    kpis: [
+      { key: 'order',  name: '受注管理工数',   target: 45,  subs: [] },
+      { key: 'supply', name: '需給調整工数',   target: 78,  subs: [] },
+      { key: 'instr',  name: '作業指示工数',   target: 67,  subs: [] },
+      { key: 'prog',   name: '進捗管理工数',   target: 27,  subs: [] },
+      { key: 'bom',    name: 'BOMメンテ工数',  target: 49,  subs: [] },
+      { key: 'eco',    name: '設計変更工数',   target: 49,  subs: [] },
+      { key: 'proto',  name: '試作手配工数',   target: 130, subs: [] }
+    ],
     // タスクID(タスク管理アプリ) → 日報の中分類CD の既定対応表。
     // 「管理」タブで編集するとFirebaseマスタ(taskMap)に保存され、以後はそちらが優先。
     taskMap: {
@@ -2067,6 +2105,19 @@ function _normGoals(g) {
 }
 let GOALS = (() => { try { return _normGoals(JSON.parse(localStorage.getItem(GOALS_STORAGE_KEY) || 'null')); } catch(e) { return _normGoals(null); } })();
 function applyGoals(g) { GOALS = _normGoals(g); try { localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(GOALS)); } catch(e) {} }
+// ── KPI（月次工数目標）── 既定は DEPARTMENT_CONFIG.kpis。保存値は key で突き合わせて目標値と中分類を上書き
+const KPIS_STORAGE_KEY = LS_NS + '__kpis__';
+function _normKpis(list) {
+  const defs = DEPARTMENT_CONFIG.kpis || [];
+  const saved = Array.isArray(list) ? list : [];
+  return defs.map(d => {
+    const v = saved.find(x => x && x.key === d.key) || {};
+    return {key: d.key, name: d.name, target: Number.isFinite(Number(v.target)) && v.target !== '' ? Number(v.target) : d.target,
+            subs: Array.isArray(v.subs) ? v.subs.filter(cd => typeof cd === 'string') : (d.subs || [])};
+  });
+}
+let KPIS = (() => { try { return _normKpis(JSON.parse(localStorage.getItem(KPIS_STORAGE_KEY) || 'null')); } catch(e) { return _normKpis(null); } })();
+function applyKpis(list) { KPIS = _normKpis(list); try { localStorage.setItem(KPIS_STORAGE_KEY, JSON.stringify(KPIS)); } catch(e) {} }
 
 const TASK_MAP_STORAGE_KEY = LS_NS + '__taskMap__';
 function normalizeTaskMap(map) {
@@ -2141,7 +2192,7 @@ async function saveMasterCatsToFirebase(cats) {
     updatedBy: firebaseUser ? firebaseUser.email : ''
   }, {merge:true});
   // taskMap はmerge:trueだと削除したキーが残るため、update でフィールドごと置き換える
-  await fdb.collection(MASTER_DOC_COLLECTION).doc(MASTER_DOC_ID).update({taskMap: TASK_MAP, goals: GOALS});
+  await fdb.collection(MASTER_DOC_COLLECTION).doc(MASTER_DOC_ID).update({taskMap: TASK_MAP, goals: GOALS, kpis: KPIS});
   return true;
 }
 
@@ -2192,6 +2243,7 @@ async function loadMasterFromFirebase(force = false) {
     const cats = Array.isArray(data.cats) ? data.cats : [];
     if (cats.length) applyMasterCats(cats);
     if (data.goals && typeof data.goals === 'object') { applyGoals(data.goals); renderAdminGoals(); }
+    if (Array.isArray(data.kpis)) { applyKpis(data.kpis); renderAdminKpis(); renderKpiHeat(); }
     if (data.taskMap && typeof data.taskMap === 'object' && Object.keys(data.taskMap).length) {
       applyTaskMap(data.taskMap);
     }
@@ -2218,6 +2270,7 @@ async function writeMasterSub(mainCd, sub) {
 
 function renderAdminMasters() {
   renderAdminGoals();
+  renderAdminKpis();
   const catList = document.getElementById('admin-cat-list');
   const subList = document.getElementById('admin-sub-list');
   const subCat = document.getElementById('admin-sub-cat');
@@ -6197,6 +6250,96 @@ async function setGoal(k, field, val) {
   } catch(e) { if (st) st.textContent = '保存に失敗しました: ' + e.message; }
 }
 
+// ── KPI（月次工数目標）: 年度ヒートマップ ──
+// 各KPI = 紐づけた中分類の工数（全員・通常＋残業、退勤時刻ベースで補正）の月期合計。目標以下なら緑、超えるほど黄→赤
+function _kpiHoursOf(d, subs) {
+  if (!d || !subs.length) return 0;
+  const by = _effStats(d).bySub;
+  return subs.reduce((t, cd) => t + (by[cd] || 0), 0);
+}
+function renderKpiHeat() {
+  const card = document.getElementById('kpi-card'), el = document.getElementById('kpi-heat');
+  if (!card || !el) return;
+  const ctx = _mgrCtx, ec = _entryCtx;
+  if (!KPIS.length || !ctx) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const p = ctx.period, fy = _fiscalYearOf(p), periods = getFiscalPeriods(fy);
+  const curIdx = periods.findIndex(x => x.year === p.year && x.month === p.month);
+  // 期初〜当期の生データ（loadMgrExtras 完了前は当期のみ）
+  const raw = ctx.fyRaw || periods.map((x, i) => i === curIdx ? ctx.curRaw : null);
+  const proj = (ec && ec.inProgress && ec.workElapsed > 0 && ec.workTotal > ec.workElapsed) ? ec.workTotal / ec.workElapsed : 1;
+  const loading = !ctx.fyRaw && curIdx > 0;
+  const mapped = KPIS.filter(k => k.subs.length).length;
+  const sub = document.getElementById('kpi-sub');
+  if (sub) sub.textContent = `${fy + 1}年度（${fy - 1952}期）・月期ごとの工数合計（全員・通常＋残業）を目標と比較${mapped < KPIS.length ? `・中分類の紐づけが未設定のKPIが${KPIS.length - mapped}件（管理タブで設定）` : ''}`;
+  const cell = (h, target, isCur) => {
+    if (h == null) return '<td class="h"><span class="t-muted">·</span></td>';
+    const r = target > 0 ? h / target : 0;
+    const lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
+    const str = r <= 1 ? 8 + Math.round(r * 30) : lv === 'warn' ? 30 + Math.round((r - 1) * 150) : 55;
+    const pj = isCur && proj > 1 ? h * proj : null;
+    return `<td class="h ${isCur ? 'is-cur' : ''}" title="${h.toFixed(1)}h／目標${target}h（${Math.round(r * 100)}%）${pj != null ? `・月末見込 ${pj.toFixed(1)}h` : ''}" style="background:color-mix(in srgb,var(--st-${lv}) ${str}%,transparent)">
+      <b class="${lv === 'ok' ? '' : 't-' + lv}">${h.toFixed(1)}</b>${pj != null ? `<small class="${pj > target ? 't-crit' : 't-muted'}">見込 ${pj.toFixed(0)}</small>` : ''}</td>`;
+  };
+  el.innerHTML = `<table class="dx-table dx-heat kpi-heat">
+    <thead><tr><th class="sticky">KPI</th><th class="num">目標</th>${periods.map((x, i) => `<th class="num ${i === curIdx ? 'is-cur' : ''}">${x.month}月期${i === curIdx ? '<span class="dx-tag">今期</span>' : ''}</th>`).join('')}<th class="num">達成月</th></tr></thead>
+    <tbody>${KPIS.map(k => {
+      const vals = periods.map((x, i) => (i > curIdx || !raw[i] || !k.subs.length) ? null : _kpiHoursOf(raw[i], k.subs));
+      const done = vals.filter((v, i) => v != null && i < curIdx && v <= k.target).length, past = vals.filter((v, i) => v != null && i < curIdx).length;
+      return `<tr><td class="sticky" style="white-space:nowrap"><b>${escHtml(k.name)}</b>${k.subs.length ? '' : '<span class="dx-tag is-warn">未設定</span>'}</td>
+        <td class="num t-muted">≦${k.target}h</td>
+        ${vals.map((v, i) => cell(v, k.target, i === curIdx)).join('')}
+        <td class="num">${past ? `<b class="${done === past ? 't-ok' : ''}">${done}</b><span class="t-muted">/${past}</span>` : '<span class="t-muted">—</span>'}</td></tr>`;
+    }).join('')}</tbody></table>
+    <div class="dx-legend"><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-ok) 30%,transparent)"></i>目標以下（濃いほど目標に近い）</span><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-warn) 45%,transparent)"></i>目標の1.2倍まで</span><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-crit) 55%,transparent)"></i>1.2倍超</span><span class="t-muted">今期の「見込」＝今のペースで締め日まで続けた場合${loading ? '・過去の月期を読み込み中…' : ''}</span></div>`;
+}
+// 管理タブ: KPI の目標値と中分類の紐づけ
+function renderAdminKpis() {
+  const sec = document.getElementById('admin-kpi-section'), el = document.getElementById('admin-kpis');
+  if (!sec || !el) return;
+  if (!KPIS.length) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  const cats = (typeof activeInputCats === 'function' ? activeInputCats() : CATS) || [];
+  el.innerHTML = KPIS.map((k, i) => {
+    const used = new Set(k.subs);
+    const picked = k.subs.map(cd => (SUB_MAP[cd] || {}).label || cd);
+    return `<details class="kpi-adm">
+      <summary><span class="nm">${escHtml(k.name)}</span>
+        <span class="tg" onclick="event.preventDefault();event.stopPropagation()">目標 <input type="number" step="1" min="0" value="${k.target}" onchange="setKpi(${i},'target',this.value)" onclick="event.stopPropagation()"> h 以下</span>
+        <span class="pk ${picked.length ? '' : 't-warn'}">${picked.length ? `${picked.length}件: ${escHtml(picked.join('、'))}` : '中分類が未設定'}</span></summary>
+      <div class="kpi-subs">${cats.map(c => `<div class="kpi-cat"><div class="kpi-cat-hd"><i class="dx-sw" style="background:${c.color}"></i>${escHtml(c.label)}</div>
+        ${(c.subs || []).map(sb => `<label><input type="checkbox" ${used.has(sb.cd) ? 'checked' : ''} onchange="toggleKpiSub(${i},'${escHtml(sb.cd)}',this.checked)"><span class="t-muted">${escHtml(sb.cd)}</span> ${escHtml(sb.label)}</label>`).join('')}</div>`).join('')}</div>
+    </details>`;
+  }).join('');
+}
+async function _saveKpis(list) {
+  applyKpis(list);
+  renderAdminKpis();
+  renderKpiHeat();
+  const st = document.getElementById('admin-kpis-status');
+  try {
+    if (firebaseConfigured()) await seedMasterToFirebase();
+    if (st) { st.textContent = '保存しました'; setTimeout(() => { st.textContent = ''; }, 1800); }
+  } catch(e) { if (st) st.textContent = '保存に失敗しました: ' + e.message; }
+}
+function setKpi(i, field, val) {
+  const list = JSON.parse(JSON.stringify(KPIS));
+  if (!list[i]) return;
+  if (field === 'target') list[i].target = Number(val);
+  _saveKpis(list);
+}
+function toggleKpiSub(i, cd, on) {
+  const list = JSON.parse(JSON.stringify(KPIS));
+  if (!list[i]) return;
+  const set = new Set(list[i].subs);
+  if (on) set.add(cd); else set.delete(cd);
+  list[i].subs = [...set];
+  // 開いている details を保ったまま再描画
+  const open = [...document.querySelectorAll('#admin-kpis details')].map(d => d.open);
+  _saveKpis(list).then(() => { document.querySelectorAll('#admin-kpis details').forEach((d, j) => { d.open = !!open[j]; }); });
+  document.querySelectorAll('#admin-kpis details').forEach((d, j) => { d.open = !!open[j]; });
+}
+
 // ── 管理者サマリー（月次）──
 let _mgrCtx = null;
 
@@ -6237,7 +6380,9 @@ async function loadMgrExtras(ctx) {
     if (_mgrCtx !== ctx) return;
     ctx.fyPeriods = fyPeriods; ctx.fyIdx = fyIdx;
     ctx.fy = before.map(_otByAuthor).concat([ctx.cur]);
+    ctx.fyRaw = before.concat([ctx.curRaw]);
     renderMgrSummary();
+    renderKpiHeat();
   } catch(e) { console.warn('[管理者サマリー] 追加データの読込に失敗:', e.message); }
 }
 
@@ -6849,6 +6994,7 @@ async function renderMonthlyDash(silent) {
     _mgrCtx = {key: renderKey, startDate, endDate, period: {...currentPeriod},
                cur: _otByAuthor(byAuthor), curRaw: byAuthor, prev: null, prevRaw: null, fy: null, fyPeriods: null, fyIdx: -1};
     renderEfficiency();
+    renderKpiHeat();
     renderEntryMatrix();
     renderFolioCompare();
     loadFolioRangeInto(_entryCtx);
