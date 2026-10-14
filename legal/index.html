@@ -1160,11 +1160,14 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .kpi-bd-sec{font-size:11px;font-weight:700;color:var(--dx-ink-3);margin:8px 0 6px;letter-spacing:.04em;}
 .kpi-bd .dx-hbar{grid-template-columns:minmax(0,130px) minmax(0,1fr) auto;font-size:12.5px;}
 .pdf-mode .kpi-bd-grid{grid-template-columns:repeat(3,1fr)!important;gap:8px!important;}
-.pdf-mode .kpi-tiles{grid-template-columns:repeat(7,1fr)!important;}
+.pdf-mode .kpi-tiles{grid-template-columns:repeat(8,1fr)!important;}
+.pdf-mode #kpi-ot-canvas{width:100%!important;max-width:100%!important;height:auto!important;}
 .kpi-adm-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:9px 12px 9px 26px;font-size:13px;color:var(--g800);}
 .kpi-adm-row .nm{font-weight:800;min-width:120px;}
 .kpi-adm-row .tg input{width:70px;height:28px;border:1.5px solid var(--g200);border-radius:6px;padding:0 6px;background:var(--surface);color:var(--g800);font:inherit;margin:0 2px;}
 .kpi-adm-row .pk{font-size:12px;color:var(--g600);flex:1;min-width:200px;}
+#kpi-ot-legend{font-size:13px;gap:8px 18px;}
+#kpi-ot-legend .dx-sw{width:12px;height:12px;}
 /* ── 効率化ハイライト ── */
 .dx-eff{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:24px;align-items:start;}
 .dx-eff-hero{padding:14px 16px;border-radius:12px;background:var(--dx-track);}
@@ -1662,7 +1665,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
     <div class="card" id="kpi-ot-card" style="display:none;">
       <div class="card-hd"><h2>残業時間（全員合算）</h2><span class="card-sub" id="kpi-ot-sub">月期ごとの残業時間の合計 ｜ 破線＝目標</span></div>
       <div class="card-body" style="position:relative;">
-        <canvas id="kpi-ot-canvas"></canvas>
+        <div style="overflow-x:auto;"><canvas id="kpi-ot-canvas"></canvas></div>
         <div class="dx-legend" id="kpi-ot-legend"></div>
       </div>
     </div>
@@ -6507,35 +6510,45 @@ async function renderKpiDash(force) {
 function renderKpiOtBar(canvas, periods, ranges, vals, target, curIdx, proj, stack) {
   if (!canvas) return;
   stack = stack || {by: [], authors: [], color: () => CHT_OT, sel: -1};
-  const W = _contentW(canvas.parentElement, 640) - 2, H = 240;
-  const PL = 44, PR = 16, PT = 26, PB = 40;
+  // 狭い画面では横スクロールにして棒とラベルがつぶれないようにする
+  const W = Math.max(_contentW(canvas.closest('.card-body') || canvas.parentElement, 640) - 2, 760), H = document.documentElement.classList.contains('pdf-mode') ? 300 : 420;
+  canvas.style.width = W + 'px'; canvas.style.maxWidth = 'none';
+  const PL = 52, PR = 20, PT = 34, PB = 48;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
   const cW = W - PL - PR, cH = H - PT - PB, n = periods.length;
   const pj = curIdx >= 0 && vals[curIdx] != null && proj > 1 ? vals[curIdx] * proj : null;
   const maxV = Math.max(target * 1.25, ...vals.filter(v => v != null), pj || 0) * 1.08;
-  const slot = cW / n, barW = Math.min(44, slot * 0.6);
+  const slot = cW / n, barW = Math.min(76, slot * 0.64);
   const hatch = (() => { const pc = document.createElement('canvas'); pc.width = pc.height = 8; const c = pc.getContext('2d');
     c.strokeStyle = CHT_OT; c.lineWidth = 2; c.beginPath(); c.moveTo(-2, 10); c.lineTo(10, -2); c.moveTo(-2, 2); c.lineTo(2, -2); c.moveTo(6, 10); c.lineTo(10, 6); c.stroke(); return ctx.createPattern(pc, 'repeat'); })();
   const draw = frac => {
     ctx.clearRect(0, 0, W, H);
     // グリッド＋Y軸
     const step = maxV <= 60 ? 10 : maxV <= 150 ? 25 : 50;
-    ctx.strokeStyle = CHT_GRID; ctx.lineWidth = 1; ctx.fillStyle = CHT_FAINT; ctx.font = '10px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    for (let v = 0; v <= maxV; v += step) { const y = PT + cH - v / maxV * cH; ctx.beginPath(); ctx.moveTo(PL, y); ctx.lineTo(PL + cW, y); ctx.stroke(); ctx.fillText(v + 'h', PL - 6, y); }
+    ctx.strokeStyle = CHT_GRID; ctx.lineWidth = 1; ctx.fillStyle = CHT_AXIS; ctx.font = '12px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    for (let v = 0; v <= maxV; v += step) { const y = PT + cH - v / maxV * cH; ctx.beginPath(); ctx.moveTo(PL, y); ctx.lineTo(PL + cW, y); ctx.stroke(); ctx.fillText(v + 'h', PL - 8, y); }
     // 棒
     periods.forEach((p, i) => {
       const x = PL + slot * (i + 0.5), v = vals[i];
-      ctx.fillStyle = CHT_TEXT; ctx.font = (i === curIdx ? 'bold ' : '') + '11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillText(`${p.month}月期`, x, PT + cH + 6);
-      if (ranges[i].calendar) { ctx.fillStyle = CHT_FAINT; ctx.font = '9px sans-serif'; ctx.fillText('月末締', x, PT + cH + 19); }
+      ctx.fillStyle = CHT_TEXT; ctx.font = (i === curIdx ? 'bold ' : '') + '13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText(`${p.month}月期`, x, PT + cH + 8);
+      if (ranges[i].calendar) { ctx.fillStyle = CHT_FAINT; ctx.font = '10px sans-serif'; ctx.fillText('月末締', x, PT + cH + 26); }
       if (v == null) return;
       const h = v / maxV * cH * frac, over = v > target;
       // 担当者ごとの積み上げ（多い人が下）。外形を目標以下＝緑／超過＝赤の枠で示す
       const by = stack.by[i];
       if (by && stack.authors.length) {
         let y0 = PT + cH;
-        stack.authors.forEach(a => { const ah = ((by[a] || {}).ot || 0) / maxV * cH * frac; if (ah <= 0) return; ctx.fillStyle = stack.color(a); ctx.fillRect(x - barW / 2, y0 - ah, barW, ah); y0 -= ah; });
+        stack.authors.forEach(a => {
+          const av = (by[a] || {}).ot || 0, ah = av / maxV * cH * frac; if (ah <= 0) return;
+          ctx.fillStyle = stack.color(a); ctx.fillRect(x - barW / 2, y0 - ah, barW, ah);
+          // 区切り線＋セグメント内に名前と時間（高さがあるときだけ）
+          ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - barW / 2, y0); ctx.lineTo(x + barW / 2, y0); ctx.stroke();
+          if (frac >= 1 && ah >= 26 && barW >= 48) { ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 11px sans-serif'; ctx.fillText(a.length > 4 ? a.slice(0, 4) : a, x, y0 - ah / 2 - 6); ctx.font = '600 10px Inter, sans-serif'; ctx.fillText(av.toFixed(1), x, y0 - ah / 2 + 7); }
+          else if (frac >= 1 && ah >= 14 && barW >= 48) { ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 10px sans-serif'; ctx.fillText(`${a.length > 3 ? a.slice(0, 3) : a} ${av.toFixed(0)}`, x, y0 - ah / 2); }
+          y0 -= ah;
+        });
         ctx.strokeStyle = over ? CHT_OT : CHT_OK; ctx.lineWidth = i === stack.sel ? 3 : 1.5; ctx.strokeRect(x - barW / 2, PT + cH - h, barW, h);
       } else {
         ctx.fillStyle = over ? CHT_OT : CHT_OK;
@@ -6549,15 +6562,18 @@ function renderKpiOtBar(canvas, periods, ranges, vals, target, curIdx, proj, sta
         ctx.strokeStyle = pj > target ? CHT_OT : CHT_OK; ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.strokeRect(x - barW / 2, PT + cH - ph, barW, ph - h); ctx.setLineDash([]);
       }
       if (frac >= 1) {
-        ctx.fillStyle = over ? CHT_OT_INK : CHT_OK_INK; ctx.font = '700 11px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        ctx.fillStyle = over ? CHT_OT_INK : CHT_OK_INK; ctx.font = '800 14px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
         const topY = PT + cH - (i === curIdx && pj != null && pj > v ? pj / maxV * cH : h);
-        ctx.fillText(v.toFixed(1) + (i === curIdx && pj != null && pj > v ? `→${pj.toFixed(0)}` : ''), x, topY - 3);
+        ctx.fillText(v.toFixed(1) + 'h', x, topY - (i === curIdx && pj != null && pj > v ? 16 : 4));
+        if (i === curIdx && pj != null && pj > v) { ctx.font = '600 11px Inter, sans-serif'; ctx.fillStyle = pj > target ? CHT_OT_INK : CHT_OK_INK; ctx.fillText(`見込 ${pj.toFixed(0)}h`, x, topY - 3); }
       }
     });
     // 目標の破線
     const ty = PT + cH - target / maxV * cH;
     ctx.save(); ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1.8; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(PL, ty); ctx.lineTo(PL + cW, ty); ctx.stroke(); ctx.restore();
-    ctx.fillStyle = '#d97706'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText(`目標 ${target}h`, PL + cW, ty - 3);
+    ctx.fillStyle = '#d97706'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    const lw = ctx.measureText(`目標 ${target}h`).width + 10; ctx.save(); ctx.globalAlpha = .9; ctx.fillStyle = '#fff7e6'; ctx.fillRect(PL + 2, ty - 18, lw, 16); ctx.restore();
+    ctx.fillStyle = '#d97706'; ctx.fillText(`目標 ${target}h`, PL + 7, ty - 4);
   };
   const key = vals.map(v => v == null ? '' : v.toFixed(2)).join('|') + `|${target}|${pj == null ? '' : pj.toFixed(1)}|${stack.sel}|${stack.authors.join(',')}`;
   if (!canvas._kpiBound) {
