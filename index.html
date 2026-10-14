@@ -1161,6 +1161,10 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .kpi-bd .dx-hbar{grid-template-columns:minmax(0,130px) minmax(0,1fr) auto;font-size:12.5px;}
 .pdf-mode .kpi-bd-grid{grid-template-columns:repeat(3,1fr)!important;gap:8px!important;}
 .pdf-mode .kpi-tiles{grid-template-columns:repeat(7,1fr)!important;}
+.kpi-adm-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:9px 12px 9px 26px;font-size:13px;color:var(--g800);}
+.kpi-adm-row .nm{font-weight:800;min-width:120px;}
+.kpi-adm-row .tg input{width:70px;height:28px;border:1.5px solid var(--g200);border-radius:6px;padding:0 6px;background:var(--surface);color:var(--g800);font:inherit;margin:0 2px;}
+.kpi-adm-row .pk{font-size:12px;color:var(--g600);flex:1;min-width:200px;}
 /* ── 効率化ハイライト ── */
 .dx-eff{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:24px;align-items:start;}
 .dx-eff-hero{padding:14px 16px;border-radius:12px;background:var(--dx-track);}
@@ -1651,6 +1655,12 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <button class="btn-pdf no-print" onclick="exportPdf('kpi')">PDF出力</button>
     </div>
     <div class="dash-stats kpi-tiles" id="kpi-tiles"></div>
+    <div class="card" id="kpi-ot-card" style="display:none;">
+      <div class="card-hd"><h2>残業時間（全員合算）</h2><span class="card-sub" id="kpi-ot-sub">月期ごとの残業時間の合計 ｜ 破線＝目標</span></div>
+      <div class="card-body" style="position:relative;">
+        <canvas id="kpi-ot-canvas"></canvas>
+      </div>
+    </div>
     <div class="card">
       <div class="card-hd"><h2>年度ヒートマップ</h2><span class="card-sub" id="kpi-sub">月期ごとの工数合計（全員・通常＋残業）を目標と比較</span></div>
       <div class="card-body"><div id="kpi-heat" style="overflow-x:auto;"></div></div>
@@ -1948,7 +1958,8 @@ const DEPARTMENT_CONFIG = (function(){
       { key: 'prog',   name: '進捗管理工数',   target: 27,  subs: ['K4'] },         // 部品進捗確認
       { key: 'bom',    name: 'BOMメンテ工数',  target: 49,  subs: ['B1'] },         // 部品表メンテナンス
       { key: 'eco',    name: '設計変更工数',   target: 49,  subs: ['B2'] },         // 設計変更
-      { key: 'proto',  name: '試作手配工数',   target: 130, subs: ['T3'] }          // 試作手配
+      { key: 'proto',  name: '試作手配工数',   target: 130, subs: ['T3'] },         // 試作手配
+      { key: 'ot',     name: '残業時間',       target: 60,  kind: 'ot' }             // 全員の残業時間の合計（棒グラフ）
     ],
     // タスクID(タスク管理アプリ) → 日報の中分類CD の既定対応表。
     // 「管理」タブで編集するとFirebaseマスタ(taskMap)に保存され、以後はそちらが優先。
@@ -2146,10 +2157,14 @@ function _normKpis(list) {
   const saved = Array.isArray(list) ? list : [];
   return defs.map(d => {
     const v = saved.find(x => x && x.key === d.key) || {};
-    return {key: d.key, name: d.name, target: Number.isFinite(Number(v.target)) && v.target !== '' ? Number(v.target) : d.target,
-            subs: Array.isArray(v.subs) ? v.subs.filter(cd => typeof cd === 'string') : (d.subs || [])};
+    return {key: d.key, name: d.name, kind: d.kind || 'hours', target: Number.isFinite(Number(v.target)) && v.target !== '' ? Number(v.target) : d.target,
+            subs: d.kind === 'ot' ? [] : (Array.isArray(v.subs) ? v.subs.filter(cd => typeof cd === 'string') : (d.subs || []))};
   });
 }
+// 工数KPI（中分類の紐づけで集計するもの）と、残業時間KPI
+function _kpiHoursItems() { return KPIS.filter(k => k.kind !== 'ot'); }
+function _kpiOtItem() { return KPIS.find(k => k.kind === 'ot') || null; }
+function _kpiOtOf(d) { const all = _otByAuthor(d); return Object.keys(all).reduce((t, a) => t + all[a].ot, 0); }
 let KPIS = (() => { try { return _normKpis(JSON.parse(localStorage.getItem(KPIS_STORAGE_KEY) || 'null')); } catch(e) { return _normKpis(null); } })();
 function applyKpis(list) { KPIS = _normKpis(list); try { localStorage.setItem(KPIS_STORAGE_KEY, JSON.stringify(KPIS)); } catch(e) {} _syncKpiTab(); }
 function _syncKpiTab() { const b = document.getElementById('stab-kpi'); if (b) b.style.display = KPIS.length ? '' : 'none'; }
@@ -6377,10 +6392,12 @@ async function renderKpiDash(force) {
   if (_kpiCtx !== ctx) return;
   const data = ctx.data;
   // 各KPI × 月期 の工数
-  const vals = KPIS.map(k => periods.map((x, i) => (i > lastIdx || !data[i] || !k.subs.length) ? null : _kpiHoursOf(data[i], k.subs)));
+  const HK = _kpiHoursItems(), OTK = _kpiOtItem();
+  const vals = HK.map(k => periods.map((x, i) => (i > lastIdx || !data[i] || !k.subs.length) ? null : _kpiHoursOf(data[i], k.subs)));
+  const otVals = periods.map((x, i) => (i > lastIdx || !data[i]) ? null : _kpiOtOf(data[i]));
   const wd = curIdx >= 0 && data[curIdx] ? _kpiWorkdays(data[curIdx], ranges[curIdx].startDate, ranges[curIdx].endDate) : null;
   const proj = wd && wd.elapsed > 0 && wd.total > wd.elapsed ? wd.total / wd.elapsed : 1;
-  const mapped = KPIS.filter(k => k.subs.length).length;
+  const mapped = HK.filter(k => k.subs.length).length;
   const calFirst = ranges.findIndex(r => !r.calendar);
   const calNote = ranges.some(r => r.calendar) ? (calFirst >= 0 ? `${periods[calFirst].month}月期から15日締め、それ以前は月末締め` : '全月期とも月末締め') : '15日締め';
 
@@ -6389,16 +6406,16 @@ async function renderKpiDash(force) {
   const tiles = document.getElementById('kpi-tiles');
   if (tiles) {
     tiles.style.gridTemplateColumns = `repeat(auto-fit, minmax(150px, 1fr))`;
-    tiles.innerHTML = KPIS.map((k, ki) => {
-      const v = tIdx >= 0 ? vals[ki][tIdx] : null;
-      if (v == null) return `<div class="d-stat"><div class="sv t-muted">—</div><div class="sl">${escHtml(k.name)}</div><div class="sd">${k.subs.length ? '' : '中分類が未設定'}</div></div>`;
+    const tile = (k, v, note) => {
+      if (v == null) return `<div class="d-stat"><div class="sv t-muted">—</div><div class="sl">${escHtml(k.name)}</div><div class="sd">${note || ''}</div></div>`;
       const isCur = tIdx === curIdx, pj = isCur && proj > 1 ? v * proj : v;
       const r = k.target > 0 ? v / k.target : 0, lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
       const judge = isCur ? (pj <= k.target ? '<span class="dx-tag is-ok">達成見込</span>' : '<span class="dx-tag is-crit">超過見込</span>') : (v <= k.target ? '<span class="dx-tag is-ok">達成</span>' : '<span class="dx-tag is-crit">超過</span>');
       return `<div class="d-stat"><div class="sv ${lv === 'ok' ? '' : 'ot'}">${v.toFixed(1)}<small>h</small></div><div class="sl">${escHtml(k.name)} <span class="t-muted">／ 目標 ≦${k.target}h</span></div>
         <div class="dx-meter thin is-${lv}" style="margin-top:6px"><span class="f" data-w="${Math.min(100, r * 100).toFixed(1)}"></span></div>
         <div class="sd">${Math.round(r * 100)}%${isCur && proj > 1 ? `・見込 ${pj.toFixed(0)}h` : ''} ${judge}</div></div>`;
-    }).join('');
+    };
+    tiles.innerHTML = (OTK ? tile(OTK, tIdx >= 0 ? otVals[tIdx] : null, '') : '') + HK.map((k, ki) => tile(k, tIdx >= 0 ? vals[ki][tIdx] : null, k.subs.length ? '' : '中分類が未設定')).join('');
   }
   const tl = document.querySelector('#dash-kpi .kpi-tiles');
   if (tl) tl.title = tIdx >= 0 ? `${periods[tIdx].month}月期（${ranges[tIdx].range}）` : '';
@@ -6418,7 +6435,7 @@ async function renderKpiDash(force) {
   };
   if (el) el.innerHTML = `<table class="dx-table dx-heat kpi-heat">
     <thead><tr><th class="sticky">KPI</th><th class="num">目標</th>${periods.map((x, i) => `<th class="num ${i === curIdx ? 'is-cur' : ''} ${i === ctx.sel ? 'is-sel' : ''}" title="${ranges[i].range}" onclick="_kpiPick(${i})">${x.month}月期${ranges[i].calendar ? '<small class="t-muted" style="display:block;font-weight:600">月末締</small>' : ''}${i === curIdx ? '<span class="dx-tag">今期</span>' : ''}</th>`).join('')}<th class="num">達成月</th></tr></thead>
-    <tbody>${KPIS.map((k, ki) => {
+    <tbody>${HK.map((k, ki) => {
       const v = vals[ki];
       const past = v.filter((x, i) => x != null && i !== curIdx).length, done = v.filter((x, i) => x != null && i !== curIdx && x <= k.target).length;
       return `<tr><td class="sticky" style="white-space:nowrap"><b>${escHtml(k.name)}</b>${k.subs.length ? '' : '<span class="dx-tag is-warn">未設定</span>'}</td>
@@ -6436,7 +6453,14 @@ async function renderKpiDash(force) {
   if (bd) {
     const d = si >= 0 ? data[si] : null;
     if (!d) bd.innerHTML = '<p class="dx-empty">この月期のデータがありません</p>';
-    else bd.innerHTML = `<div class="kpi-bd-grid">${KPIS.map((k, ki) => {
+    else bd.innerHTML = `<div class="kpi-bd-grid">${(OTK ? [(() => {
+      const all = _otByAuthor(d), auth = _authorsLast(Object.keys(all).filter(a => all[a].ot > 0).sort((x, y) => all[y].ot - all[x].ot));
+      const total = auth.reduce((t, a) => t + all[a].ot, 0), maxA = Math.max(0.01, ...auth.map(a => all[a].ot));
+      const r = OTK.target > 0 ? total / OTK.target : 0, lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
+      return `<div class="kpi-bd">
+        <div class="kpi-bd-hd"><b>${escHtml(OTK.name)}</b><span class="t-${lv}">${total.toFixed(1)}h</span><span class="t-muted">／ 目標 ≦${OTK.target}h</span><span class="dx-tag is-${lv}">${lv === 'ok' ? '達成' : lv === 'warn' ? '超過' : '大幅超過'}</span></div>
+        <div class="kpi-bd-sec">担当者</div><div class="dx-hbars">${auth.length ? auth.map(a => `<div class="dx-hbar"><span class="lb">${escHtml(a)}</span><div class="tr"><i style="background:${all[a].ot > (DEPARTMENT_CONFIG.rules.otMonthWarn || 36) ? 'var(--st-crit)' : 'var(--st-warn)'}" data-w="${(all[a].ot / maxA * 100).toFixed(1)}"></i></div><span class="vv">${all[a].ot.toFixed(1)}h<small>${total ? Math.round(all[a].ot / total * 100) : 0}%</small></span></div>`).join('') : '<p class="dx-empty" style="padding:6px 0">この月期の残業はありません</p>'}</div>
+      </div>`; })()] : []).join('')}${HK.map((k, ki) => {
       const b = _kpiBreakdown(d, k.subs);
       const r = k.target > 0 ? b.total / k.target : 0, lv = !k.subs.length ? '' : r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
       const subs = Object.keys(b.bySub).sort((x, y) => b.bySub[y] - b.bySub[x]);
@@ -6450,7 +6474,71 @@ async function renderKpiDash(force) {
       </div>`;
     }).join('')}</div>`;
   }
+  // ── 残業時間の棒グラフ ──
+  const otCard = document.getElementById('kpi-ot-card');
+  if (otCard) {
+    otCard.style.display = OTK ? '' : 'none';
+    if (OTK) {
+      const os = document.getElementById('kpi-ot-sub');
+      if (os) os.textContent = `月期ごとの全員の残業時間の合計 ｜ 破線＝目標 ${OTK.target}h ｜ 斜線＝今期の月末見込`;
+      requestAnimationFrame(() => renderKpiOtBar(document.getElementById('kpi-ot-canvas'), periods, ranges, otVals, OTK.target, curIdx, proj));
+    }
+  }
   dxGrow(document.getElementById('dash-kpi'), !!ctx._grown && reuse); ctx._grown = true;
+}
+// KPI: 残業時間（全員合算）の縦棒グラフ。目標以下は緑、超えたら赤。今期は月末見込までの伸びを斜線で
+function renderKpiOtBar(canvas, periods, ranges, vals, target, curIdx, proj) {
+  if (!canvas) return;
+  const W = _contentW(canvas.parentElement, 640) - 2, H = 240;
+  const PL = 44, PR = 16, PT = 26, PB = 40;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const cW = W - PL - PR, cH = H - PT - PB, n = periods.length;
+  const pj = curIdx >= 0 && vals[curIdx] != null && proj > 1 ? vals[curIdx] * proj : null;
+  const maxV = Math.max(target * 1.25, ...vals.filter(v => v != null), pj || 0) * 1.08;
+  const slot = cW / n, barW = Math.min(44, slot * 0.6);
+  const hatch = (() => { const pc = document.createElement('canvas'); pc.width = pc.height = 8; const c = pc.getContext('2d');
+    c.strokeStyle = CHT_OT; c.lineWidth = 2; c.beginPath(); c.moveTo(-2, 10); c.lineTo(10, -2); c.moveTo(-2, 2); c.lineTo(2, -2); c.moveTo(6, 10); c.lineTo(10, 6); c.stroke(); return ctx.createPattern(pc, 'repeat'); })();
+  const draw = frac => {
+    ctx.clearRect(0, 0, W, H);
+    // グリッド＋Y軸
+    const step = maxV <= 60 ? 10 : maxV <= 150 ? 25 : 50;
+    ctx.strokeStyle = CHT_GRID; ctx.lineWidth = 1; ctx.fillStyle = CHT_FAINT; ctx.font = '10px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    for (let v = 0; v <= maxV; v += step) { const y = PT + cH - v / maxV * cH; ctx.beginPath(); ctx.moveTo(PL, y); ctx.lineTo(PL + cW, y); ctx.stroke(); ctx.fillText(v + 'h', PL - 6, y); }
+    // 棒
+    periods.forEach((p, i) => {
+      const x = PL + slot * (i + 0.5), v = vals[i];
+      ctx.fillStyle = CHT_TEXT; ctx.font = (i === curIdx ? 'bold ' : '') + '11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText(`${p.month}月期`, x, PT + cH + 6);
+      if (ranges[i].calendar) { ctx.fillStyle = CHT_FAINT; ctx.font = '9px sans-serif'; ctx.fillText('月末締', x, PT + cH + 19); }
+      if (v == null) return;
+      const h = v / maxV * cH * frac, over = v > target;
+      ctx.fillStyle = over ? CHT_OT : CHT_OK;
+      _rr(ctx, x - barW / 2, PT + cH - h, barW, h, 4, 'up');
+      if (i === curIdx && pj != null && pj > v) {
+        const ph = pj / maxV * cH * frac;
+        ctx.save(); ctx.beginPath(); ctx.rect(x - barW / 2, PT + cH - ph, barW, ph - h); ctx.clip();
+        ctx.fillStyle = hatch; _rr(ctx, x - barW / 2, PT + cH - ph, barW, ph, 4, 'up'); ctx.restore();
+        ctx.strokeStyle = pj > target ? CHT_OT : CHT_OK; ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.strokeRect(x - barW / 2, PT + cH - ph, barW, ph - h); ctx.setLineDash([]);
+      }
+      if (frac >= 1) {
+        ctx.fillStyle = over ? CHT_OT_INK : CHT_OK_INK; ctx.font = '700 11px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        const topY = PT + cH - (i === curIdx && pj != null && pj > v ? pj / maxV * cH : h);
+        ctx.fillText(v.toFixed(1) + (i === curIdx && pj != null && pj > v ? `→${pj.toFixed(0)}` : ''), x, topY - 3);
+      }
+    });
+    // 目標の破線
+    const ty = PT + cH - target / maxV * cH;
+    ctx.save(); ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1.8; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(PL, ty); ctx.lineTo(PL + cW, ty); ctx.stroke(); ctx.restore();
+    ctx.fillStyle = '#d97706'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText(`目標 ${target}h`, PL + cW, ty - 3);
+  };
+  const key = vals.map(v => v == null ? '' : v.toFixed(2)).join('|') + `|${target}|${pj == null ? '' : pj.toFixed(1)}`;
+  if (canvas._raf) { cancelAnimationFrame(canvas._raf); canvas._raf = 0; }
+  if (canvas._grownKey === key || _dxReduce()) { canvas._grownKey = key; draw(1); return; }
+  canvas._grownKey = key;
+  const t0 = performance.now(), DUR = 650;
+  const step = now => { const k = Math.min(1, (now - t0) / DUR); draw(1 - Math.pow(1 - k, 3)); canvas._raf = k < 1 ? requestAnimationFrame(step) : 0; };
+  draw(0); canvas._raf = requestAnimationFrame(step);
 }
 // 管理タブ: KPI の目標値と中分類の紐づけ
 function renderAdminKpis() {
@@ -6460,6 +6548,9 @@ function renderAdminKpis() {
   sec.style.display = '';
   const cats = (typeof activeInputCats === 'function' ? activeInputCats() : CATS) || [];
   el.innerHTML = KPIS.map((k, i) => {
+    if (k.kind === 'ot') return `<div class="kpi-adm"><div class="kpi-adm-row"><span class="nm">${escHtml(k.name)}</span>
+        <span class="tg">目標 <input type="number" step="1" min="0" value="${k.target}" onchange="setKpi(${i},'target',this.value)"> h 以下</span>
+        <span class="pk">全員の残業時間の合計（退勤時刻から算出）。KPIタブでは棒グラフで表示</span></div></div>`;
     const used = new Set(k.subs);
     const picked = k.subs.map(cd => (SUB_MAP[cd] || {}).label || cd);
     return `<details class="kpi-adm">
