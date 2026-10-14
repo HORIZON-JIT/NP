@@ -5631,7 +5631,7 @@ function openPersonDash(author, fromGrid) {
     if (fromGrid === 'daily-person-grid') period = periodOfDate(currentDate);
     else period = currentPeriod;
     const fy = _fiscalYearOf(period);
-    if (![...sf.options].some(o => o.value === String(fy))) sf.add(new Option(`${fy + 1}年度（${fy - 1952}期）`, fy));
+    if (![...sf.options].some(o => o.value === String(fy))) sf.add(new Option(`${fy + 1}年度（${fiscalKi(fy)}期）`, fy));
     sf.value = String(fy);
     if (ss) { const idx = getFiscalPeriods(fy).findIndex(p => p.year === period.year && p.month === period.month); ss.value = String(idx >= 0 ? idx : -1); }
   }
@@ -6343,7 +6343,7 @@ function initKpiSelector() {
   if (!sel) return;
   const thisFY = getCurrentFiscalYear(), cur = Number(sel.value) || thisFY;
   sel.innerHTML = '';
-  for (let fy = thisFY - 4; fy <= thisFY; fy++) { const o = document.createElement('option'); o.value = fy; o.textContent = `${fy + 1}年度（${fy - 1952}期）`; sel.appendChild(o); }
+  for (let fy = thisFY - 4; fy <= thisFY; fy++) { const o = document.createElement('option'); o.value = fy; o.textContent = `${fy + 1}年度（${fiscalKi(fy)}期）`; sel.appendChild(o); }
   sel.value = String(Math.min(Math.max(cur, thisFY - 4), thisFY));
 }
 function changeKpiYear(delta) {
@@ -6405,7 +6405,7 @@ async function renderKpiDash(force) {
 
   // ── ヒートマップ ──
   const el = document.getElementById('kpi-heat'), sub = document.getElementById('kpi-sub');
-  if (sub) sub.textContent = `${fy + 1}年度（${fy - 1952}期）・${calNote}${mapped < KPIS.length ? `・中分類の紐づけが未設定のKPIが${KPIS.length - mapped}件（管理タブで設定）` : ''}`;
+  if (sub) sub.textContent = `${fy + 1}年度（${fiscalKi(fy)}期）・${calNote}${mapped < KPIS.length ? `・中分類の紐づけが未設定のKPIが${KPIS.length - mapped}件（管理タブで設定）` : ''}`;
   const cell = (h, target, i) => {
     const isCur = i === curIdx, isSel = i === ctx.sel;
     if (h == null) return `<td class="h ${isSel ? 'is-sel' : ''}" onclick="_kpiPick(${i})"><span class="t-muted">·</span></td>`;
@@ -6664,7 +6664,7 @@ function initPersonSelectors() {
   const curFY = Number(sf.value) || getCurrentFiscalYear();
   const thisFY = getCurrentFiscalYear();
   let opts = '';
-  for (let fy = thisFY - 4; fy <= thisFY; fy++) opts += `<option value="${fy}"${fy === curFY ? ' selected' : ''}>${fy + 1}年度（${fy - 1952}期）</option>`;
+  for (let fy = thisFY - 4; fy <= thisFY; fy++) opts += `<option value="${fy}"${fy === curFY ? ' selected' : ''}>${fy + 1}年度（${fiscalKi(fy)}期）</option>`;
   sf.innerHTML = opts;
   // 年度全体／月期（10月期〜9月期）
   const ss = document.getElementById('person-sel-scope');
@@ -7176,6 +7176,8 @@ function getCurrentFiscalYear() {
   return m>=10 ? now.getFullYear() : now.getFullYear()-1;
 }
 let currentFiscalYear = getCurrentFiscalYear();
+// 期の番号: 2025年10月〜2026年9月（fy=2025）= 74期、次が75期
+function fiscalKi(fy) { return fy - 1951; }
 
 // 会計年度の12期（10月期〜9月期）を返す
 // 例: fiscalYear=2025 → [{year:2025,month:10}, ... ,{year:2026,month:9}]
@@ -7216,7 +7218,7 @@ function initYearSelector() {
   for(let fy=thisFY-4;fy<=thisFY+1;fy++){
     const o=document.createElement('option');
     o.value=fy;
-    const dispYear=fy+1; const ki=fy-1952; o.textContent=`${dispYear}年度（${ki}期）`;
+    const dispYear=fy+1; const ki=fiscalKi(fy); o.textContent=`${dispYear}年度（${ki}期）`;
     sel.appendChild(o);
   }
   syncYearSelector();
@@ -7242,7 +7244,7 @@ async function renderYearlyDash(silent) {
     const fiscalPeriods = getFiscalPeriods(currentFiscalYear);
     const fyStart=`${currentFiscalYear}/10/16`;
     const fyEnd  =`${currentFiscalYear+1}/9/15`;
-    const dispFY=currentFiscalYear+1; const kiNum=currentFiscalYear-1952;
+    const dispFY=currentFiscalYear+1; const kiNum=fiscalKi(currentFiscalYear);
     document.getElementById('yearly-range').textContent       = `${dispFY}年度（${kiNum}期）　${fyStart} 〜 ${fyEnd}`;
     document.getElementById('yearly-ot-sub').textContent      = `全担当合計 ｜ 棒=残業 ｜ 破線=月平均 ｜ 折線=累計平均 ｜ グレー=前年`;
     document.getElementById('yearly-person-sub').textContent  = '作業時間合計（定時＋残業）';
