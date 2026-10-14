@@ -1,0 +1,56 @@
+# gas/task-sheet-reader.gs が main に入ったら、Folio 連携の GAS を自動で再デプロイする。
+# 必要な Secrets: CLASPRC_JSON（clasp login で作られる ~/.clasprc.json の中身）, GAS_SCRIPT_ID（スクリプト ID）
+# プロジェクト内のファイル名（コード.gs）と appsscript.json はそのまま維持し、中身だけ置き換える。
+name: Deploy GAS
+
+on:
+  push:
+    branches: [main]
+    paths: ['gas/task-sheet-reader.gs']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-gas
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      DEPLOYMENT_ID: AKfycbwxhtGBpHgb5Iz9FLydd5oxwtYgCQqMEbM_KudCxNTZAo61xL0SLJfokqDE-gW2Ze6w
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install clasp
+        run: npm i -g @google/clasp@2.4.2
+      - name: Check secrets
+        run: |
+          if [ -z "${{ secrets.CLASPRC_JSON }}" ] || [ -z "${{ secrets.GAS_SCRIPT_ID }}" ]; then
+            echo "::error::Secrets CLASPRC_JSON / GAS_SCRIPT_ID が未設定です"; exit 1; fi
+      - name: Write clasp credentials
+        run: printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+      - name: Clone current project (keeps appsscript.json and file names)
+        run: |
+          mkdir -p /tmp/gas && cd /tmp/gas
+          clasp clone "${{ secrets.GAS_SCRIPT_ID }}" --rootDir .
+          ls -la
+      - name: Replace script body
+        run: |
+          cd /tmp/gas
+          # 既存の .gs / .js ファイル（appsscript.json 以外）が1つだけならその名前を保ち、無ければ task-sheet-reader.gs として置く
+          f=$(ls *.gs *.js 2>/dev/null | head -n1)
+          n=$(ls *.gs *.js 2>/dev/null | wc -l)
+          if [ "$n" -gt 1 ]; then echo "::error::スクリプトファイルが複数あります（$n）。手動で確認してください"; ls *.gs *.js; exit 1; fi
+          [ -n "$f" ] || f=task-sheet-reader.gs
+          cp "$GITHUB_WORKSPACE/gas/task-sheet-reader.gs" "$f"
+          echo "replaced: $f ($(wc -l < "$f") lines)"
+      - name: Push and deploy new version
+        run: |
+          cd /tmp/gas
+          clasp push -f
+          clasp deploy -i "$DEPLOYMENT_ID" -d "auto: ${GITHUB_SHA::7}"
+          clasp deployments
