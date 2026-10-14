@@ -1201,6 +1201,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .kpi-heat th .kh-cal{display:block;font-size:9.5px;font-weight:600;color:var(--dx-ink-3);letter-spacing:0;}
 .kpi-heat td{padding:4px 6px;height:38px;border-bottom:1px solid var(--dx-line);}
 .kpi-heat td.sticky{padding-left:10px;font-weight:700;white-space:nowrap;}
+.kpi-heat .kh-owner{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;color:var(--dx-ink-2);background:var(--dx-track);vertical-align:1px;}
 .kpi-heat td.tg{color:var(--dx-ink-3);font-size:12px;white-space:nowrap;}
 .kpi-heat td.h{min-width:58px;cursor:pointer;text-align:center;border-radius:7px;font-variant-numeric:tabular-nums;line-height:1.15;transition:box-shadow .15s;}
 .kpi-heat td.h b{font-weight:700;font-size:13px;color:var(--dx-ink-1);}
@@ -1290,6 +1291,10 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .kpi-adm summary .nm{font-weight:800;min-width:120px;}
 .kpi-adm summary .tg input{width:70px;height:28px;border:1.5px solid var(--g200);border-radius:6px;padding:0 6px;background:var(--surface);color:var(--g800);font:inherit;margin:0 2px;}
 .kpi-adm summary .pk{font-size:12px;color:var(--g600);flex:1;min-width:200px;}
+.kpi-adm summary .tg input.ow{width:84px;}
+.kpi-plan{display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:start;padding:8px 12px 2px;border-top:1px solid var(--g200);font-size:12px;color:var(--g600);}
+.kpi-plan label{padding-top:6px;font-weight:700;white-space:nowrap;}
+.kpi-plan textarea{width:100%;border:1.5px solid var(--g200);border-radius:6px;padding:6px 8px;background:var(--surface);color:var(--g800);font:inherit;font-size:12.5px;line-height:1.5;resize:vertical;}
 .kpi-subs{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px 18px;padding:4px 12px 12px;border-top:1px solid var(--g200);}
 .kpi-cat-hd{font-size:12px;font-weight:800;color:var(--g700);margin:8px 0 4px;display:flex;align-items:center;gap:6px;}
 .kpi-subs label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--g800);padding:3px 0;cursor:pointer;}
@@ -2109,13 +2114,20 @@ const DEPARTMENT_CONFIG = (function(){
     // KPI（月次の工数目標）。全員の1か月（月期）の工数合計（通常＋残業）を目標以下に収める。
     // subs = 紐づける中分類CD。管理タブで変更→Firebaseマスタ(kpis)に保存。空配列の部署はカードを出さない
     kpis: [
-      { key: 'order',  name: '受注管理工数',   target: 45,  subs: ['J1', 'J2'] },   // 受注確認/引当・OEM商品受注出荷
-      { key: 'supply', name: '需給調整工数',   target: 78,  subs: ['K1'] },         // 新規計画
-      { key: 'instr',  name: '作業指示工数',   target: 67,  subs: ['T1', 'T2'] },   // 計画手配・計画外手配
-      { key: 'prog',   name: '進捗管理工数',   target: 27,  subs: ['K4'] },         // 部品進捗確認
-      { key: 'bom',    name: 'BOMメンテ工数',  target: 49,  subs: ['B1'] },         // 部品表メンテナンス
-      { key: 'eco',    name: '設計変更工数',   target: 49,  subs: ['B2'] },         // 設計変更
-      { key: 'proto',  name: '試作手配工数',   target: 130, subs: ['T3'] },         // 試作手配
+      { key: 'order',  name: '受注管理工数',   target: 45,  subs: ['J1', 'J2'],
+        owner: '谷', plan: '受発注のメールを廃止し、システム化を行う／受発注の標準化と責任のルール化を行う' },   // 受注確認/引当・OEM商品受注出荷
+      { key: 'supply', name: '需給調整工数',   target: 78,  subs: ['K1'],
+        owner: '須藤', plan: '在庫計画の標準化を行う／計画作成フローの標準化を行う' },         // 新規計画
+      { key: 'instr',  name: '作業指示工数',   target: 67,  subs: ['T1', 'T2'],
+        owner: '田村', plan: '緊急オーダーリリースの標準化および自動化を行う／計画外手配の標準化および自動化を行う' },   // 計画手配・計画外手配
+      { key: 'prog',   name: '進捗管理工数',   target: 27,  subs: ['K4'],
+        owner: '吉永', plan: '納期変更連絡の標準化および自動化を行う／計画フォローの標準化および自動化を行う' },         // 部品進捗確認
+      { key: 'bom',    name: 'BOMメンテ工数',  target: 49,  subs: ['B1'],
+        owner: '勝野', plan: '構成変更の標準化および自動化を行う／工程変更の標準化および自動化を行う' },         // 部品表メンテナンス
+      { key: 'eco',    name: '設計変更工数',   target: 49,  subs: ['B2'],
+        owner: '田村', plan: '設計変更の標準化および自動化を行う' },         // 設計変更
+      { key: 'proto',  name: '試作手配工数',   target: 130, subs: ['T3'],
+        owner: '勝野', plan: '試作手配の標準化および自動化を行う／試作手配の全体スケジュールを統制できるように仕組み化' },         // 試作手配
       { key: 'ot',     name: '残業時間',       target: 60,  kind: 'ot' }             // 全員の残業時間の合計（棒グラフ）
     ],
     // タスクID(タスク管理アプリ) → 日報の中分類CD の既定対応表。
@@ -2315,6 +2327,7 @@ function _normKpis(list) {
   return defs.map(d => {
     const v = saved.find(x => x && x.key === d.key) || {};
     return {key: d.key, name: d.name, kind: d.kind || 'hours', target: Number.isFinite(Number(v.target)) && v.target !== '' ? Number(v.target) : d.target,
+            owner: typeof v.owner === 'string' ? v.owner.trim() : (d.owner || ''), plan: typeof v.plan === 'string' ? v.plan.trim() : (d.plan || ''),
             // 保存値の subs が空なら既定の紐づけを使う（空のままでは集計できないため）
             subs: d.kind === 'ot' ? [] : ((Array.isArray(v.subs) && v.subs.length) ? v.subs.filter(cd => typeof cd === 'string') : (d.subs || []))};
   });
@@ -6745,7 +6758,7 @@ async function renderKpiDash(force) {
     <tbody>${HK.map((k, ki) => {
       const v = vals[ki];
       const past = v.filter((x, i) => x != null && i !== curIdx).length, done = v.filter((x, i) => x != null && i !== curIdx && x <= k.target).length;
-      return `<tr><td class="sticky"><b>${escHtml(k.name)}</b>${k.subs.length ? '' : '<span class="dx-tag is-warn">未設定</span>'}</td>
+      return `<tr><td class="sticky" ${k.plan ? `title="アクションプラン: ${escHtml(k.plan)}"` : ''}><b>${escHtml(k.name)}</b>${k.owner ? `<span class="kh-owner" title="主担当">${escHtml(k.owner)}</span>` : ''}${k.subs.length ? '' : '<span class="dx-tag is-warn">未設定</span>'}</td>
         <td class="tg">≦${k.target}h</td>
         ${v.map((x, i) => cell(x, k.target, i, ki)).join('')}
         <td class="kh-done">${past ? `<b class="${done === past ? 't-ok' : ''}">${done}</b><span class="t-muted">/${past}</span>` : '<span class="t-muted">—</span>'}<div class="kh-dots">${v.map((x, i) => `<i class="${i === curIdx ? 'cur' : x == null ? '' : x <= k.target ? 'ok' : 'crit'}"></i>`).join('')}</div></td></tr>`;
@@ -6937,7 +6950,9 @@ function renderAdminKpis() {
     return `<details class="kpi-adm">
       <summary><span class="nm">${escHtml(k.name)}</span>
         <span class="tg" onclick="event.preventDefault();event.stopPropagation()">目標 <input type="number" step="1" min="0" value="${k.target}" onchange="setKpi(${i},'target',this.value)" onclick="event.stopPropagation()"> h 以下</span>
+        <span class="tg" onclick="event.preventDefault();event.stopPropagation()">主担当 <input type="text" class="ow" value="${escHtml(k.owner || '')}" placeholder="苗字" onchange="setKpi(${i},'owner',this.value)" onclick="event.stopPropagation()"></span>
         <span class="pk ${picked.length ? '' : 't-warn'}">${picked.length ? `${picked.length}件: ${escHtml(picked.join('、'))}` : '中分類が未設定'}</span></summary>
+      <div class="kpi-plan"><label>アクションプラン</label><textarea rows="2" placeholder="例: 受発注の標準化を行う／…" onchange="setKpi(${i},'plan',this.value)">${escHtml(k.plan || '')}</textarea></div>
       <div class="kpi-subs">${cats.map(c => `<div class="kpi-cat"><div class="kpi-cat-hd"><i class="dx-sw" style="background:${c.color}"></i>${escHtml(c.label)}</div>
         ${(c.subs || []).map(sb => `<label><input type="checkbox" ${used.has(sb.cd) ? 'checked' : ''} onchange="toggleKpiSub(${i},'${escHtml(sb.cd)}',this.checked)"><span class="t-muted">${escHtml(sb.cd)}</span> ${escHtml(sb.label)}</label>`).join('')}</div>`).join('')}</div>
     </details>`;
@@ -6957,6 +6972,7 @@ function setKpi(i, field, val) {
   const list = JSON.parse(JSON.stringify(KPIS));
   if (!list[i]) return;
   if (field === 'target') list[i].target = Number(val);
+  else if (field === 'owner' || field === 'plan') list[i][field] = String(val || '').trim();
   _saveKpis(list);
 }
 function toggleKpiSub(i, cd, on) {
