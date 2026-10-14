@@ -1908,13 +1908,13 @@ const DEPARTMENT_CONFIG = (function(){
     // KPI（月次の工数目標）。全員の1か月（月期）の工数合計（通常＋残業）を目標以下に収める。
     // subs = 紐づける中分類CD。管理タブで変更→Firebaseマスタ(kpis)に保存。空配列の部署はカードを出さない
     kpis: [
-      { key: 'order',  name: '受注管理工数',   target: 45,  subs: [] },
-      { key: 'supply', name: '需給調整工数',   target: 78,  subs: [] },
-      { key: 'instr',  name: '作業指示工数',   target: 67,  subs: [] },
-      { key: 'prog',   name: '進捗管理工数',   target: 27,  subs: [] },
-      { key: 'bom',    name: 'BOMメンテ工数',  target: 49,  subs: [] },
-      { key: 'eco',    name: '設計変更工数',   target: 49,  subs: [] },
-      { key: 'proto',  name: '試作手配工数',   target: 130, subs: [] }
+      { key: 'order',  name: '受注管理工数',   target: 45,  subs: ['J1', 'J2'] },   // 受注確認/引当・OEM商品受注出荷
+      { key: 'supply', name: '需給調整工数',   target: 78,  subs: ['K1'] },         // 新規計画
+      { key: 'instr',  name: '作業指示工数',   target: 67,  subs: ['T1'] },         // 計画手配
+      { key: 'prog',   name: '進捗管理工数',   target: 27,  subs: ['K4'] },         // 部品進捗確認
+      { key: 'bom',    name: 'BOMメンテ工数',  target: 49,  subs: ['B1'] },         // 部品表メンテナンス
+      { key: 'eco',    name: '設計変更工数',   target: 49,  subs: ['B2'] },         // 設計変更
+      { key: 'proto',  name: '試作手配工数',   target: 130, subs: ['T3'] }          // 試作手配
     ],
     // タスクID(タスク管理アプリ) → 日報の中分類CD の既定対応表。
     // 「管理」タブで編集するとFirebaseマスタ(taskMap)に保存され、以後はそちらが優先。
