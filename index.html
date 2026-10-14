@@ -1223,6 +1223,24 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .kpi-heat-lg span{display:inline-flex;align-items:center;}
 .kpi-heat-lg .dx-sw{width:12px;height:12px;border-radius:4px;}
 .kpi-heat-lg .sep{flex:1;}
+/* ヒートマップのツールチップ */
+.kpi-tip{position:fixed;z-index:400;min-width:220px;max-width:300px;padding:10px 12px 9px;border-radius:10px;background:var(--surface);border:1px solid var(--dx-line);box-shadow:0 12px 32px -8px rgba(0,0,0,.28);font-size:12px;color:var(--dx-ink-1);opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s;pointer-events:none;}
+.kpi-tip.on{opacity:1;transform:none;}
+.kpi-tip .kt-top{display:flex;flex-direction:column;gap:1px;margin-bottom:5px;}
+.kpi-tip .kt-top b{font-size:13px;}
+.kpi-tip .kt-top span{font-size:11px;color:var(--dx-ink-3);}
+.kpi-tip .kt-tot{display:flex;align-items:baseline;gap:4px;padding-bottom:7px;margin-bottom:7px;border-bottom:1px solid var(--dx-line);}
+.kpi-tip .kt-tot em{font-style:normal;font-weight:800;font-size:15px;}
+.kpi-tip .kt-tot span{font-size:11px;color:var(--dx-ink-3);}
+.kpi-tip .kt-rows{display:grid;gap:5px;}
+.kpi-tip .kt-row{display:grid;grid-template-columns:minmax(0,56px) minmax(0,1fr) auto;gap:8px;align-items:center;}
+.kpi-tip .kt-row .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
+.kpi-tip .kt-row .bar{height:6px;border-radius:999px;background:var(--dx-track);overflow:hidden;}
+.kpi-tip .kt-row .bar i{display:block;height:100%;border-radius:999px;background:var(--dx-accent);}
+.kpi-tip .kt-row .hv{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap;}
+.kpi-tip .kt-row .hv small{font-weight:600;color:var(--dx-ink-3);margin-left:4px;font-size:10.5px;}
+.kpi-tip .kt-none{color:var(--dx-ink-3);font-size:11.5px;}
+@media print{.kpi-tip{display:none;}}
 /* 残業グラフ */
 .kpi-ot-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 14px;margin:2px 0 6px;}
 #kpi-ot-legend{margin:0;font-size:12px;gap:6px 14px;}
@@ -6711,14 +6729,14 @@ async function renderKpiDash(force) {
   const el = document.getElementById('kpi-heat'), sub = document.getElementById('kpi-sub');
   const unmapped = HK.filter(k => !k.subs.length).map(k => k.name);
   if (sub) sub.textContent = `${fy + 1}年度（${fiscalKi(fy)}期）・${calNote}・今期の「見込」は今のペースで締め日まで続けた場合${unmapped.length ? `・中分類が未設定: ${unmapped.join('、')}（管理タブ「KPI」で紐づけてください）` : ''}`;
-  const cell = (h, target, i) => {
+  const cell = (h, target, i, ki) => {
     const isCur = i === curIdx, isSel = i === ctx.sel;
     if (h == null) return `<td class="h is-empty"></td>`;
     const r = target > 0 ? h / target : 0;
     const lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
     const str = lv === 'ok' ? 9 + Math.round(r * 11) : lv === 'warn' ? 20 : 24;
     const pj = isCur && proj > 1 ? h * proj : null;
-    return `<td class="h is-${lv} ${isCur ? 'is-cur' : ''} ${isSel ? 'is-sel' : ''}" onclick="_kpiPick(${i})" title="${periods[i].month}月期 ${h.toFixed(1)}h／目標${target}h（${Math.round(r * 100)}%）${pj != null ? `・見込 ${pj.toFixed(1)}h` : ''}" style="background:color-mix(in srgb,var(--st-${lv}) ${str}%,transparent)">
+    return `<td class="h is-${lv} ${isCur ? 'is-cur' : ''} ${isSel ? 'is-sel' : ''}" onclick="_kpiPick(${i})" data-k="${ki}" data-i="${i}" style="background:color-mix(in srgb,var(--st-${lv}) ${str}%,transparent)">
       <b>${h.toFixed(1)}</b>${pj != null ? `<small class="${pj > target ? 't-crit' : ''}">見込 ${pj.toFixed(0)}</small>` : ''}</td>`;
   };
   if (el) el.innerHTML = `<table class="dx-table kpi-heat">
@@ -6728,11 +6746,17 @@ async function renderKpiDash(force) {
       const past = v.filter((x, i) => x != null && i !== curIdx).length, done = v.filter((x, i) => x != null && i !== curIdx && x <= k.target).length;
       return `<tr><td class="sticky"><b>${escHtml(k.name)}</b>${k.subs.length ? '' : '<span class="dx-tag is-warn">未設定</span>'}</td>
         <td class="tg">≦${k.target}h</td>
-        ${v.map((x, i) => cell(x, k.target, i)).join('')}
+        ${v.map((x, i) => cell(x, k.target, i, ki)).join('')}
         <td class="kh-done">${past ? `<b class="${done === past ? 't-ok' : ''}">${done}</b><span class="t-muted">/${past}</span>` : '<span class="t-muted">—</span>'}<div class="kh-dots">${v.map((x, i) => `<i class="${i === curIdx ? 'cur' : x == null ? '' : x <= k.target ? 'ok' : 'crit'}"></i>`).join('')}</div></td></tr>`;
     }).join('')}</tbody></table>
     <div class="kpi-heat-lg"><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-ok) 20%,transparent)"></i>目標以下</span><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-warn) 20%,transparent)"></i>1.2倍まで</span><span><i class="dx-sw" style="background:color-mix(in srgb,var(--st-crit) 24%,transparent)"></i>1.2倍超</span><span class="sep"></span><span>列をクリックすると下の内訳が切り替わります</span></div>`;
 
+  if (el && !el._tipBound) {
+    el._tipBound = true;
+    el.addEventListener('mouseover', ev => { const td = ev.target.closest('td.h[data-k]'); if (td && td !== el._tipTd) { el._tipTd = td; _kpiTipShow(td); } });
+    el.addEventListener('mouseout', ev => { const td = ev.target.closest('td.h[data-k]'); if (td && !td.contains(ev.relatedTarget)) { el._tipTd = null; _kpiTipHide(); } });
+    el.addEventListener('scroll', _kpiTipHide);
+  }
   // ── 内訳（選択中の月期）──
   const bd = document.getElementById('kpi-breakdown'), bt = document.getElementById('kpi-bd-title'), bs = document.getElementById('kpi-bd-sub');
   const si = ctx.sel;
@@ -6784,6 +6808,32 @@ async function renderKpiDash(force) {
   }
   dxGrow(document.getElementById('dash-kpi'), !!ctx._grown && reuse); ctx._grown = true;
 }
+// ヒートマップのセルにカーソルを合わせたときの担当者別内訳
+function _kpiTipEl() {
+  let t = document.getElementById('kpi-tip');
+  if (!t) { t = document.createElement('div'); t.id = 'kpi-tip'; t.className = 'kpi-tip'; document.body.appendChild(t); }
+  return t;
+}
+function _kpiTipShow(td) {
+  const ctx = _kpiCtx; if (!ctx || !ctx.data) return;
+  const ki = Number(td.dataset.k), i = Number(td.dataset.i), d = ctx.data[i], k = _kpiHoursItems()[ki];
+  if (!d || !k) return;
+  const b = _kpiBreakdown(d, k.subs);
+  const auth = _authorsLast(Object.keys(b.byAuthor).filter(a => b.byAuthor[a] > 0.005).sort((x, y) => b.byAuthor[y] - b.byAuthor[x]));
+  const max = Math.max(0.01, ...auth.map(a => b.byAuthor[a]));
+  const r = k.target > 0 ? b.total / k.target : 0, lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
+  const tip = _kpiTipEl();
+  tip.innerHTML = `<div class="kt-top"><b>${escHtml(k.name)}</b><span>${ctx.periods[i].month}月期 ${escHtml(ctx.ranges[i].range)}</span></div>
+    <div class="kt-tot"><em class="t-${lv}">${b.total.toFixed(1)}h</em><span>／ 目標 ${k.target}h（${Math.round(r * 100)}%）</span></div>
+    ${auth.length ? `<div class="kt-rows">${auth.map(a => `<div class="kt-row"><span class="nm">${escHtml(a)}</span><span class="bar"><i style="width:${(b.byAuthor[a] / max * 100).toFixed(1)}%"></i></span><span class="hv">${b.byAuthor[a].toFixed(1)}h<small>${b.total ? Math.round(b.byAuthor[a] / b.total * 100) : 0}%</small></span></div>`).join('')}</div>` : '<div class="kt-none">この月期は該当の作業がありません</div>'}`;
+  tip.classList.add('on');
+  const r0 = td.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
+  let x = r0.left + r0.width / 2 - tw / 2, y = r0.bottom + 8;
+  if (x < 8) x = 8; if (x + tw > vw - 8) x = vw - 8 - tw;
+  if (y + th > vh - 8) y = r0.top - th - 8;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+function _kpiTipHide() { const t = document.getElementById('kpi-tip'); if (t) t.classList.remove('on'); }
 // KPI: 残業時間（全員合算）の縦棒グラフ。目標以下は緑、超えたら赤。今期は月末見込までの伸びを斜線で
 function renderKpiOtBar(canvas, periods, ranges, vals, target, curIdx, proj, stack) {
   if (!canvas) return;
