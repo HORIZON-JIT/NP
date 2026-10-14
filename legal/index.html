@@ -1054,7 +1054,9 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .tr-sub .nm{font-weight:700;color:var(--g700);font-size:11.5px;}
 .tr-sub .nm small{display:block;color:var(--g400);font-weight:600;}
 .tr-chips{display:flex;flex-wrap:wrap;gap:4px;}
-.tr-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--g200);border-radius:999px;padding:2px 8px;font-size:11px;background:var(--surface);}
+.tr-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--g200);border-radius:999px;padding:2px 8px;font-size:11px;background:var(--surface);color:var(--g800);cursor:pointer;font-family:inherit;}
+.tr-chip:hover{border-color:var(--primary);background:var(--g50);}
+.tr-edit{opacity:.55;} .tr-table tr:hover .tr-edit{opacity:1;}
 .tr-chip b{font-family:monospace;font-weight:800;}
 .tr-chip small{color:var(--g400);}
 .tr-none{color:var(--g300);font-size:11px;}
@@ -5253,16 +5255,20 @@ function renderTaskRef() {
         const sb = SUB_MAP[t.cdSub];
         const i = _trData.indexOf(t);
         const catCell = sb ? `<span class="tr-cat"><i style="background:${CAT_COLOR[sb.mainCd] || '#8C8377'}"></i>${escHtml(sb.mainLabel || sb.mainCd)}</span>` : '<span class="tr-none">—</span>';
-        const subCell = sb ? `${escHtml(t.cdSub)} ${escHtml(sb.label)}`
-          : `<span class="tr-unset">${t.cdSub ? '日報に無い: ' + escHtml(t.cdSub) : '未設定'}</span><select id="tr-sel-${i}"><option value="">中分類を選択</option>${opts}</select><button type="button" class="btn btn-primary" id="tr-btn-${i}" onclick="registerTaskRefCd(${i})">登録</button>`;
+        const editor = `<select id="tr-sel-${i}"><option value="">中分類を選択</option>${opts}</select><button type="button" class="btn btn-primary" id="tr-btn-${i}" onclick="registerTaskRefCd(${i})">${sb ? '保存' : '登録'}</button>`;
+        const subCell = sb
+          ? (_trEdit === i ? `${editor}<button type="button" class="btn btn-outline" onclick="editTaskRefCd(null)">取消</button>`
+                           : `${escHtml(t.cdSub)} ${escHtml(sb.label)}<button type="button" class="btn btn-outline tr-edit" onclick="editTaskRefCd(${i})">変更</button>`)
+          : `<span class="tr-unset">${t.cdSub ? '日報に無い: ' + escHtml(t.cdSub) : '未設定'}</span>${editor}`;
         return `<tr class="${sb ? '' : 'unset'}"><td class="tr-id">${escHtml(t.taskId)}</td><td>${escHtml(t.name)}</td><td class="tr-std">${_trStd(t.std)}</td><td>${catCell}</td><td>${subCell}</td></tr>`;
       }).join('') + '</tbody></table>';
+    if (_trEdit != null) { const sel = document.getElementById(`tr-sel-${_trEdit}`); if (sel) { sel.value = _trData[_trEdit].cdSub; sel.focus(); } }
     return;
   }
   // 日報 → Folio
   const bySub = {};
   rows.forEach(t => { if (SUB_MAP[t.cdSub]) (bySub[t.cdSub] = bySub[t.cdSub] || []).push(t); });
-  const chips = list => list.length ? `<div class="tr-chips">${list.map(t => `<span class="tr-chip" title="${escHtml(t.name)}"><b>${escHtml(t.taskId)}</b>${escHtml(t.name)}<small>${_trStd(t.std)}</small></span>`).join('')}</div>` : '<span class="tr-none">（なし）</span>';
+  const chips = list => list.length ? `<div class="tr-chips">${list.map(t => `<button type="button" class="tr-chip" title="クリックで対応を変更" onclick="editTaskRefCd(${_trData.indexOf(t)})"><b>${escHtml(t.taskId)}</b>${escHtml(t.name)}<small>${_trStd(t.std)}</small></button>`).join('')}</div>` : '<span class="tr-none">（なし）</span>';
   const cats = activeInputCats().map(c => {
     const subs = (c.subs || []).filter(sb => !q || bySub[sb.cd] || `${sb.cd} ${sb.label} ${c.label}`.toLowerCase().includes(q));
     if (!subs.length) return '';
@@ -5273,23 +5279,33 @@ function renderTaskRef() {
   if (orphan.length && !q) cats.push(`<div class="tr-group"><h4><i style="background:var(--danger)"></i>中分類が未設定のタスク <small style="color:var(--g400);font-weight:600;">「Folio → 日報」で登録できます</small></h4><div class="tr-sub"><div class="nm">未設定<small>${orphan.length}件</small></div>${chips(orphan)}</div></div>`);
   body.innerHTML = cats.join('') || '<div style="padding:16px;color:var(--g400);">該当する項目はありません</div>';
 }
-// 早見表から未設定タスクの中分類を登録（タスクマスタへ書き込み）
+// 設定済みの行を変更モードにする（i=null で解除）
+let _trEdit = null;
+function editTaskRefCd(i) {
+  _trEdit = i;
+  if (i != null) { _trMode = 'f2n'; document.getElementById('tr-mode-f2n').classList.add('on'); document.getElementById('tr-mode-n2f').classList.remove('on'); }
+  renderTaskRef();
+}
+// 早見表からタスクの中分類を登録・変更（タスクマスタへ書き込み）
 async function registerTaskRefCd(i) {
   const t = _trData && _trData[i];
   const sel = document.getElementById(`tr-sel-${i}`), btn = document.getElementById(`tr-btn-${i}`);
   if (!t || !sel || !sel.value) return;
   const cd = sel.value;
-  if (btn) { btn.disabled = true; btn.textContent = '登録中...'; }
+  if (cd === t.cdSub) { editTaskRefCd(null); return; }
+  if (btn) { btn.disabled = true; btn.textContent = '保存中...'; }
   try {
     const d = await _gasJsonpTag(taskImportUrl(), {action:'setTaskCd', taskId: t.taskId, cd});
     if (!d || !d.ok) throw new Error((d && d.error) || '書き込みに失敗しました');
+    const prev = t.cdSub;
     t.cdSub = cd;
+    _trEdit = null;
     if (typeof TASK_MAP === 'object' && TASK_MAP) TASK_MAP[t.taskId] = cd;
     renderTaskRef();
     const sub = document.getElementById('tr-sub');
-    if (sub) sub.textContent += `　✔ ${t.taskId} → ${cd} を登録しました`;
+    if (sub) sub.textContent += `　✔ ${t.taskId}: ${prev && SUB_MAP[prev] ? prev + ' → ' : ''}${cd} を${prev && SUB_MAP[prev] ? '変更' : '登録'}しました`;
   } catch(e) {
-    if (btn) { btn.disabled = false; btn.textContent = '登録'; }
+    if (btn) { btn.disabled = false; btn.textContent = SUB_MAP[t.cdSub] ? '保存' : '登録'; }
     alert(`タスクマスタへ書き込めませんでした: ${e.message}`);
   }
 }
