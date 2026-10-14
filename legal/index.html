@@ -1368,7 +1368,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <h1 class="dx-title" id="dx-title">月次レポート</h1>
     </div>
   <div class="dash-subtabs no-print" role="tablist">
-    <button class="dash-stab active" id="stab-monthly" onclick="showDashTab('monthly')">月次（15日締め）</button>
+    <button class="dash-stab active" id="stab-monthly" onclick="showDashTab('monthly')">月次</button>
     <button class="dash-stab"        id="stab-yearly"  onclick="showDashTab('yearly')">年次</button>
     <button class="dash-stab"        id="stab-daily"   onclick="showDashTab('daily')">日別</button>
     <button class="dash-stab"        id="stab-person"  onclick="showDashTab('person')">個人</button>
@@ -1869,6 +1869,8 @@ const DEPARTMENT_CONFIG = (function(){
       backupSheetUrl: 'https://docs.google.com/spreadsheets/d/1LlQVpi8O7RMmugpVkOlXckiNGrSzE2isS73drWsgxYk/edit'
     },
     // 勤務ルール（時刻は "HH:MM"）
+    // 月期の締め: midMonthFrom 以降の月期は「前月16日〜当月15日」、それより前は「1日〜月末」（暦月）
+    periodRule: { midMonthFrom: { year: 2026, month: 10 } },
     rules: {
       workStart:      '08:30',  // 始業
       normalEnd:      '17:20',  // 定時（夕方休憩前）
@@ -2561,16 +2563,31 @@ function todayStr() {
 }
 function pad(n){ return String(n).padStart(2,'0'); }
 
-// ─── 15日締め期間計算 ────────────────────
-// 「YYYY年M月期」= 前月16日〜当月15日
-function getCurrentPeriodMonth() {
-  const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth()+1, d = now.getDate();
-  // 16日以降は「翌月期」
-  if (d > 15) return m===12 ? {year:y+1,month:1} : {year:y,month:m+1};
-  return {year:y, month:m};
+// ─── 月期の期間計算 ────────────────────
+// periodRule.midMonthFrom 以降の「YYYY年M月期」= 前月16日〜当月15日。それより前の月期 = 1日〜月末（暦月）
+function _isMidMonthPeriod(year, month) {
+  const f = (DEPARTMENT_CONFIG.periodRule || {}).midMonthFrom;
+  if (!f) return true;
+  return year * 100 + month >= f.year * 100 + f.month;
 }
+// 日付(YYYY-MM-DD)が属する月期。16日以降で翌月期が15日締めなら翌月期、それ以外は当月期
+function periodOfDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const next = m === 12 ? {year: y + 1, month: 1} : {year: y, month: m + 1};
+  if (d > 15 && _isMidMonthPeriod(next.year, next.month)) return next;
+  return {year: y, month: m};
+}
+function getCurrentPeriodMonth() { return periodOfDate(todayStr()); }
 function getPeriodDates(year, month) {
+  if (!_isMidMonthPeriod(year, month)) {
+    const last = new Date(year, month, 0).getDate();
+    return {
+      startDate: `${year}-${pad(month)}-01`,
+      endDate:   `${year}-${pad(month)}-${pad(last)}`,
+      label:     `${year}年${month}月期`,
+      range:     `${year}/${pad(month)}/01 〜 ${year}/${pad(month)}/${pad(last)}`
+    };
+  }
   const prevM = month===1?12:month-1;
   const prevY = month===1?year-1:year;
   return {
@@ -2585,12 +2602,8 @@ function getPeriodDates(year, month) {
 function cacheGet(k)    { return _cache.has(k) ? _cache.get(k) : null; }
 function cacheSet(k,v)  { _cache.set(k,v); }
 function cacheInvalidate(date) {
-  // ── 当該日が属する月期を特定 ──
-  // 16日〜翌月15日が1期なので日付から所属期を逆算
-  const [y,m,d] = date.split('-').map(Number);
-  // 16日以降は翌月期、1〜15日は当月期
-  const periodMonth = d >= 16 ? (m===12 ? 1 : m+1) : m;
-  const periodYear  = d >= 16 ? (m===12 ? y+1 : y) : y;
+  // ── 当該日が属する月期を特定（締めルールは periodOfDate に集約）──
+  const {year: periodYear, month: periodMonth} = periodOfDate(date);
   const {startDate:ckStart, endDate:ckEnd} = getPeriodDates(periodYear, periodMonth);
   const rangeKey = `range_${ckStart}_${ckEnd}`;
 
@@ -5585,7 +5598,7 @@ function openPersonDash(author, fromGrid) {
   let period = null;
   if (fromGrid === 'yearly-person-grid') { sf.value = String(currentFiscalYear); if (ss) ss.value = '-1'; }
   else {
-    if (fromGrid === 'daily-person-grid') { const d = new Date(currentDate + 'T00:00:00'); period = d.getDate() > 15 ? (d.getMonth() === 11 ? {year: d.getFullYear() + 1, month: 1} : {year: d.getFullYear(), month: d.getMonth() + 2}) : {year: d.getFullYear(), month: d.getMonth() + 1}; }
+    if (fromGrid === 'daily-person-grid') period = periodOfDate(currentDate);
     else period = currentPeriod;
     const fy = _fiscalYearOf(period);
     if (![...sf.options].some(o => o.value === String(fy))) sf.add(new Option(`${fy + 1}年度（${fy - 1952}期）`, fy));
@@ -8248,10 +8261,7 @@ async function refreshRecentCache() {
   // 過去7日が属する月次期を特定（重複除去）
   const periodSet = new Map();
   allDates.forEach(date => {
-    const d = new Date(date + 'T00:00:00');
-    const y = d.getFullYear(), m = d.getMonth() + 1, day = d.getDate();
-    let periodY = y, periodM = m;
-    if (day > 15) { periodM = m === 12 ? 1 : m + 1; periodY = m === 12 ? y + 1 : y; }
+    const {year: periodY, month: periodM} = periodOfDate(date);
     const {startDate, endDate} = getPeriodDates(periodY, periodM);
     const k = `${startDate}_${endDate}`;
     if (!periodSet.has(k)) periodSet.set(k, {startDate, endDate});
