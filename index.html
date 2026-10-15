@@ -6713,7 +6713,7 @@ async function renderKpiDash(force) {
   const otVals = periods.map((x, i) => (i > lastIdx || !data[i]) ? null : _kpiOtOf(data[i]));
   // 担当者別の残業（積み上げ棒用）。年度内に残業のある人を多い順に
   const otBy = periods.map((x, i) => (i > lastIdx || !data[i]) ? null : _otByAuthor(data[i]));
-  const otAuthors = (() => { const t = {}; otBy.forEach(m => m && Object.keys(m).forEach(a => { t[a] = (t[a] || 0) + m[a].ot; })); return _authorsLast(Object.keys(t).filter(a => t[a] > 0).sort((a, b) => t[b] - t[a])); })();
+  const otAuthors = (() => { const t = {}; otBy.forEach(m => m && Object.keys(m).forEach(a => { t[a] = (t[a] || 0) + m[a].ot; })); return Object.keys(t).filter(a => t[a] > 0).sort((a, b) => t[b] - t[a]); })();   // KPI は公平に多い順（谷を最後にしない）
   const AUTH_COLORS = ['#2a78d6', '#e0a526', '#8b5cf6', '#10b981', '#f43f5e', '#0ea5e9', '#f97316', '#84cc16', '#ec4899', '#6b7280'];
   // 担当者の色は年度を通して固定（残業の多い順に割当。残業の無い人も内訳のバーで同じ色になるよう全員に振る）
   const palAuthors = otAuthors.slice();
@@ -6792,7 +6792,7 @@ async function renderKpiDash(force) {
     const d = si >= 0 ? data[si] : null;
     if (!d) bd.innerHTML = '<p class="dx-empty">この月期のデータがありません</p>';
     else bd.innerHTML = `<div class="kpi-bd-grid">${(OTK ? [(() => {
-      const all = _otByAuthor(d), auth = _authorsLast(Object.keys(all).filter(a => all[a].ot > 0).sort((x, y) => all[y].ot - all[x].ot));   // 多い順（要因が上に来るように）。谷は最後
+      const all = _otByAuthor(d), auth = Object.keys(all).filter(a => all[a].ot > 0).sort((x, y) => all[y].ot - all[x].ot);   // 多い順（要因が上に来るように）
       const total = auth.reduce((t, a) => t + all[a].ot, 0), maxA = Math.max(0.01, ...auth.map(a => all[a].ot));
       const r = OTK.target > 0 ? total / OTK.target : 0, lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
       const prevD = si > 0 ? data[si - 1] : ctx.prev0, prevAll = prevD ? _otByAuthor(prevD) : null;
@@ -6808,7 +6808,7 @@ async function renderKpiDash(force) {
       const b = _kpiBreakdown(d, k.subs);
       const r = k.target > 0 ? b.total / k.target : 0, lv = !k.subs.length ? '' : r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
       const subs = Object.keys(b.bySub).filter(cd => b.bySub[cd] > 0.005).sort((x, y) => b.bySub[y] - b.bySub[x]);
-      const auth = _authorsLast(Object.keys(b.byAuthor).filter(a => b.byAuthor[a] > 0.005).sort((x, y) => b.byAuthor[y] - b.byAuthor[x]));
+      const auth = Object.keys(b.byAuthor).filter(a => b.byAuthor[a] > 0.005).sort((x, y) => b.byAuthor[y] - b.byAuthor[x]);
       const maxS = Math.max(0.01, ...subs.map(cd => b.bySub[cd])), maxA = Math.max(0.01, ...auth.map(a => b.byAuthor[a]));
       const bar = (label, h, max, color) => `<div class="dx-hbar"><span class="lb">${label}</span><div class="tr"><i style="background:${color}" data-w="${(h / max * 100).toFixed(1)}"></i></div><span class="vv">${h.toFixed(1)}h<small>${b.total ? Math.round(h / b.total * 100) : 0}%</small></span></div>`;
       const empty = k.subs.length && !subs.length && !auth.length;
@@ -6845,7 +6845,7 @@ function _kpiTipShow(td) {
   const ki = Number(td.dataset.k), i = Number(td.dataset.i), d = ctx.data[i], k = _kpiHoursItems()[ki];
   if (!d || !k) return;
   const b = _kpiBreakdown(d, k.subs);
-  const auth = _authorsLast(Object.keys(b.byAuthor).filter(a => b.byAuthor[a] > 0.005).sort((x, y) => b.byAuthor[y] - b.byAuthor[x]));
+  const auth = Object.keys(b.byAuthor).filter(a => b.byAuthor[a] > 0.005).sort((x, y) => b.byAuthor[y] - b.byAuthor[x]);
   const max = Math.max(0.01, ...auth.map(a => b.byAuthor[a]));
   const r = k.target > 0 ? b.total / k.target : 0, lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
   const subs = Object.keys(b.bySub).filter(cd => b.bySub[cd] > 0.005).sort((x, y) => b.bySub[y] - b.bySub[x]);
