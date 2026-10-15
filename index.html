@@ -1486,7 +1486,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
         <button class="btn-clear no-print" onclick="clearInputs()">クリア</button>
         <span id="save-msg"></span>
       </div>
-      <button class="btn-clear no-print" id="btn-task-import" onclick="openTaskImport()" style="display:none;width:100%;margin-top:8px;">Folioから取込</button>
+      <button class="btn-clear no-print" id="btn-task-import" onclick="openTaskImport(true)" style="display:none;width:100%;margin-top:8px;">Folioから取込</button>
       <button class="btn-clear no-print" id="btn-task-ref" onclick="openTaskRef()" style="display:none;width:100%;margin-top:6px;">タスク早見表</button>
       <div class="side-leave no-print">
         <label class="leave-label" for="input-leave">退勤時刻</label>
@@ -5481,10 +5481,14 @@ function fetchFolioTasks(date, author, force) {
   promise.catch(() => { if (_folioCache.get(key)?.promise === promise) _folioCache.delete(key); });
   return promise;
 }
-// 入力画面で日付/担当者が決まったら裏で先読み（ボタン押下時に待たない＋GASのコールドスタート解消）
+// 入力画面で日付/担当者が決まったら GAS を起こしておく（コールドスタート解消）。
+// 取込は毎回シートを読み直すので、データの先読みはしない（古い結果を表示しないため）
+let _folioWarmAt = 0;
 function prefetchFolioTasks() {
   if (!taskImportUrl() || !getAuthor()) return;
-  fetchFolioTasks(currentDate, getAuthor(), false).catch(() => {});
+  if (Date.now() - _folioWarmAt < 5 * 60 * 1000) return;
+  _folioWarmAt = Date.now();
+  _gasJsonpTag(taskImportUrl(), {action:'test'}).catch(() => { _folioWarmAt = 0; });
 }
 
 // ── Folioから取込: 抽出アニメーション ──
