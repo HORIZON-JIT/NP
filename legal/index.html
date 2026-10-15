@@ -51,7 +51,7 @@ button,a{-webkit-tap-highlight-color:transparent;}
 /* ─── HEADER ─────────────────────────── */
 header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;position:sticky;top:0;z-index:100;box-shadow:0 1px 0 rgba(17,17,17,.06);border-bottom:1px solid rgba(231,222,201,.8);backdrop-filter:blur(14px);}
 .hd-left{display:flex;align-items:center;gap:12px;}
-.hd-left::before{content:'H';display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;background:#0A0A0A;color:#fff;font-size:13px;font-weight:900;letter-spacing:0;box-shadow:0 8px 18px rgba(17,17,17,.12);}
+.hd-left::before{content:'';display:block;flex:none;width:36px;height:36px;border-radius:8px;background:url(icons/favicon-192.png) center/cover no-repeat;box-shadow:0 8px 18px rgba(17,17,17,.12);}
 .hd-left h1{font-size:17px;font-weight:850;white-space:nowrap;letter-spacing:0;color:var(--g800);}
 .hd-left .sub{font-size:10px;color:var(--g500);font-weight:700;letter-spacing:.08em;text-transform:uppercase;}
 .hd-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
@@ -748,7 +748,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 [data-theme="dark"] body{background:var(--page);color:var(--g800);}
 /* ── ヘッダー：Manual風の静かなダークアプリバー ── */
 [data-theme="dark"] header{background:rgba(22,25,34,.9);color:var(--g800);box-shadow:0 1px 0 rgba(255,255,255,.05);border-bottom-color:var(--g200);}
-[data-theme="dark"] .hd-left::before{background:#fff;color:#0A0A0A;}
+[data-theme="dark"] .hd-left::before{box-shadow:0 0 0 1px rgba(255,255,255,.14),0 8px 18px rgba(0,0,0,.35);}
 [data-theme="dark"] .date-nav,[data-theme="dark"] .author-chip,[data-theme="dark"] .btn-hd{background:var(--surface);border-color:var(--g200);}
 [data-theme="dark"] .btn-today,[data-theme="dark"] .btn-submit,[data-theme="dark"] .btn-primary,[data-theme="dark"] #btn-fl-ok{background:#2563EB;border-color:#2563EB!important;color:#fff;}
 [data-theme="dark"] .btn-today:hover,[data-theme="dark"] .btn-submit:hover,[data-theme="dark"] .btn-primary:hover,[data-theme="dark"] #btn-fl-ok:hover{background:#1E40AF;}
