@@ -1228,7 +1228,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .kpi-heat-lg .dx-sw{width:12px;height:12px;border-radius:4px;}
 .kpi-heat-lg .sep{flex:1;}
 /* ヒートマップのツールチップ */
-.kpi-tip{position:fixed;z-index:400;min-width:220px;max-width:300px;padding:10px 12px 9px;border-radius:10px;background:var(--surface);border:1px solid var(--dx-line);box-shadow:0 12px 32px -8px rgba(0,0,0,.28);font-size:12px;color:var(--dx-ink-1);opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s;pointer-events:none;}
+.kpi-tip{position:fixed;z-index:400;min-width:260px;max-width:340px;padding:10px 12px 9px;border-radius:10px;background:var(--surface);border:1px solid var(--dx-line);box-shadow:0 12px 32px -8px rgba(0,0,0,.28);font-size:12px;color:var(--dx-ink-1);opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s;pointer-events:none;}
 .kpi-tip.on{opacity:1;transform:none;}
 .kpi-tip .kt-top{display:flex;flex-direction:column;gap:1px;margin-bottom:5px;}
 .kpi-tip .kt-top b{font-size:13px;}
@@ -1237,7 +1237,11 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .kpi-tip .kt-tot em{font-style:normal;font-weight:800;font-size:15px;}
 .kpi-tip .kt-tot span{font-size:11px;color:var(--dx-ink-3);}
 .kpi-tip .kt-rows{display:grid;gap:5px;}
-.kpi-tip .kt-row{display:grid;grid-template-columns:minmax(0,56px) minmax(0,1fr) auto;gap:8px;align-items:center;}
+.kpi-tip .kt-row{display:grid;grid-template-columns:minmax(0,108px) minmax(0,1fr) auto;gap:8px;align-items:center;}
+.kpi-tip .kt-sec{font-size:10.5px;font-weight:700;color:var(--dx-ink-3);letter-spacing:.06em;margin:2px 0 5px;}
+.kpi-tip .kt-rows + .kt-sec{margin-top:9px;padding-top:8px;border-top:1px solid var(--dx-line);}
+.kpi-tip .kt-sub{display:flex;flex-wrap:wrap;gap:1px 10px;margin:-2px 0 2px 10px;font-size:10.5px;color:var(--dx-ink-3);}
+.kpi-tip .kt-sub b{font-weight:700;color:var(--dx-ink-2);font-variant-numeric:tabular-nums;}
 .kpi-tip .kt-row .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
 .kpi-tip .kt-row .bar{height:6px;border-radius:999px;background:var(--dx-track);overflow:hidden;}
 .kpi-tip .kt-row .bar i{display:block;height:100%;border-radius:999px;background:var(--dx-accent);}
@@ -6630,8 +6634,8 @@ function _kpiHoursOf(d, subs) {
 }
 // 期データから、指定の中分類の工数を 中分類別／担当者別 に集計（_effStats と同じ補正）
 function _kpiBreakdown(d, subs) {
-  const bySub = {}, byAuthor = {};
-  if (!d || !subs.length) return {bySub, byAuthor, total: 0};
+  const bySub = {}, byAuthor = {}, byAuthorSub = {};
+  if (!d || !subs.length) return {bySub, byAuthor, byAuthorSub, total: 0};
   const set = new Set(subs), all = _otByAuthor(d);
   let total = 0;
   Object.keys(all).forEach(a => {
@@ -6642,9 +6646,10 @@ function _kpiBreakdown(d, subs) {
       if (!set.has(r.cdSub)) return;
       const h = ((r.hoursNormal || 0) + (r.hoursOT || 0)) * k;
       bySub[r.cdSub] = (bySub[r.cdSub] || 0) + h; byAuthor[a] = (byAuthor[a] || 0) + h; total += h;
+      const m = byAuthorSub[a] || (byAuthorSub[a] = {}); m[r.cdSub] = (m[r.cdSub] || 0) + h;
     });
   });
-  return {bySub, byAuthor, total};
+  return {bySub, byAuthor, byAuthorSub, total};
 }
 // 月期の稼働日（入力状況と同じ判定: 平日のうち、全員未入力の過去日は休日とみなす）→ 今期の月末見込に使う
 function _kpiWorkdays(d, startDate, endDate) {
@@ -6843,10 +6848,23 @@ function _kpiTipShow(td) {
   const auth = _authorsLast(Object.keys(b.byAuthor).filter(a => b.byAuthor[a] > 0.005).sort((x, y) => b.byAuthor[y] - b.byAuthor[x]));
   const max = Math.max(0.01, ...auth.map(a => b.byAuthor[a]));
   const r = k.target > 0 ? b.total / k.target : 0, lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
+  const subs = Object.keys(b.bySub).filter(cd => b.bySub[cd] > 0.005).sort((x, y) => b.bySub[y] - b.bySub[x]);
+  const maxS = Math.max(0.01, ...subs.map(cd => b.bySub[cd])), multi = subs.length > 1;
+  const subName = cd => (SUB_MAP[cd] || {}).label || cd;
+  const pct = h => b.total ? Math.round(h / b.total * 100) : 0;
+  const row = (nm, h, w, color, full) => `<div class="kt-row" ${full ? `title="${escHtml(full)}"` : ''}><span class="nm">${nm}</span><span class="bar"><i style="width:${w.toFixed(1)}%;${color ? `background:${color}` : ''}"></i></span><span class="hv">${h.toFixed(1)}h<small>${pct(h)}%</small></span></div>`;
   const tip = _kpiTipEl();
   tip.innerHTML = `<div class="kt-top"><b>${escHtml(k.name)}</b><span>${ctx.periods[i].month}月期 ${escHtml(ctx.ranges[i].range)}</span></div>
     <div class="kt-tot"><em class="t-${lv}">${b.total.toFixed(1)}h</em><span>／ 目標 ${k.target}h（${Math.round(r * 100)}%）</span></div>
-    ${auth.length ? `<div class="kt-rows">${auth.map(a => `<div class="kt-row"><span class="nm">${escHtml(a)}</span><span class="bar"><i style="width:${(b.byAuthor[a] / max * 100).toFixed(1)}%"></i></span><span class="hv">${b.byAuthor[a].toFixed(1)}h<small>${b.total ? Math.round(b.byAuthor[a] / b.total * 100) : 0}%</small></span></div>`).join('')}</div>` : '<div class="kt-none">この月期は該当の作業がありません</div>'}`;
+    ${!auth.length ? '<div class="kt-none">この月期は該当の作業がありません</div>' : `
+    <div class="kt-sec">日報のタスク（中分類）</div>
+    <div class="kt-rows">${subs.map(cd => row(escHtml(subName(cd)), b.bySub[cd], b.bySub[cd] / maxS * 100, `var(--st-${lv})`, `${cd} ${subName(cd)}`)).join('')}</div>
+    <div class="kt-sec">担当者</div>
+    <div class="kt-rows">${auth.map(a => {
+      const ms = b.byAuthorSub[a] || {}, list = subs.filter(cd => (ms[cd] || 0) > 0.005);
+      return row(escHtml(a), b.byAuthor[a], b.byAuthor[a] / max * 100, '') +
+        (multi ? `<div class="kt-sub">${list.map(cd => `<span>${escHtml(subName(cd))} <b>${ms[cd].toFixed(1)}h</b></span>`).join('')}</div>` : '');
+    }).join('')}</div>`}`;
   tip.classList.add('on');
   const r0 = td.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
   let x = r0.left + r0.width / 2 - tw / 2, y = r0.bottom + 8;
