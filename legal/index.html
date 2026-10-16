@@ -1280,6 +1280,9 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .kpi-bd .dx-hbar .vv small{font-size:11px;margin-left:4px;}
 .kpi-bd .dx-empty{padding:6px 0 4px;font-size:12.5px;}
 .kpi-bd .dx-note{margin-top:10px;font-size:12px;}
+.kpi-bd .kb-pj{font-size:11px;font-weight:700;color:var(--ki);margin-left:6px;}
+.kpi-tip .kt-pj{font-size:11.5px;color:var(--dx-ink-2);margin:-3px 0 8px;}
+.kpi-tip .kt-pj b{font-weight:800;}
 .kpi-bd .kb-over{font-size:11px;font-weight:700;color:var(--st-crit-ink);margin-left:4px;}
 @media(max-width:1100px){#view-dash .kpi-tiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;} .kpi-tile{padding:12px 13px 11px;} .kpi-tile .kt-v b{font-size:23px;} .kpi-bd-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:768px){#view-dash .kpi-tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:14px;} .kpi-tile{padding:11px 12px 10px;gap:5px;} .kpi-tile .kt-v b{font-size:22px;} .kpi-heat td.h{min-width:52px;}}
@@ -6687,6 +6690,13 @@ function changeKpiYear(delta) {
   if ([...sel.options].some(o => Number(o.value) === v)) { sel.value = String(v); renderKpiDash(); }
 }
 function _kpiPick(i) { if (!_kpiCtx) return; _kpiCtx.sel = i; renderKpiDash(); }
+// KPI の判定。進行中の月期（今期）は月末見込（実績 × proj）で判定し、文言に「見込」を付ける
+function _kpiJudge(v, target, isCur, proj) {
+  const hasPj = !!isCur && proj > 1, pj = hasPj ? v * proj : v;
+  const r = target > 0 ? pj / target : 0, lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
+  const base = lv === 'ok' ? '達成' : lv === 'warn' ? '超過' : '大幅超過';
+  return {hasPj, pj, r, rAct: target > 0 ? v / target : 0, lv, label: isCur ? base + '見込' : base};
+}
 async function renderKpiDash(force) {
   if (!KPIS.length) return;
   const sel = document.getElementById('kpi-sel-fy');
@@ -6728,6 +6738,7 @@ async function renderKpiDash(force) {
   const authColor = a => { const i = palAuthors.indexOf(a); return i < 0 ? '#8C8377' : AUTH_COLORS[i % AUTH_COLORS.length]; };
   const wd = curIdx >= 0 && data[curIdx] ? _kpiWorkdays(data[curIdx], ranges[curIdx].startDate, ranges[curIdx].endDate) : null;
   const proj = wd && wd.elapsed > 0 && wd.total > wd.elapsed ? wd.total / wd.elapsed : 1;
+  ctx.proj = proj;
   const calFirst = ranges.findIndex(r => !r.calendar), calMixed = ranges.some(r => r.calendar) && calFirst >= 0;
   const calNote = ranges.some(r => r.calendar) ? (calFirst >= 0 ? `${periods[calFirst].month}月期から15日締め、それ以前は月末締め` : '全月期とも月末締め') : '15日締め';
 
@@ -6738,9 +6749,7 @@ async function renderKpiDash(force) {
     const tile = (k, v, note, isOt) => {
       const base = 'kpi-tile' + (isOt ? ' is-ot' : '');
       if (v == null) return `<div class="${base} is-na"><div class="kt-hd"><span class="kt-nm">${escHtml(k.name)}</span><span class="kt-dot"></span></div><div class="kt-v"><b>—</b><span class="kt-tg">/ ${k.target}h</span></div><div class="kt-m"></div><div class="kt-ft"><span class="kt-tag">${note || 'データなし'}</span></div></div>`;
-      const isCur = tIdx === curIdx, hasPj = isCur && proj > 1, pj = hasPj ? v * proj : v;
-      const r = k.target > 0 ? v / k.target : 0, lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
-      const judgeOk = pj <= k.target, judge = isCur ? (judgeOk ? '達成見込' : '超過見込') : (judgeOk ? '達成' : '超過');
+      const isCur = tIdx === curIdx, J = _kpiJudge(v, k.target, isCur, proj), hasPj = J.hasPj, pj = J.pj, lv = J.lv, judge = J.label, r = J.rAct;
       const scale = Math.max(k.target * 1.35, pj, v, 0.01);
       const sub = hasPj ? `見込 ${pj.toFixed(0)}h・${Math.round(r * 100)}%` : (v > k.target ? `目標超過 +${(v - k.target).toFixed(1)}h` : `${Math.round(r * 100)}%`);
       return `<div class="${base} is-${lv}" title="${escHtml(k.name)}: ${v.toFixed(1)}h／目標 ${k.target}h（${Math.round(r * 100)}%）${hasPj ? `・見込 ${pj.toFixed(1)}h` : ''}">
@@ -6761,10 +6770,9 @@ async function renderKpiDash(force) {
   const cell = (h, target, i, ki) => {
     const isCur = i === curIdx, isSel = i === ctx.sel;
     if (h == null) return `<td class="h is-empty"></td>`;
-    const r = target > 0 ? h / target : 0;
-    const lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
+    const J = _kpiJudge(h, target, isCur, proj), r = J.r, lv = J.lv;
     const str = lv === 'ok' ? 9 + Math.round(r * 11) : lv === 'warn' ? 20 : 24;
-    const pj = isCur && proj > 1 ? h * proj : null;
+    const pj = J.hasPj ? J.pj : null;
     return `<td class="h is-${lv} ${isCur ? 'is-cur' : ''} ${isSel ? 'is-sel' : ''}" onclick="_kpiPick(${i})" data-k="${ki}" data-i="${i}" style="background:color-mix(in srgb,var(--st-${lv}) ${str}%,transparent)">
       <b>${h.toFixed(1)}</b>${pj != null ? `<small class="${pj > target ? 't-crit' : ''}">見込 ${pj.toFixed(0)}</small>` : ''}</td>`;
   };
@@ -6801,26 +6809,26 @@ async function renderKpiDash(force) {
     else bd.innerHTML = `<div class="kpi-bd-grid">${(OTK ? [(() => {
       const all = _otByAuthor(d), auth = Object.keys(all).filter(a => all[a].ot > 0).sort((x, y) => all[y].ot - all[x].ot);   // 多い順（要因が上に来るように）
       const total = auth.reduce((t, a) => t + all[a].ot, 0), maxA = Math.max(0.01, ...auth.map(a => all[a].ot));
-      const r = OTK.target > 0 ? total / OTK.target : 0, lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
+      const J = _kpiJudge(total, OTK.target, si === curIdx, proj), lv = J.lv;
       const prevD = si > 0 ? data[si - 1] : ctx.prev0, prevAll = prevD ? _otByAuthor(prevD) : null;
-      const over = Math.max(0, total - OTK.target), avg = auth.length ? total / auth.length : 0;
+      const over = Math.max(0, J.pj - OTK.target), avg = auth.length ? total / auth.length : 0;
       const inc = prevAll ? auth.filter(a => (all[a].ot - ((prevAll[a] || {}).ot || 0)) > 0.05) : [];
       return `<div class="kpi-bd kpi-bd-ot is-${lv}">
-        <div class="kpi-bd-hd"><span class="kb-dot"></span><b>${escHtml(OTK.name)}</b><span class="kb-v"><em>${total.toFixed(1)}h</em>/ ${OTK.target}h${over > 0 ? `<span class="kb-over">+${over.toFixed(1)}h</span>` : ''}</span><span class="dx-tag is-${lv}">${lv === 'ok' ? '達成' : lv === 'warn' ? '超過' : '大幅超過'}</span></div>
+        <div class="kpi-bd-hd"><span class="kb-dot"></span><b>${escHtml(OTK.name)}</b><span class="kb-v"><em>${total.toFixed(1)}h</em>/ ${OTK.target}h${J.hasPj ? `<span class="kb-pj">見込 ${J.pj.toFixed(0)}h</span>` : ''}${over > 0 ? `<span class="kb-over">+${over.toFixed(1)}h</span>` : ''}</span><span class="dx-tag is-${lv}">${J.label}</span></div>
         ${auth.length ? `<div class="kpi-bd-sec">担当者（多い順）・平均 ${avg.toFixed(1)}h${prevAll ? '・前期比' : ''}</div>
         <div class="dx-hbars">${auth.map(a => { const v = all[a].ot, pv = prevAll ? ((prevAll[a] || {}).ot || 0) : null, dv = pv == null ? null : v - pv, hi = v > avg + 0.05;
           return `<div class="dx-hbar"><span class="lb"><i class="dx-sw" style="background:${authColor(a)}"></i>${escHtml(a)}${hi ? '<span class="dx-tag is-crit" title="チーム平均より多い">平均超</span>' : ''}</span><div class="tr"><i style="background:${authColor(a)}" data-w="${(v / maxA * 100).toFixed(1)}"></i></div><span class="vv">${v.toFixed(1)}h<small>${total ? Math.round(v / total * 100) : 0}%</small>${dv == null ? '' : `<small class="${dv > 0.05 ? 't-crit' : dv < -0.05 ? 't-ok' : 't-muted'}" title="前期 ${pv.toFixed(1)}h">${dv > 0 ? '+' : ''}${dv.toFixed(1)}</small>`}</span></div>`; }).join('')}</div>
         ${inc.length ? `<p class="dx-note">前期より増えた人: ${inc.map(a => `${escHtml(a)} +${(all[a].ot - ((prevAll[a] || {}).ot || 0)).toFixed(1)}h`).join('、')}</p>` : ''}` : '<p class="dx-empty">この月期の残業はありません</p>'}
       </div>`; })()] : []).join('')}${HK.map((k, ki) => {
       const b = _kpiBreakdown(d, k.subs);
-      const r = k.target > 0 ? b.total / k.target : 0, lv = !k.subs.length ? '' : r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
+      const J = _kpiJudge(b.total, k.target, si === curIdx, proj), lv = !k.subs.length ? '' : J.lv;
       const subs = Object.keys(b.bySub).filter(cd => b.bySub[cd] > 0.005).sort((x, y) => b.bySub[y] - b.bySub[x]);
       const auth = Object.keys(b.byAuthor).filter(a => b.byAuthor[a] > 0.005).sort((x, y) => b.byAuthor[y] - b.byAuthor[x]);
       const maxS = Math.max(0.01, ...subs.map(cd => b.bySub[cd])), maxA = Math.max(0.01, ...auth.map(a => b.byAuthor[a]));
       const bar = (label, h, max, color) => `<div class="dx-hbar"><span class="lb">${label}</span><div class="tr"><i style="background:${color}" data-w="${(h / max * 100).toFixed(1)}"></i></div><span class="vv">${h.toFixed(1)}h<small>${b.total ? Math.round(h / b.total * 100) : 0}%</small></span></div>`;
       const empty = k.subs.length && !subs.length && !auth.length;
       return `<div class="kpi-bd ${lv ? 'is-' + lv : ''} ${empty || !k.subs.length ? 'is-quiet' : ''}">
-        <div class="kpi-bd-hd"><span class="kb-dot"></span><b>${escHtml(k.name)}</b><span class="kb-v">${k.subs.length ? `<em>${b.total.toFixed(1)}h</em>/ ${k.target}h` : `/ ${k.target}h`}</span>${lv ? `<span class="dx-tag is-${lv}">${lv === 'ok' ? '達成' : lv === 'warn' ? '超過' : '大幅超過'}</span>` : '<span class="dx-tag is-warn">未設定</span>'}</div>
+        <div class="kpi-bd-hd"><span class="kb-dot"></span><b>${escHtml(k.name)}</b><span class="kb-v">${k.subs.length ? `<em>${b.total.toFixed(1)}h</em>/ ${k.target}h${J.hasPj ? `<span class="kb-pj">見込 ${J.pj.toFixed(0)}h</span>` : ''}` : `/ ${k.target}h`}</span>${lv ? `<span class="dx-tag is-${lv}">${J.label}</span>` : '<span class="dx-tag is-warn">未設定</span>'}</div>
         ${!k.subs.length ? '<p class="dx-empty">管理タブ「KPI」で中分類を紐づけてください</p>' : empty ? '<p class="dx-empty">この月期は該当の作業がありません</p>' :
         `<div class="kpi-bd-sec">中分類</div><div class="dx-hbars">${subs.map(cd => { const sb = SUB_MAP[cd] || {}; return bar(escHtml(sb.label || cd), b.bySub[cd], maxS, 'var(--k)'); }).join('')}</div>
         <div class="kpi-bd-sec">担当者</div><div class="dx-hbars">${auth.map(a => bar(`<i class="dx-sw" style="background:${authColor(a)}"></i>${escHtml(a)}`, b.byAuthor[a], maxA, authColor(a))).join('')}</div>`}
@@ -6854,7 +6862,7 @@ function _kpiTipShow(td) {
   const b = _kpiBreakdown(d, k.subs);
   const auth = Object.keys(b.byAuthor).filter(a => b.byAuthor[a] > 0.005).sort((x, y) => b.byAuthor[y] - b.byAuthor[x]);
   const max = Math.max(0.01, ...auth.map(a => b.byAuthor[a]));
-  const r = k.target > 0 ? b.total / k.target : 0, lv = r <= 1 ? 'ok' : r <= 1.2 ? 'warn' : 'crit';
+  const J = _kpiJudge(b.total, k.target, i === ctx.curIdx, ctx.proj || 1), lv = J.lv, r = J.rAct;
   const subs = Object.keys(b.bySub).filter(cd => b.bySub[cd] > 0.005).sort((x, y) => b.bySub[y] - b.bySub[x]);
   const maxS = Math.max(0.01, ...subs.map(cd => b.bySub[cd])), multi = subs.length > 1;
   const subName = cd => (SUB_MAP[cd] || {}).label || cd;
@@ -6863,6 +6871,7 @@ function _kpiTipShow(td) {
   const tip = _kpiTipEl();
   tip.innerHTML = `<div class="kt-top"><b>${escHtml(k.name)}</b><span>${ctx.periods[i].month}月期 ${escHtml(ctx.ranges[i].range)}</span></div>
     <div class="kt-tot"><em class="t-${lv}">${b.total.toFixed(1)}h</em><span>／ 目標 ${k.target}h（${Math.round(r * 100)}%）</span></div>
+    ${J.hasPj ? `<div class="kt-pj">月末見込 <b class="t-${lv}">${J.pj.toFixed(1)}h</b>（${Math.round(J.r * 100)}%）・${J.label}</div>` : ''}
     ${!auth.length ? '<div class="kt-none">この月期は該当の作業がありません</div>' : `
     <div class="kt-sec">日報のタスク（中分類）</div>
     <div class="kt-rows">${subs.map(cd => row(escHtml(subName(cd)), b.bySub[cd], b.bySub[cd] / maxS * 100, `var(--st-${lv})`, `${cd} ${subName(cd)}`)).join('')}</div>
