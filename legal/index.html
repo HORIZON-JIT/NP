@@ -2082,9 +2082,9 @@ const DEPARTMENT_CONFIG = (function(){
       backupSheetUrl: 'https://docs.google.com/spreadsheets/d/1LlQVpi8O7RMmugpVkOlXckiNGrSzE2isS73drWsgxYk/edit'
     },
     // 勤務ルール（時刻は "HH:MM"）
-    // KPI（月次工数目標）だけの締めルール: midMonthFrom 以降の月期は「前月16日〜当月15日」、それより前は「1日〜月末」（暦月）。
-    // 日報アプリ本体の月期（ダッシュボード・入力）は常に15日締め
-    kpiPeriodRule: { midMonthFrom: { year: 2026, month: 10 } },
+    // KPI（月次工数目標）だけの締めルール: monthEnd=true で全月期「1日〜月末」（暦月）。日報全体の15日締めとは別。
+    // （互換: midMonthFrom を指定すると、その月期以降だけ15日締めになる）
+    kpiPeriodRule: { monthEnd: true },
     rules: {
       workStart:      '08:30',  // 始業
       normalEnd:      '17:20',  // 定時（夕方休憩前）
@@ -2803,8 +2803,8 @@ function periodOfDate(dateStr) {
 function getCurrentPeriodMonth() { return periodOfDate(todayStr()); }
 // KPI（月次工数目標）専用: kpiPeriodRule.midMonthFrom より前の月期は暦月（1日〜月末）
 function kpiPeriodDates(year, month) {
-  const f = (DEPARTMENT_CONFIG.kpiPeriodRule || {}).midMonthFrom;
-  if (f && year * 100 + month < f.year * 100 + f.month) {
+  const rule = DEPARTMENT_CONFIG.kpiPeriodRule || {}, f = rule.midMonthFrom;
+  if (rule.monthEnd || (f && year * 100 + month < f.year * 100 + f.month)) {
     const last = new Date(year, month, 0).getDate();
     return {startDate: `${year}-${pad(month)}-01`, endDate: `${year}-${pad(month)}-${pad(last)}`, label: `${year}年${month}月期`,
             range: `${year}/${pad(month)}/01 〜 ${year}/${pad(month)}/${pad(last)}`, calendar: true};
@@ -6728,7 +6728,7 @@ async function renderKpiDash(force) {
   const authColor = a => { const i = palAuthors.indexOf(a); return i < 0 ? '#8C8377' : AUTH_COLORS[i % AUTH_COLORS.length]; };
   const wd = curIdx >= 0 && data[curIdx] ? _kpiWorkdays(data[curIdx], ranges[curIdx].startDate, ranges[curIdx].endDate) : null;
   const proj = wd && wd.elapsed > 0 && wd.total > wd.elapsed ? wd.total / wd.elapsed : 1;
-  const calFirst = ranges.findIndex(r => !r.calendar);
+  const calFirst = ranges.findIndex(r => !r.calendar), calMixed = ranges.some(r => r.calendar) && calFirst >= 0;
   const calNote = ranges.some(r => r.calendar) ? (calFirst >= 0 ? `${periods[calFirst].month}月期から15日締め、それ以前は月末締め` : '全月期とも月末締め') : '15日締め';
 
   // ── タイル: 今期（当年度でなければ選択中の月期）──
@@ -6769,7 +6769,7 @@ async function renderKpiDash(force) {
       <b>${h.toFixed(1)}</b>${pj != null ? `<small class="${pj > target ? 't-crit' : ''}">見込 ${pj.toFixed(0)}</small>` : ''}</td>`;
   };
   if (el) el.innerHTML = `<table class="dx-table kpi-heat">
-    <thead><tr><th class="sticky">KPI</th><th class="num">目標</th>${periods.map((x, i) => `<th class="num ${i === curIdx ? 'is-cur' : ''} ${i === ctx.sel ? 'is-sel' : ''}" title="${ranges[i].range}" onclick="_kpiPick(${i})">${i === curIdx ? '<span class="kh-cur">今期</span>' : ''}${x.month}月期${ranges[i].calendar ? '<span class="kh-cal">月末締</span>' : ''}</th>`).join('')}<th class="num kh-stat" title="終わった月期の平均">平均</th><th class="num kh-stat" title="終わった月期の中央値">中央値</th><th class="num">達成月</th></tr></thead>
+    <thead><tr><th class="sticky">KPI</th><th class="num">目標</th>${periods.map((x, i) => `<th class="num ${i === curIdx ? 'is-cur' : ''} ${i === ctx.sel ? 'is-sel' : ''}" title="${ranges[i].range}" onclick="_kpiPick(${i})">${i === curIdx ? '<span class="kh-cur">今期</span>' : ''}${x.month}月期${calMixed && ranges[i].calendar ? '<span class="kh-cal">月末締</span>' : ''}</th>`).join('')}<th class="num kh-stat" title="終わった月期の平均">平均</th><th class="num kh-stat" title="終わった月期の中央値">中央値</th><th class="num">達成月</th></tr></thead>
     <tbody>${HK.map((k, ki) => {
       const v = vals[ki];
       const pastVals = v.filter((x, i) => x != null && i !== curIdx), past = pastVals.length, done = pastVals.filter(x => x <= k.target).length;
@@ -6794,7 +6794,7 @@ async function renderKpiDash(force) {
   const bd = document.getElementById('kpi-breakdown'), bt = document.getElementById('kpi-bd-title'), bs = document.getElementById('kpi-bd-sub');
   const si = ctx.sel;
   if (bt) bt.textContent = si >= 0 ? `内訳（${periods[si].month}月期）` : '内訳';
-  if (bs) bs.textContent = si >= 0 ? `${ranges[si].range}${ranges[si].calendar ? '（月末締め）' : ''}・KPI ごとの中分類別と担当者別の工数` : 'ヒートマップの月期をクリックで切替';
+  if (bs) bs.textContent = si >= 0 ? `${ranges[si].range}${calMixed && ranges[si].calendar ? '（月末締め）' : ''}・KPI ごとの中分類別と担当者別の工数` : 'ヒートマップの月期をクリックで切替';
   if (bd) {
     const d = si >= 0 ? data[si] : null;
     if (!d) bd.innerHTML = '<p class="dx-empty">この月期のデータがありません</p>';
@@ -6907,7 +6907,7 @@ function renderKpiOtBar(canvas, periods, ranges, vals, target, curIdx, proj, sta
       const x = PL + slot * (i + 0.5), v = vals[i];
       ctx.fillStyle = CHT_TEXT; ctx.font = (i === curIdx ? 'bold ' : '') + '13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
       ctx.fillText(`${p.month}月期`, x, PT + cH + 8);
-      if (ranges[i].calendar) { ctx.fillStyle = CHT_FAINT; ctx.font = '10px sans-serif'; ctx.fillText('月末締', x, PT + cH + 26); }
+      if (ranges[i].calendar && ranges.some(r => !r.calendar)) { ctx.fillStyle = CHT_FAINT; ctx.font = '10px sans-serif'; ctx.fillText('月末締', x, PT + cH + 26); }
       if (v == null) return;
       const h = v / maxV * cH * frac, over = v > target;
       // 担当者ごとの積み上げ（多い人が下）。外形を目標以下＝緑／超過＝赤の枠で示す
