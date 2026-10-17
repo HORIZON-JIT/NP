@@ -201,7 +201,7 @@ function systemPromptYearly_() {
     '- prevOt は前年度の同じ月期の全員の残業合計。prevPersonsOt は前年度の同じ経過月期までの担当別残業合計。',
     '- elapsed は経過した月期数、curIdx は進行中の月期の位置（-1 なら無し）。進行中の月期は途中の値。',
     '- 36協定の管理基準: 月 otMonthWarn h で警告、月 otMonthLimit h が上限、年 otYearLimit h が上限、月上限超えは年 otOverMonthsMax 回まで。',
-    '- 年間見込みは、終わった月期の平均×12 で考える。',
+    '- 年間見込みは summary.persons[担当].projYearOt を使う（締まった月期の累計＋平均×残り月期）。remainingMonths が0の年度は確定済みなので「見込み」を書かない。途中から記録のある担当を12か月に換算しない。',
     '',
     '【出力形式】',
     '- 次の形のJSONだけを出力する。前後に説明文やコードブロック記号を付けない。',
