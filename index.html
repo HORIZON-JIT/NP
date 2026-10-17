@@ -417,6 +417,8 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .ai-body p{margin:4px 0;}
 .ai-meta{margin-top:12px;font-size:11px;color:var(--g400);}
 .ai-meta .warn{color:var(--st-warn,#d97706);font-weight:700;}
+.ai-meta.ai-sched{margin-top:10px;padding-top:8px;border-top:1px dashed var(--g200,#e5e7eb);}
+.ai-meta.ai-sched b{color:var(--g500,#6b7280);}
 .ai-err{color:var(--danger);}
 .aiv-head{font-size:15px;font-weight:800;color:var(--g800);line-height:1.6;padding:12px 14px;border-radius:10px;background:var(--primary-lt);border:1px solid var(--g200);margin-bottom:12px;}
 .aiv-head .lbl{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--surface);background:var(--dx-accent,var(--primary));border-radius:4px;padding:1px 6px;margin-right:8px;vertical-align:2px;}
@@ -7623,7 +7625,7 @@ function _aiItems(items) {
 function renderAiCard(msg, isErr) {
   const st = _aiState, body = document.getElementById('ai-body'), btn = document.getElementById('ai-run-btn');
   if (!body || !st) return;
-  if (btn) { btn.disabled = !!st.busy; btn.textContent = st.busy ? '分析中…' : (st.stored ? '再分析' : '分析する'); }
+  if (btn) { btn.style.display = st.stored && !st.busy ? 'none' : ''; btn.disabled = !!st.busy; btn.textContent = st.busy ? '分析中…' : '分析する'; }
   const ready = st.ctx.fy != null;   // 前月期・年度累計の読込が終わったか
   const p = buildAiPayload();
   const V = p && Object.keys(p.cur).length ? _aiVisuals(p) : null;
@@ -7636,7 +7638,7 @@ function renderAiCard(msg, isErr) {
   let head;
   if (st.busy) head = `<div class="aiv-head busy"><span class="spin"></span>Claude が分析しています（20〜60秒ほどかかります）…</div>`;
   else if (rep && rep.headline) head = `<div class="aiv-head${ST ? ' st-' + ST[0] : ''}"><span class="lbl">AIの総括</span>${ST ? `<span class="stt ${ST[0]}">${ST[1]}</span>` : ''}<span class="txt">${escHtml(rep.headline)}</span></div>`;
-  else if (!s) head = `<div class="aiv-head muted">${msg ? `<span class="${isErr ? 'ai-err' : ''}">${escHtml(msg)}</span>` : 'この月期はまだ分析していません。「分析する」を押すと、下の図表に AI のコメントが加わります。'}</div>`;
+  else if (!s) head = `<div class="aiv-head muted">${msg ? `<span class="${isErr ? 'ai-err' : ''}">${escHtml(msg)}</span>` : 'この月期はまだ分析していません。自動更新を待つか、「分析する」を押すと、下の図表に AI のコメントが加わります。'}</div>`;
   else head = '';
 
   const notes = (rep && rep.notes) || {};
@@ -7660,10 +7662,21 @@ function renderAiCard(msg, isErr) {
   }
   if (s && !rep) html += `<div class="aiv-panel aiv-md">${_aiMd(s.text)}</div>`;   // 旧形式（文章のみ）の保存結果
   if (s) html += `<div class="ai-meta">${escHtml(_aiFmtAt(s.at))} 作成${s.model ? '（' + escHtml(s.model) + '）' : ''}` +
-    (stale ? '　<span class="warn">分析後に日報が更新されています。最新にするには「再分析」を押してください。</span>' : '') +
+    (stale ? '　<span class="warn">分析後に日報が更新されています。次回の自動更新で反映されます。</span>' : '') +
     (msg ? `　<span class="${isErr ? 'ai-err' : ''}">${escHtml(msg)}</span>` : '') +
     `<br>図表の数値は日報の集計から算出しています。コメントはAIによる自動分析のため、内容は図表と照らしてご確認ください。</div>`;
+  html += _aiSchedNote('monthly');
   body.innerHTML = html;
+}
+
+// AI分析の自動更新タイミング（GAS の autoDaily と合わせる）
+function _aiSchedNote(scope) {
+  const t = {
+    monthly: '当月期は平日の毎朝6時台に自動更新します。月期の締め（15日）後は、最初の平日の朝に締まった月期の最終分析を行います。',
+    kpi: '当年度のKPIは平日の毎朝6時台に自動更新します。',
+    yearly: '月期の締め（15日）後、最初の平日の朝6時台に月1回自動更新します。',
+  }[scope];
+  return `<div class="ai-meta ai-sched"><b>更新タイミング</b>　${t}日報に変更がない日は前回の分析をそのまま表示します（土日祝は更新しません）。</div>`;
 }
 
 // ── 通常の分析 ⇄ AI分析 の画面切替（月次・年次・KPI 共通。View Transitions で横にスライド） ──
@@ -7865,7 +7878,7 @@ function _aivActions(rep, title) {
 function aiScopeRender(scope, msg, isErr) {
   const st = _aiS[scope], body = document.getElementById('ai-body-' + scope), btn = document.getElementById('ai-run-btn-' + scope);
   if (!body || !st) return;
-  if (btn) { btn.disabled = !!st.busy || !!st.loading; btn.textContent = st.busy ? '分析中…' : (st.stored ? '再分析' : '分析する'); }
+  if (btn) { btn.style.display = st.stored && !st.busy ? 'none' : ''; btn.disabled = !!st.busy || !!st.loading; btn.textContent = st.busy ? '分析中…' : '分析する'; }
   let p = null; try { p = st.payloadFn && st.payloadFn(); } catch (e) { console.warn('[AI分析] 集計に失敗:', e); }
   const s = st.stored, rep = s ? _aiParse(s.text) : null, sec = (rep && rep.sections) || {};
   const stale = s && p && s.hash && _aiHash(JSON.stringify(p)) !== s.hash;
@@ -7873,7 +7886,7 @@ function aiScopeRender(scope, msg, isErr) {
   let head;
   if (st.busy) head = `<div class="aiv-head busy"><span class="spin"></span>Claude が分析しています（30〜90秒ほどかかります）…</div>`;
   else if (rep && rep.headline) head = `<div class="aiv-head${ST ? ' st-' + ST[0] : ''}"><span class="lbl">AIの総括</span>${ST ? `<span class="stt ${ST[0]}">${ST[1]}</span>` : ''}<span class="txt">${escHtml(rep.headline)}</span></div>`;
-  else if (!s) head = `<div class="aiv-head muted">${msg ? `<span class="${isErr ? 'ai-err' : ''}">${escHtml(msg)}</span>` : st.loading ? '読み込み中…' : 'まだ分析していません。「分析する」を押すと、下の図表に AI のコメントが加わります。'}</div>`;
+  else if (!s) head = `<div class="aiv-head muted">${msg ? `<span class="${isErr ? 'ai-err' : ''}">${escHtml(msg)}</span>` : st.loading ? '読み込み中…' : 'まだ分析していません。自動更新を待つか、「分析する」を押すと、下の図表に AI のコメントが加わります。'}</div>`;
   else head = '';
   let html = head;
   if (p) {
@@ -7892,9 +7905,10 @@ function aiScopeRender(scope, msg, isErr) {
   }
   if (s && !rep) html += `<div class="aiv-panel aiv-md">${_aiMd(s.text)}</div>`;
   if (s) html += `<div class="ai-meta">${escHtml(_aiFmtAt(s.at))} 作成${s.model ? '（' + escHtml(s.model) + '）' : ''}` +
-    (stale ? '　<span class="warn">分析後に日報が更新されています。最新にするには「再分析」を押してください。</span>' : '') +
+    (stale ? '　<span class="warn">分析後に日報が更新されています。次回の自動更新で反映されます。</span>' : '') +
     (msg ? `　<span class="${isErr ? 'ai-err' : ''}">${escHtml(msg)}</span>` : '') +
     `<br>図表の数値は日報の集計から算出しています。コメントはAIによる自動分析のため、内容は図表と照らしてご確認ください。</div>`;
+  html += _aiSchedNote(scope);
   body.innerHTML = html;
 }
 
