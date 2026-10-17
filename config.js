@@ -8,5 +8,5 @@ window.DEPARTMENT_CONFIG_OVERRIDE = {
   taskSheetGasUrl: 'https://script.google.com/a/macros/horizon.co.jp/s/AKfycbwxhtGBpHgb5Iz9FLydd5oxwtYgCQqMEbM_KudCxNTZAo61xL0SLJfokqDE-gW2Ze6w/exec',
   // 月次AI分析用GAS（gas/ai-monthly-analyzer.gs をデプロイしたもの）。生産管理課だけで使う。
   // URL を入れると月次ダッシュボードに「AI分析」カードが出る。空なら非表示。
-  aiAnalysisGasUrl: ''
+  aiAnalysisGasUrl: 'https://script.google.com/a/macros/horizon.co.jp/s/AKfycbx_vALcuIZVtAlN5oX4bFbBmcstz-M2HB45UXpSzUdRHPSBHRjeLCBshGbPZFchQcfj/exec'
 };
