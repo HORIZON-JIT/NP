@@ -89,6 +89,7 @@ function writeRec_(sk, rec) {
   for (var i = 0; i < rec.text.length; i += CH) parts.push(rec.text.slice(i, i + CH));
   if (parts.length > 8) throw new Error('分析結果が長すぎて保存できません');
   var head = {at: rec.at, model: rec.model, hash: rec.hash, parts: parts.length};
+  if (rec.by) head.by = rec.by;
   var kv = {}; kv[sk] = JSON.stringify(head);
   parts.forEach(function (t, k) { kv[sk + '#' + (k + 1)] = t; });
   props.setProperties(kv);
@@ -300,4 +301,274 @@ function clearStoredAnalyses() {
   var all = props.getProperties(), n = 0;
   Object.keys(all).forEach(function (k) { if (k.indexOf(STORE_PREFIX) === 0) { props.deleteProperty(k); n++; } });
   Logger.log(n + '件削除しました');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  自動分析（時間主導トリガーで毎朝実行）
+//  - 平日（土日・祝日を除く）: 月次（当月期）と KPI（当年度）
+//  - 月期の締め（15日）後の最初の平日: 締まった月期の月次と、その年度の年次も
+//  日報データは Firestore（nippou-f191c）をこのスクリプトの実行ユーザーの権限で直接読む。
+//  集計は日報アプリの公開コード（index.html / config.js）から同じ関数を取り出して実行するため、
+//  画面に出る図表と同じ数値・同じハッシュになる（画面で「日報が更新されています」と誤表示されない）。
+//
+//  初回だけ: エディタで setupAutoTrigger を実行（毎朝6時台に autoDaily を実行するトリガーを作成）。
+//  動作確認: autoDailyDryRun（Claude は呼ばず、集計と判定だけログに出す）/ autoDailyForce（今すぐ分析）。
+// ═══════════════════════════════════════════════════════════════
+var APP_SRC_BASE = 'https://raw.githubusercontent.com/HORIZON-JIT/NP/main/';
+var FIRESTORE_PROJECT = 'nippou-f191c';
+var FIRESTORE_COLLECTION = 'dailyReports';
+var AUTO_HOUR = 6;
+
+// 日報アプリの index.html から取り出す宣言（関数・定数）
+var APP_CORE_NAMES = [
+  'pad', '_hmToMin', 'DEPARTMENT_CONFIG', 'JP_HOLIDAYS', 'todayStr', 'periodOfDate', 'kpiPeriodDates', 'getPeriodDates',
+  'isHoliday', 'getLunchBreak', '_calcFromLeaveCache', 'calcFromLeave', 'normalizeRows', 'eachDateInRange', '_authorsLast',
+  '_otByAuthor', '_scaledRows', '_effStats', '_kpiHoursOf', '_kpiOtOf', '_kpiBreakdown', '_kpiWorkdays', '_kpiJudge',
+  '_normKpis', '_kpiHoursItems', '_kpiOtItem', 'getCurrentFiscalYear', 'getFiscalPeriods', 'fiscalKi', '_fiscalYearOf',
+  '_aiR', '_aiHash', '_aiSubs', 'buildAiPayload', '_aiYearPayload', '_aiKpiPayload'
+];
+
+// ─── ソースから宣言を1つ取り出す（文字列・テンプレート・コメント・正規表現を読み飛ばして括弧を数える） ───
+function extractDecl_(src, name) {
+  var esc = name.replace(/[$]/g, '\\$');
+  var re = new RegExp('(^|\\n)((?:async\\s+)?function\\s+' + esc + '\\s*\\(|(?:const|let|var)\\s+' + esc + '\\s*=)');
+  var m = re.exec(src);
+  if (!m) throw new Error('日報アプリのコードに ' + name + ' が見つかりません');
+  var start = m.index + m[1].length, isFn = /function/.test(m[2]);
+  var i = start, depth = 0, opened = false, tpl = [], prev = '';
+  while (i < src.length) {
+    var c = src[i], n2 = src[i + 1];
+    if (c === '/' && n2 === '/') { i = src.indexOf('\n', i); if (i < 0) break; continue; }
+    if (c === '/' && n2 === '*') { i = src.indexOf('*/', i + 2) + 2; continue; }
+    if (c === '"' || c === "'") { var q = c; i++; while (i < src.length && src[i] !== q) { if (src[i] === '\\') i++; i++; } i++; prev = q; continue; }
+    if (c === '`' || (c === '}' && tpl.length && tpl[tpl.length - 1] === depth)) {
+      if (c === '}') { tpl.pop(); depth--; }
+      i++;
+      while (i < src.length && src[i] !== '`') {
+        if (src[i] === '\\') { i += 2; continue; }
+        if (src[i] === '$' && src[i + 1] === '{') { depth++; tpl.push(depth); i += 2; break; }
+        i++;
+      }
+      if (src[i] === '`') i++;
+      prev = '`'; continue;
+    }
+    if (c === '/' && /[(,=:\[!&|?{};+\-*%<>~^]|^$/.test(prev)) {   // 正規表現リテラル
+      i++; var cls = false;
+      while (i < src.length) { var r = src[i]; if (r === '\\') { i += 2; continue; } if (r === '[') cls = true; else if (r === ']') cls = false; else if (r === '/' && !cls) break; i++; }
+      i++; while (/[a-z]/i.test(src[i])) i++;
+      prev = '/'; continue;
+    }
+    if (c === '(' || c === '[' || c === '{') { depth++; opened = true; }
+    else if (c === ')' || c === ']' || c === '}') {
+      depth--;
+      if (isFn && c === '}' && depth === 0 && opened) return src.slice(start, i + 1);
+    } else if (!isFn && c === ';' && depth === 0) return src.slice(start, i + 1);
+    if (!/\s/.test(c)) prev = c;
+    i++;
+  }
+  throw new Error(name + ' の終わりを見つけられませんでした');
+}
+
+// ─── 日報アプリの集計関数を読み込む ───
+function loadAppCore_() {
+  var html = UrlFetchApp.fetch(APP_SRC_BASE + 'index.html?t=' + Date.now()).getContentText();
+  var cfg = UrlFetchApp.fetch(APP_SRC_BASE + 'config.js?t=' + Date.now()).getContentText();
+  var decls = APP_CORE_NAMES.map(function (n) { return extractDecl_(html, n); });
+  var src = [
+    'var window = {}, document = undefined, localStorage = undefined;',
+    cfg,
+    'var SUB_MAP = {}, CATS = [], CAT_LABEL = {}, CAT_COLOR = {}, KPIS = [], _kpiCtx = null, _aiState = null, _entryCtx = null, currentDate = "";',
+    decls.join('\n\n'),
+    'return {',
+    '  set: function (k, v) { switch (k) { case "CATS": CATS = v; break; case "KPIS": KPIS = v; break; case "_kpiCtx": _kpiCtx = v; break; case "_aiState": _aiState = v; break; case "_entryCtx": _entryCtx = v; break; case "currentDate": currentDate = v; break; } },',
+    '  get KPIS() { return KPIS; }, get CATS() { return CATS; },',
+    '  SUB_MAP: SUB_MAP, CAT_LABEL: CAT_LABEL, CAT_COLOR: CAT_COLOR, DEPARTMENT_CONFIG: DEPARTMENT_CONFIG,',
+    '  ' + APP_CORE_NAMES.filter(function (n) { return n !== 'DEPARTMENT_CONFIG'; }).map(function (n) { return n + ': ' + n; }).join(', '),
+    '};'
+  ].join('\n');
+  return new Function(src)();
+}
+
+// ─── Firestore（REST）───
+function fsValue_(v) {
+  if (!v) return null;
+  if ('stringValue' in v) return v.stringValue;
+  if ('integerValue' in v) return Number(v.integerValue);
+  if ('doubleValue' in v) return Number(v.doubleValue);
+  if ('booleanValue' in v) return v.booleanValue;
+  if ('nullValue' in v) return null;
+  if ('timestampValue' in v) return v.timestampValue;
+  if ('arrayValue' in v) return (v.arrayValue.values || []).map(fsValue_);
+  if ('mapValue' in v) { var o = {}, f = v.mapValue.fields || {}; Object.keys(f).forEach(function (k) { o[k] = fsValue_(f[k]); }); return o; }
+  return null;
+}
+function fsDoc_(doc) { var o = {}, f = (doc && doc.fields) || {}; Object.keys(f).forEach(function (k) { o[k] = fsValue_(f[k]); }); return o; }
+function fsBase_() { return 'https://firestore.googleapis.com/v1/projects/' + FIRESTORE_PROJECT + '/databases/(default)/documents'; }
+function fsFetch_(url, payload) {
+  var opt = {headers: {Authorization: 'Bearer ' + ScriptApp.getOAuthToken()}, muteHttpExceptions: true};
+  if (payload) { opt.method = 'post'; opt.contentType = 'application/json'; opt.payload = JSON.stringify(payload); }
+  var res = UrlFetchApp.fetch(url, opt), code = res.getResponseCode();
+  if (code !== 200) throw new Error('Firestore 読み取りエラー（' + code + '）: ' + res.getContentText().slice(0, 300));
+  return JSON.parse(res.getContentText());
+}
+function fsReportsBetween_(startDate, endDate) {
+  var out = fsFetch_(fsBase_() + ':runQuery', {structuredQuery: {
+    from: [{collectionId: FIRESTORE_COLLECTION}],
+    where: {compositeFilter: {op: 'AND', filters: [
+      {fieldFilter: {field: {fieldPath: 'date'}, op: 'GREATER_THAN_OR_EQUAL', value: {stringValue: startDate}}},
+      {fieldFilter: {field: {fieldPath: 'date'}, op: 'LESS_THAN_OR_EQUAL', value: {stringValue: endDate}}}
+    ]}}
+  }});
+  return out.filter(function (r) { return r.document; }).map(function (r) { return fsDoc_(r.document); });
+}
+function fsMaster_(deptId) {
+  try { return fsDoc_(fsFetch_(fsBase_() + '/' + FIRESTORE_COLLECTION + '/' + deptId + '_master_categories')); }
+  catch (e) { Logger.log('マスタを読めませんでした（既定値を使用）: ' + e.message); return {}; }
+}
+
+// 日報アプリの loadRangeDataFirebase と同じ形に集計: {担当: [{cdSub, hoursNormal, hoursOT}], _leaveMap: {担当: {日付: 退勤}}}
+function rangeData_(core, docs, startDate, endDate) {
+  var tmp = {}, leaveMap = {};
+  docs.forEach(function (d) {
+    if (!d.author || !d.date || d.date < startDate || d.date > endDate) return;
+    core.normalizeRows(d.rows || []).forEach(function (r) {
+      var a = tmp[d.author] || (tmp[d.author] = {});
+      var x = a[r.cdSub] || (a[r.cdSub] = {cdSub: r.cdSub, hoursNormal: 0, hoursOT: 0});
+      x.hoursNormal += r.hoursNormal || 0; x.hoursOT += r.hoursOT || 0;
+    });
+    if (d.leaveTime) { (leaveMap[d.author] = leaveMap[d.author] || {})[d.date] = d.leaveTime; }
+  });
+  var result = {_leaveMap: leaveMap};
+  Object.keys(tmp).forEach(function (a) { result[a] = Object.keys(tmp[a]).map(function (k) { return tmp[a][k]; }); });
+  return result;
+}
+
+// 項目・KPI マスタを日報アプリと同じように反映
+function applyMaster_(core, master) {
+  var cats = Array.isArray(master.cats) && master.cats.length ? master.cats : core.DEPARTMENT_CONFIG.defaultCats;
+  core.set('CATS', cats);
+  Object.keys(core.SUB_MAP).forEach(function (k) { delete core.SUB_MAP[k]; });
+  cats.forEach(function (c) {
+    core.CAT_COLOR[c.cd] = c.color || '#6b7280'; core.CAT_LABEL[c.cd] = c.label || c.cd;
+    (c.subs || []).forEach(function (s) {
+      var o = {}; Object.keys(s).forEach(function (k) { o[k] = s[k]; });
+      o.mainCd = c.cd; o.mainLabel = c.label; o.color = c.color; o.mainActive = c.active !== false; o.active = s.active !== false;
+      core.SUB_MAP[s.cd] = o;
+    });
+  });
+  core.set('KPIS', core._normKpis(Array.isArray(master.kpis) ? master.kpis : null));
+}
+
+// 日報アプリの「入力状況」と同じ判定で、未入力日数と稼働日を出す
+function entryCtx_(core, key, leaveMap, startDate, endDate) {
+  var list = (core.DEPARTMENT_CONFIG.defaultAuthors || []).filter(function (a) { return a && a !== 'ヘルプ'; });
+  Object.keys(leaveMap || {}).forEach(function (a) { if (a !== 'ヘルプ' && list.indexOf(a) < 0) list.push(a); });
+  var authors = core._authorsLast(list), today = core.todayStr();
+  var anyEntry = function (d) { return authors.some(function (a) { return leaveMap[a] && leaveMap[a][d]; }); };
+  var dayInfo = core.eachDateInRange(startDate, endDate).map(function (d) {
+    var dow = new Date(d + 'T00:00:00').getDay(), weekend = dow === 0 || dow === 6, future = d > today;
+    var holiday = !weekend && !future && d < today && !anyEntry(d);
+    return {d: d, weekend: weekend, future: future, off: weekend || holiday};
+  });
+  var missing = {};
+  authors.forEach(function (a) {
+    var miss = 0;
+    dayInfo.forEach(function (x) { var t = leaveMap[a] && leaveMap[a][x.d]; if (!t && !x.future && !x.off) miss++; });
+    missing[a] = miss;
+  });
+  var elapsed = dayInfo.filter(function (x) { return !x.off && !x.future && (x.d < today || anyEntry(x.d)); }).length;
+  var total = elapsed + dayInfo.filter(function (x) { return !x.weekend && (x.future || (x.d === today && !anyEntry(x.d))); }).length;
+  return {key: key, missing: missing, workElapsed: elapsed, workTotal: total, inProgress: startDate <= today && today <= endDate};
+}
+
+// ─── 各分析の送るデータ（画面の buildAiPayload / _aiKpiPayload / _aiYearPayload と同じ関数で作る） ───
+function monthlyPayload_(core, docs, period) {
+  var pd = core.getPeriodDates(period.year, period.month), key = pd.startDate + '_' + pd.endDate;
+  var cur = rangeData_(core, docs, pd.startDate, pd.endDate);
+  if (!Object.keys(cur._leaveMap).length) return null;
+  var prevP = period.month === 1 ? {year: period.year - 1, month: 12} : {year: period.year, month: period.month - 1};
+  var pp = core.getPeriodDates(prevP.year, prevP.month), prev = rangeData_(core, docs, pp.startDate, pp.endDate);
+  var fyPeriods = core.getFiscalPeriods(core._fiscalYearOf(period));
+  var fyIdx = fyPeriods.findIndex(function (x) { return x.year === period.year && x.month === period.month; });
+  var before = fyPeriods.slice(0, Math.max(0, fyIdx)).map(function (x) { var r = core.getPeriodDates(x.year, x.month); return rangeData_(core, docs, r.startDate, r.endDate); });
+  var ctx = {startDate: pd.startDate, endDate: pd.endDate, period: period, cur: core._otByAuthor(cur), curRaw: cur,
+    prev: core._otByAuthor(prev), prevRaw: prev, fy: before.map(core._otByAuthor).concat([core._otByAuthor(cur)])};
+  core.set('_aiState', {key: key, label: pd.label, ctx: ctx});
+  core.set('_entryCtx', entryCtx_(core, key, cur._leaveMap, pd.startDate, pd.endDate));
+  return {key: key, payload: core.buildAiPayload()};
+}
+function kpiPayload_(core, docs, fy) {
+  if (!core.KPIS.length) return null;
+  var periods = core.getFiscalPeriods(fy), ranges = periods.map(function (x) { return core.kpiPeriodDates(x.year, x.month); });
+  var today = core.todayStr();
+  var curIdx = ranges.findIndex(function (r) { return r.startDate <= today && today <= r.endDate; });
+  var lastIdx = -1; ranges.forEach(function (r, i) { if (r.startDate <= today) lastIdx = i; });
+  var data = periods.map(function (x, i) { return i <= lastIdx ? rangeData_(core, docs, ranges[i].startDate, ranges[i].endDate) : null; });
+  var wd = curIdx >= 0 && data[curIdx] ? core._kpiWorkdays(data[curIdx], ranges[curIdx].startDate, ranges[curIdx].endDate) : null;
+  var proj = wd && wd.elapsed > 0 && wd.total > wd.elapsed ? wd.total / wd.elapsed : 1;
+  core.set('_kpiCtx', {fy: fy, periods: periods, ranges: ranges, curIdx: curIdx, lastIdx: lastIdx, data: data, proj: proj});
+  var p = core._aiKpiPayload();
+  return p ? {key: 'kpi_' + fy, payload: p} : null;
+}
+function yearlyPayload_(core, docs, fy) {
+  var load = function (f) { return core.getFiscalPeriods(f).map(function (x) { var r = core.getPeriodDates(x.year, x.month); return rangeData_(core, docs, r.startDate, r.endDate); }); };
+  var p = core._aiYearPayload({fy: fy, periods: core.getFiscalPeriods(fy), data: load(fy), prev: load(fy - 1)});
+  return p ? {key: 'fy_' + fy, payload: p} : null;
+}
+
+// ─── 1件分析して保存（集計が前回と同じなら Claude を呼ばない） ───
+function autoAnalyzeOne_(core, job, dry) {
+  if (!job || !job.payload) return 'データなし';
+  var hash = core._aiHash(JSON.stringify(job.payload)), sk = storeKey_(job.key), prev = readRec_(sk);
+  if (prev && prev.hash === hash) return '変更なし（前回の分析を継続）';
+  if (dry) return '分析対象（dry run のため未実行）hash=' + hash;
+  var text = callClaude_(job.payload);
+  writeRec_(sk, {text: text, at: new Date().toISOString(), model: model_(), hash: hash, by: 'auto'});
+  return '分析して保存しました';
+}
+
+function autoDailyRun_(force, dry) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) { Logger.log('他の処理が実行中のためスキップ'); return; }
+  try {
+    var core = loadAppCore_();
+    var today = core.todayStr(); core.set('currentDate', today);
+    if (!force && core.isHoliday(today)) { Logger.log(today + ' は土日・祝日のためスキップ'); return; }
+    var y = Number(today.slice(0, 4)), mo = Number(today.slice(5, 7)), dd = Number(today.slice(8, 10));
+    // 締め（15日）後の最初の平日か: 16日〜昨日までに平日が無い
+    var closeDay = false;
+    if (dd >= 16) {
+      closeDay = true;
+      for (var d = 16; d < dd; d++) { if (!core.isHoliday(y + '-' + core.pad(mo) + '-' + core.pad(d))) { closeDay = false; break; } }
+    }
+    applyMaster_(core, fsMaster_(core.DEPARTMENT_CONFIG.deptId));
+    var curP = core.periodOfDate(today), closedP = {year: y, month: mo};
+    var fyNow = core.getCurrentFiscalYear(), fyClosed = core._fiscalYearOf(closedP);
+    // 読む範囲: 前年度の期初（年次の前年比用）〜今日
+    var fromFy = Math.min(fyNow, fyClosed) - (closeDay ? 1 : 0);
+    var from = core.getPeriodDates(fromFy, 10).startDate;
+    var kpiFrom = core.kpiPeriodDates(fyNow, 10).startDate;
+    if (kpiFrom < from) from = kpiFrom;
+    var docs = fsReportsBetween_(from, today);
+    Logger.log('日報 ' + docs.length + '件を読み込み（' + from + '〜' + today + '）');
+    var jobs = [['月次 ' + curP.year + '年' + curP.month + '月期', function () { return monthlyPayload_(core, docs, curP); }],
+                ['KPI ' + (fyNow + 1) + '年度', function () { return kpiPayload_(core, docs, fyNow); }]];
+    if (closeDay) {
+      jobs.push(['月次（締め） ' + closedP.year + '年' + closedP.month + '月期', function () { return monthlyPayload_(core, docs, closedP); }]);
+      jobs.push(['年次 ' + (fyClosed + 1) + '年度', function () { return yearlyPayload_(core, docs, fyClosed); }]);
+    }
+    jobs.forEach(function (j) {
+      try { Logger.log(j[0] + ': ' + autoAnalyzeOne_(core, j[1](), dry)); }
+      catch (e) { Logger.log(j[0] + ': 失敗 ' + (e && e.message || e)); }
+    });
+  } finally { lock.releaseLock(); }
+}
+function autoDaily() { autoDailyRun_(false, false); }       // トリガーから呼ばれる
+function autoDailyForce() { autoDailyRun_(true, false); }   // 手動: 今すぐ分析（集計が変わったものだけ）
+function autoDailyDryRun() { autoDailyRun_(true, true); }   // 手動: 確認だけ（Claude は呼ばない）
+
+function setupAutoTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'autoDaily') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('autoDaily').timeBased().atHour(AUTO_HOUR).everyDays(1).inTimezone('Asia/Tokyo').create();
+  Logger.log('毎朝' + AUTO_HOUR + '時台に autoDaily を実行するトリガーを作成しました');
 }
