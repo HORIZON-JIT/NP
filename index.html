@@ -478,6 +478,49 @@ em.warn{background:var(--st-warn-bg);color:var(--st-warn-ink);} em.crit{backgrou
 .aiv-actions li::before{content:counter(aia);flex:none;width:20px;height:20px;border-radius:50%;background:var(--dx-accent,var(--primary));color:var(--surface);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px;}
 .aiv-actions li span{flex:1;} .aiv-actions li em{flex:none;font-style:normal;font-size:10.5px;font-weight:700;color:var(--g500);background:var(--g100);border-radius:10px;padding:1px 8px;margin-top:2px;}
 .aiv-md{margin-bottom:12px;}
+/* ── 月次: 通常の分析 ⇄ AI分析 の画面切替 ── */
+#mv-stage{position:relative;view-transition-name:mv-stage;}
+.mv-off{position:absolute!important;left:0;right:0;top:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none;}
+.btn-ai-view{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:6px;border:none;border-radius:999px;padding:6px 15px 6px 12px;font-size:12.5px;font-weight:800;font-family:inherit;cursor:pointer;color:#fff;letter-spacing:.02em;
+  background:linear-gradient(135deg,#6d4fd8 0%,#2f6fe0 55%,#16a3b8 100%);box-shadow:0 4px 14px -4px rgba(63,90,220,.55),inset 0 0 0 1px rgba(255,255,255,.18);transition:transform .18s,box-shadow .18s;}
+.btn-ai-view svg{width:15px;height:15px;fill:currentColor;flex:none;}
+.btn-ai-view::after{content:'';position:absolute;top:0;bottom:0;left:-60%;width:45%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.45),transparent);transform:skewX(-18deg);animation:aiShine 3.6s ease-in-out infinite;}
+.btn-ai-view:hover{transform:translateY(-1px);box-shadow:0 8px 20px -6px rgba(63,90,220,.6),inset 0 0 0 1px rgba(255,255,255,.25);}
+.btn-ai-view:active{transform:translateY(0) scale(.98);}
+.btn-ai-view.on{background:var(--surface);color:var(--g700);box-shadow:inset 0 0 0 1.5px var(--g200);}
+.btn-ai-view.on::after{display:none;}
+.btn-ai-view.on svg{display:none;}
+@keyframes aiShine{0%,62%{left:-60%}100%{left:130%}}
+#ai-card{border:none;background:linear-gradient(var(--surface),var(--surface)) padding-box,linear-gradient(135deg,#6d4fd8,#2f6fe0 55%,#16a3b8) border-box;border:1.5px solid transparent;}
+#ai-card .card-hd h2{background:linear-gradient(135deg,#6d4fd8,#2f6fe0 55%,#16a3b8);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:15px;}
+/* ページ切替（View Transitions） */
+::view-transition-old(root),::view-transition-new(root){animation-duration:.2s;}
+::view-transition-group(mv-stage){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,.8,.2,1);}
+::view-transition-old(mv-stage),::view-transition-new(mv-stage){height:auto;object-fit:none;object-position:50% 0;}
+::view-transition-old(mv-stage){animation:mvOutL .34s cubic-bezier(.55,0,.75,.2) both;}
+::view-transition-new(mv-stage){animation:mvInR .55s cubic-bezier(.16,.84,.3,1) .08s both;}
+html[data-mv-dir="back"]::view-transition-old(mv-stage){animation-name:mvOutR;}
+html[data-mv-dir="back"]::view-transition-new(mv-stage){animation-name:mvInL;}
+@keyframes mvOutL{to{opacity:0;transform:translateX(-6%) scale(.96);filter:blur(4px);}}
+@keyframes mvOutR{to{opacity:0;transform:translateX(6%) scale(.96);filter:blur(4px);}}
+@keyframes mvInR{from{opacity:0;transform:translateX(8%) scale(.98);filter:blur(6px);}}
+@keyframes mvInL{from{opacity:0;transform:translateX(-8%) scale(.98);filter:blur(6px);}}
+/* 切替後の順番に浮かび上がる演出 */
+.mv-enter .mv-i{animation:mvUp .55s cubic-bezier(.16,.84,.3,1) both;animation-delay:calc(var(--i,0) * 55ms + 120ms);}
+.mv-enter .aiv-row .bar,.mv-enter .aiv-drow .bar{animation:mvGrow .8s cubic-bezier(.16,.84,.3,1) both;animation-delay:calc(var(--i,0) * 55ms + 260ms);}
+.mv-enter .aiv-drow .neg .bar{transform-origin:right;}
+.mv-enter .aiv-stk .seg span{animation:mvGrow .7s cubic-bezier(.16,.84,.3,1) both .3s;}
+.mv-enter .aiv-heat td{animation:mvFade .5s ease both;animation-delay:calc(var(--i,0) * 55ms + 200ms);}
+@keyframes mvUp{from{opacity:0;transform:translateY(14px);}}
+@keyframes mvGrow{from{transform:scaleX(0);}}
+@keyframes mvFade{from{opacity:0;}}
+.aiv-row .bar,.aiv-drow .pos .bar,.aiv-stk .seg span{transform-origin:left;}
+@media (prefers-reduced-motion:reduce){
+  ::view-transition-group(mv-stage),::view-transition-old(mv-stage),::view-transition-new(mv-stage){animation:none!important;}
+  .mv-enter *{animation:none!important;}
+  .btn-ai-view::after{display:none;}
+}
+@media print{ .mv-off{display:none!important;} }
 .aiv-full{margin-bottom:12px;}
 .aiv-head{display:flex;align-items:flex-start;gap:8px;border-left:5px solid var(--dx-accent,var(--primary));}
 .aiv-head .lbl{flex:none;margin:3px 0 0;}
@@ -1694,8 +1737,14 @@ em.warn{background:var(--st-warn-bg);color:var(--st-warn-ink);} em.crit{backgrou
       </div>
       <span class="period-range-label" id="period-range">—</span>
       <button class="btn-refresh no-print" onclick="refreshMonthly()">再読込</button>
+      <button class="btn-ai-view no-print" id="btn-ai-view" style="display:none;" onclick="toggleMonthlyView()" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+        <span class="lbl">AI分析</span>
+      </button>
       <button class="btn-pdf no-print" onclick="exportPdf('monthly')">PDF出力</button>
     </div>
+    <div id="mv-stage">
+    <div id="mv-std">
     <!-- チーム目標の達成度 -->
     <div class="card dx-goal-card" id="goal-card" style="display:none;">
       <div class="card-hd"><h2>チーム目標</h2><span class="card-sub" id="goal-sub">今月期の達成度</span></div>
@@ -1708,17 +1757,6 @@ em.warn{background:var(--st-warn-bg);color:var(--st-warn-ink);} em.crit{backgrou
       <div class="d-stat"><div class="sv ot" id="ms-ot">—</div><div class="sl">残業時間計</div><div class="sd" id="ms-ot-diff"></div></div>
       <div class="d-stat"><div class="sv avg" id="ms-ot-avg-person">—</div><div class="sl">残業平均/人</div></div>
       <div class="d-stat"><div class="sv"    id="ms-days">—</div><div class="sl">集計日数</div></div>
-    </div>
-    <!-- AI分析（aiAnalysisGasUrl を設定した部署だけ表示） -->
-    <div class="card" id="ai-card" style="display:none;">
-      <div class="card-hd">
-        <h2>AI分析</h2>
-        <span class="card-sub" id="ai-sub">この月期の集計を Claude が読み取り、傾向と気付きをまとめます</span>
-        <span class="no-print" style="display:flex;gap:6px;margin-left:auto;">
-          <button class="btn-refresh" id="ai-run-btn" style="margin-left:0;" onclick="runAiAnalysis(false)">分析する</button>
-        </span>
-      </div>
-      <div class="card-body"><div id="ai-body" class="ai-body"><p class="dx-empty">読み込み中…</p></div></div>
     </div>
     <!-- 効率化ハイライト（前月期比・日報ベース） -->
     <div class="card" id="eff-card">
@@ -1767,6 +1805,21 @@ em.warn{background:var(--st-warn-bg);color:var(--st-warn-ink);} em.crit{backgrou
       <div class="card-hd"><h2>Folio 予実対比</h2><span class="card-sub" id="folio-compare-sub">日報の入力時間 と Folioの実績工数（時間割に配置済みの完了タスク）</span></div>
       <div class="card-body"><div id="folio-compare"></div></div>
     </div>
+    </div><!-- /mv-std -->
+    <div id="mv-ai" class="mv-off" aria-hidden="true">
+    <!-- AI分析（aiAnalysisGasUrl を設定した部署だけ表示） -->
+    <div class="card" id="ai-card">
+      <div class="card-hd">
+        <h2>AI分析</h2>
+        <span class="card-sub" id="ai-sub">この月期の集計を Claude が読み取り、傾向と気付きをまとめます</span>
+        <span class="no-print" style="display:flex;gap:6px;margin-left:auto;">
+          <button class="btn-refresh" id="ai-run-btn" style="margin-left:0;" onclick="runAiAnalysis(false)">分析する</button>
+        </span>
+      </div>
+      <div class="card-body"><div id="ai-body" class="ai-body"><p class="dx-empty">読み込み中…</p></div></div>
+    </div>
+    </div><!-- /mv-ai -->
+    </div><!-- /mv-stage -->
   </div><!-- /dash-monthly -->
 
   <!-- ─── 年次ビュー ─── -->
@@ -7520,12 +7573,58 @@ function renderAiCard(msg, isErr) {
   body.innerHTML = html;
 }
 
+// ── 月次: 通常の分析 ⇄ AI分析 の画面切替（View Transitions で横にスライド） ──
+let _mvMode = 'std';
+function toggleMonthlyView() { setMonthlyView(_mvMode === 'ai' ? 'std' : 'ai'); }
+function _mvStagger(root) {
+  if (!root) return;
+  root.classList.remove('mv-enter');
+  const sel = root.id === 'mv-ai'
+    ? '.card-hd, .aiv-head, .aiv-kpi, #ai-body > .aiv-items > li, .aiv-full, .aiv-grid > .aiv-panel, .ai-meta'
+    : ':scope > .card, :scope > .dash-stats > .d-stat, :scope > .dash-layout > .card';
+  let i = 0;
+  root.querySelectorAll(sel).forEach(el => { el.classList.add('mv-i'); el.style.setProperty('--i', Math.min(i++, 14)); });
+  root.querySelectorAll('.aiv-heat tr').forEach((tr, r) => tr.querySelectorAll('td').forEach(td => td.style.setProperty('--i', Math.min(r + 3, 14))));
+  void root.offsetWidth;   // 再生し直すためにリフロー
+  root.classList.add('mv-enter');
+  clearTimeout(root._mvT);
+  root._mvT = setTimeout(() => root.classList.remove('mv-enter'), 2200);
+}
+function setMonthlyView(mode, instant) {
+  if (mode === _mvMode && !instant) return;
+  const std = document.getElementById('mv-std'), ai = document.getElementById('mv-ai'), btn = document.getElementById('btn-ai-view');
+  if (!std || !ai) return;
+  const apply = () => {
+    _mvMode = mode;
+    std.classList.toggle('mv-off', mode === 'ai'); std.setAttribute('aria-hidden', mode === 'ai');
+    ai.classList.toggle('mv-off', mode !== 'ai'); ai.setAttribute('aria-hidden', mode !== 'ai');
+    if (btn) {
+      btn.classList.toggle('on', mode === 'ai');
+      btn.setAttribute('aria-pressed', mode === 'ai');
+      btn.querySelector('.lbl').textContent = mode === 'ai' ? '← 通常の分析に戻る' : 'AI分析';
+    }
+    const top = document.getElementById('dash-monthly');
+    if (top && top.getBoundingClientRect().top < 0) top.scrollIntoView({block: 'start'});
+  };
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (instant || reduce || !document.startViewTransition) {
+    apply();
+    if (!instant && !reduce) _mvStagger(mode === 'ai' ? ai : std);
+    return;
+  }
+  document.documentElement.dataset.mvDir = mode === 'ai' ? 'fwd' : 'back';
+  const t = document.startViewTransition(apply);
+  t.ready.then(() => _mvStagger(mode === 'ai' ? ai : std)).catch(() => {});
+  t.finished.finally(() => { delete document.documentElement.dataset.mvDir; });
+}
+
 async function aiOnMonthlyRender(ctx, label) {
   const card = document.getElementById('ai-card');
   const url = aiAnalysisUrl();
   if (!card) return;
-  card.style.display = url ? '' : 'none';
-  if (!url) return;
+  const vb = document.getElementById('btn-ai-view');
+  if (vb) vb.style.display = url ? '' : 'none';
+  if (!url) { if (_mvMode === 'ai') setMonthlyView('std', true); return; }
   const key = `${ctx.startDate}_${ctx.endDate}`;
   _aiState = {key, label, ctx, stored: null, busy: false};
   renderAiCard('読み込み中…');
@@ -7586,6 +7685,7 @@ async function runAiAnalysis() {
     st.stored = d;
     st.busy = false;
     renderAiCard(d.note || '');
+    if (_mvMode === 'ai') _mvStagger(document.getElementById('mv-ai'));
   } catch (e) {
     if (_aiState !== st) return;
     st.busy = false;
