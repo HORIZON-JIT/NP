@@ -8089,7 +8089,7 @@ function _aiKpiVisuals(p, rep) {
   const tile = (label, val, sub, tone) => `<div class="aiv-kpi${tone ? ' ' + tone : ''}"><div class="k">${label}</div><div class="v">${val}</div><div class="s">${sub || '&nbsp;'}</div></div>`;
   const kpis = `<div class="aiv-kpis">
     ${tile(ti >= 0 ? `${p.periods[ti].label}${ti === cur ? '（見込）' : ''}の達成` : '今期の達成', nNowOk + `<small>/ ${nowLv.length}</small>`, 'KPI 数', nNowOk === nowLv.length ? 'ok' : 'warn')}
-    ${tile('年度の達成率', (cAll ? Math.round(cOk / cAll * 100) : 0) + '<small>%</small>', `終わった月期 ${cOk}/${cAll} マス`, cAll && cOk / cAll < 0.5 ? 'warn' : 'ok')}
+    ${tile('年度の達成率', cAll ? Math.round(cOk / cAll * 100) + '<small>%</small>' : '—', cAll ? `終わった月期 ${cOk}/${cAll} マス` : '終わった月期がまだありません', !cAll ? '' : cOk / cAll < 0.5 ? 'warn' : 'ok')}
     ${tile('大幅超過', cCrit + '<small>回</small>', '目標の1.2倍超（延べ）', cCrit ? 'crit' : 'ok')}
     ${tile('対象 KPI', p.kpis.length + '<small>件</small>', p.fy)}
   </div>`;
