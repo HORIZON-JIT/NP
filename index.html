@@ -409,6 +409,15 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .dash-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;}
 .dash-stats-7{grid-template-columns:repeat(6,1fr);}
 .card-sub{font-size:11px;color:var(--g400);}
+.ai-body{font-size:13px;line-height:1.75;color:var(--g700);}
+.ai-body h3{font-size:13px;font-weight:800;color:var(--g800);margin:14px 0 4px;padding-left:8px;border-left:3px solid var(--primary);}
+.ai-body h3:first-child{margin-top:0;}
+.ai-body ul{margin:2px 0 6px 18px;padding:0;}
+.ai-body li{margin:2px 0;}
+.ai-body p{margin:4px 0;}
+.ai-meta{margin-top:12px;font-size:11px;color:var(--g400);}
+.ai-meta .warn{color:var(--st-warn,#d97706);font-weight:700;}
+.ai-err{color:var(--danger);}
 /* ランキング3カラム */
 .d-stat .sd{font-size:11px;color:var(--g500);margin-top:3px;font-weight:700;}
 .rank-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px;}
@@ -1611,6 +1620,17 @@ tfoot .ft-total{text-align:center;font-size:16px;}
       <div class="d-stat"><div class="sv avg" id="ms-ot-avg-person">—</div><div class="sl">残業平均/人</div></div>
       <div class="d-stat"><div class="sv"    id="ms-days">—</div><div class="sl">集計日数</div></div>
     </div>
+    <!-- AI分析（aiAnalysisGasUrl を設定した部署だけ表示） -->
+    <div class="card" id="ai-card" style="display:none;">
+      <div class="card-hd">
+        <h2>AI分析</h2>
+        <span class="card-sub" id="ai-sub">この月期の集計を Claude が読み取り、傾向と気付きをまとめます</span>
+        <span class="no-print" style="display:flex;gap:6px;margin-left:auto;">
+          <button class="btn-refresh" id="ai-run-btn" style="margin-left:0;" onclick="runAiAnalysis(false)">分析する</button>
+        </span>
+      </div>
+      <div class="card-body"><div id="ai-body" class="ai-body"><p class="dx-empty">読み込み中…</p></div></div>
+    </div>
     <!-- 効率化ハイライト（前月期比・日報ベース） -->
     <div class="card" id="eff-card">
       <div class="card-hd"><h2>効率化ハイライト</h2><span class="card-sub" id="eff-sub">前月期と今月期で、1人が1日にかけた時間を比べます</span></div>
@@ -2118,6 +2138,9 @@ const DEPARTMENT_CONFIG = (function(){
     // タスク管理アプリ(タスク実績シート)の読取用GAS WebアプリURL。空なら「Folioから取込」ボタンを出さない。
     // GASのコードはリポジトリの gas/task-sheet-reader.gs。
     taskSheetGasUrl: '',
+    // 月次AI分析用GAS WebアプリURL（gas/ai-monthly-analyzer.gs をデプロイしたもの）。
+    // 空なら月次ダッシュボードの「AI分析」カードを出さない。生産管理課だけ config.js で設定する。
+    aiAnalysisGasUrl: '',
     // チーム目標（ダッシュボード月次の達成度リング）。管理タブで変更→Firebaseマスタ(goals)に保存
     goals: {
       otAvg:     { on: true, target: 20  },   // 残業 平均/人(h) 以下
@@ -7045,6 +7068,219 @@ function _otByAuthor(d) {
   return out;
 }
 
+// ═══════════════════════════════════════════
+//  月次 AI分析（Claude）
+//  集計値だけを GAS（gas/ai-monthly-analyzer.gs）へ送り、GAS が Claude API を呼ぶ。
+//  APIキーは GAS 側のスクリプトプロパティにだけ置く。結果は GAS 側に期間ごとに保存し、
+//  画面を開いたときは保存済みを表示するだけ（APIは呼ばない）。
+// ═══════════════════════════════════════════
+function aiAnalysisUrl() { return DEPARTMENT_CONFIG.aiAnalysisGasUrl || ''; }
+let _aiState = null;   // {key, label, ctx, stored, busy}
+
+function _aiJsonp(url, params, timeoutMs) {
+  const qs = new URLSearchParams(params).toString();
+  return new Promise((resolve, reject) => {
+    const cb = '_ai_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const el = document.createElement('script');
+    const timer = setTimeout(() => { delete window[cb]; el.remove(); reject(new Error('timeout')); }, timeoutMs);
+    window[cb] = d => { clearTimeout(timer); delete window[cb]; el.remove(); resolve(d); };
+    el.onerror = () => { clearTimeout(timer); delete window[cb]; el.remove(); reject(new Error('接続エラー（AI分析のGASへ到達できません）')); };
+    el.src = url + '?' + qs + '&callback=' + cb;
+    document.head.appendChild(el);
+  });
+}
+
+function _aiR(x) { return Math.round((Number(x) || 0) * 100) / 100; }
+function _aiHash(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+function _aiB64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+// 作業ログ（担当→行配列）を {担当: {中分類CD: [通常, 残業]}} に
+function _aiSubs(raw, usedCds) {
+  const out = {};
+  Object.keys(raw || {}).forEach(a => {
+    if (a.startsWith('_')) return;
+    (raw[a] || []).forEach(r => {
+      const n = r.hoursNormal || 0, ot = r.hoursOT || 0;
+      if (!n && !ot) return;
+      const m = out[a] = out[a] || {};
+      const v = m[r.cdSub] = m[r.cdSub] || [0, 0];
+      v[0] += n; v[1] += ot;
+      usedCds.add(r.cdSub);
+    });
+  });
+  Object.values(out).forEach(m => Object.keys(m).forEach(cd => { m[cd] = [_aiR(m[cd][0]), _aiR(m[cd][1])]; }));
+  return out;
+}
+
+function buildAiPayload() {
+  const st = _aiState, ctx = st && st.ctx, ec = _entryCtx;
+  if (!ctx) return null;
+  const R = DEPARTMENT_CONFIG.rules;
+  const used = new Set();
+  const curSubs = _aiSubs(ctx.curRaw, used);
+  const prevSubs = ctx.prevRaw ? _aiSubs(ctx.prevRaw, used) : null;
+  const persons = {};
+  const names = new Set([...Object.keys(ctx.cur || {}), ...Object.keys(curSubs)]);
+  names.forEach(a => {
+    const c = (ctx.cur || {})[a] || {n: 0, ot: 0};
+    const o = {n: _aiR(c.n), ot: _aiR(c.ot), subs: curSubs[a] || {}};
+    if (ec && ec.key === st.key && ec.missing && ec.missing[a] != null) o.miss = ec.missing[a];
+    persons[a] = o;
+  });
+  let prev = null;
+  if (ctx.prev) {
+    prev = {};
+    const pn = new Set([...Object.keys(ctx.prev), ...Object.keys(prevSubs || {})]);
+    pn.forEach(a => {
+      const c = ctx.prev[a] || {n: 0, ot: 0};
+      prev[a] = {n: _aiR(c.n), ot: _aiR(c.ot), subs: (prevSubs || {})[a] || {}};
+    });
+  }
+  let fy = null;
+  if (ctx.fy && ctx.fy.length) {
+    const limit = R.otMonthLimit || 45;
+    fy = {months: ctx.fy.length, persons: {}};
+    ctx.fy.forEach(m => Object.keys(m || {}).forEach(a => {
+      const f = fy.persons[a] = fy.persons[a] || {ot: 0, over45: 0};
+      f.ot += m[a].ot || 0;
+      if ((m[a].ot || 0) > limit) f.over45++;
+    }));
+    Object.values(fy.persons).forEach(f => { f.ot = _aiR(f.ot); });
+  }
+  const cats = {};
+  [...used].sort().forEach(cd => { const s = SUB_MAP[cd]; cats[cd] = s ? `${s.mainLabel}/${s.label}` : cd; });
+  const payload = {
+    dept: (DEPARTMENT_CONFIG.branding || {}).dept || '',
+    period: {label: st.label, start: ctx.startDate, end: ctx.endDate},
+    rules: {otStart: R.otStart, otMonthWarn: R.otMonthWarn, otMonthLimit: R.otMonthLimit, otYearLimit: R.otYearLimit},
+    cats, cur: persons, prev, fy
+  };
+  if (ec && ec.key === st.key) {
+    payload.inProgress = !!ec.inProgress;
+    payload.workElapsed = ec.workElapsed;
+    payload.workTotal = ec.workTotal;
+  }
+  return payload;
+}
+
+function _aiMd(text) {
+  const lines = String(text || '').replace(/\r/g, '').split('\n');
+  let html = '', inList = false;
+  const inline = t => escHtml(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  const close = () => { if (inList) { html += '</ul>'; inList = false; } };
+  lines.forEach(l => {
+    const t = l.trim();
+    if (!t) { close(); return; }
+    let m;
+    if ((m = t.match(/^#{1,4}\s+(.*)$/))) { close(); html += `<h3>${inline(m[1])}</h3>`; }
+    else if ((m = t.match(/^[-*・]\s+(.*)$/))) { if (!inList) { html += '<ul>'; inList = true; } html += `<li>${inline(m[1])}</li>`; }
+    else { close(); html += `<p>${inline(t)}</p>`; }
+  });
+  close();
+  return html;
+}
+
+function _aiFmtAt(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function renderAiCard(msg, isErr) {
+  const st = _aiState, body = document.getElementById('ai-body'), btn = document.getElementById('ai-run-btn');
+  if (!body || !st) return;
+  if (btn) { btn.disabled = !!st.busy; btn.textContent = st.busy ? '分析中…' : (st.stored ? '再分析' : '分析する'); }
+  if (st.busy) {
+    body.innerHTML = `<p class="dx-empty">分析しています（20〜60秒ほどかかります）…</p>`;
+    return;
+  }
+  if (msg && !st.stored) { body.innerHTML = `<p class="${isErr ? 'ai-err' : 'dx-empty'}">${escHtml(msg)}</p>`; return; }
+  if (!st.stored) {
+    body.innerHTML = `<p class="dx-empty">この月期はまだ分析していません。「分析する」を押すと作成します。</p>`;
+    return;
+  }
+  const s = st.stored;
+  // 前月期・年度累計の読込が終わってから比べる（途中だと必ず差が出るため）
+  const cur = st.ctx.fy != null ? buildAiPayload() : null;
+  const stale = cur && s.hash && _aiHash(JSON.stringify(cur)) !== s.hash;
+  body.innerHTML = _aiMd(s.text) +
+    `<div class="ai-meta">${escHtml(_aiFmtAt(s.at))} 作成${s.model ? '（' + escHtml(s.model) + '）' : ''}` +
+    (stale ? '　<span class="warn">分析後に日報が更新されています。最新にするには「再分析」を押してください。</span>' : '') +
+    (msg ? `　<span class="${isErr ? 'ai-err' : ''}">${escHtml(msg)}</span>` : '') +
+    `<br>AIによる自動分析です。数値や解釈は元のグラフ・表と照らしてご確認ください。</div>`;
+}
+
+async function aiOnMonthlyRender(ctx, label) {
+  const card = document.getElementById('ai-card');
+  const url = aiAnalysisUrl();
+  if (!card) return;
+  card.style.display = url ? '' : 'none';
+  if (!url) return;
+  const key = `${ctx.startDate}_${ctx.endDate}`;
+  _aiState = {key, label, ctx, stored: null, busy: false};
+  renderAiCard('読み込み中…');
+  try {
+    const d = await _aiJsonp(url, {action: 'get', key}, 20000);
+    if (!_aiState || _aiState.key !== key) return;
+    if (!d || !d.ok) throw new Error((d && d.error) || '取得に失敗しました');
+    _aiState.stored = d.found ? d : null;
+    renderAiCard();
+  } catch (e) {
+    if (_aiState && _aiState.key === key) renderAiCard('保存済みの分析を取得できませんでした: ' + (e.message === 'timeout' ? 'タイムアウト' : e.message), true);
+  }
+}
+
+async function runAiAnalysis() {
+  const st = _aiState, url = aiAnalysisUrl();
+  if (!st || !url || st.busy) return;
+  if (st.stored && !confirm('この月期を再分析します（Claude APIの利用料が発生します）。よろしいですか？')) return;
+  st.busy = true; renderAiCard();
+  const key = st.key;
+  try {
+    // 前月期・年度累計の読込（管理者サマリー用に裏で取得中）を最大15秒待つ
+    for (let i = 0; i < 30 && st.ctx.fy == null; i++) await new Promise(r => setTimeout(r, 500));
+    const payload = buildAiPayload();
+    if (!payload || !Object.keys(payload.cur).length) throw new Error('この月期のデータがありません');
+    const json = JSON.stringify(payload);
+    const hash = _aiHash(json);
+    const b64 = _aiB64(json);
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const parts = [];
+    for (let i = 0; i < b64.length; i += 1500) parts.push(b64.slice(i, i + 1500));
+    await Promise.all(parts.map((d, i) => _aiJsonp(url, {action: 'part', id, i, d}, 25000).then(r => {
+      if (!r || !r.ok) throw new Error((r && r.error) || '集計データの送信に失敗しました');
+    })));
+    let d;
+    try {
+      d = await _aiJsonp(url, {action: 'analyze', id, n: parts.length, key, hash, force: st.stored ? '1' : '0'}, 120000);
+    } catch (e) {
+      if (e.message !== 'timeout') throw e;
+      // 応答待ちが切れても GAS 側では完了している場合があるので、保存結果を確認する
+      d = await _aiJsonp(url, {action: 'get', key}, 20000);
+      if (!d || !d.found || (st.stored && d.at === st.stored.at)) throw new Error('応答がありませんでした。少し待ってから再読込してください');
+    }
+    if (!d || !d.ok) throw new Error((d && d.error) || '分析に失敗しました');
+    if (_aiState !== st) return;
+    st.stored = d;
+    st.busy = false;
+    renderAiCard(d.note || '');
+  } catch (e) {
+    if (_aiState !== st) return;
+    st.busy = false;
+    renderAiCard('分析できませんでした: ' + e.message, true);
+  }
+}
+
 function _fiscalYearOf(period) { return period.month >= 10 ? period.year : period.year - 1; }
 
 async function loadMgrExtras(ctx) {
@@ -7070,6 +7306,7 @@ async function loadMgrExtras(ctx) {
     ctx.fy = before.map(_otByAuthor).concat([ctx.cur]);
     ctx.fyRaw = before.concat([ctx.curRaw]);
     renderMgrSummary();
+    if (_aiState && _aiState.ctx === ctx && !_aiState.busy && _aiState.stored) renderAiCard();
   } catch(e) { console.warn('[管理者サマリー] 追加データの読込に失敗:', e.message); }
 }
 
@@ -7687,6 +7924,7 @@ async function renderMonthlyDash(silent) {
     renderFolioCompare();
     loadFolioRangeInto(_entryCtx);
     loadMgrExtras(_mgrCtx);
+    aiOnMonthlyRender(_mgrCtx, label);
     _renderCache.monthly = renderKey;
   } finally { if (!silent) setLoading(false); }
 }
