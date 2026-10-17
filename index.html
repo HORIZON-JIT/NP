@@ -478,6 +478,34 @@ em.warn{background:var(--st-warn-bg);color:var(--st-warn-ink);} em.crit{backgrou
 .aiv-actions li::before{content:counter(aia);flex:none;width:20px;height:20px;border-radius:50%;background:var(--dx-accent,var(--primary));color:var(--surface);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px;}
 .aiv-actions li span{flex:1;} .aiv-actions li em{flex:none;font-style:normal;font-size:10.5px;font-weight:700;color:var(--g500);background:var(--g100);border-radius:10px;padding:1px 8px;margin-top:2px;}
 .aiv-md{margin-bottom:12px;}
+.aiv-full{margin-bottom:12px;}
+.aiv-head{display:flex;align-items:flex-start;gap:8px;border-left:5px solid var(--dx-accent,var(--primary));}
+.aiv-head .lbl{flex:none;margin:3px 0 0;}
+.aiv-head .txt{flex:1;}
+.aiv-head .stt{flex:none;font-size:11px;font-weight:800;border-radius:20px;padding:2px 10px;margin-top:2px;}
+.aiv-head .stt.ok{background:var(--st-ok-bg);color:var(--st-ok-ink);} .aiv-head .stt.warn{background:var(--st-warn-bg);color:var(--st-warn-ink);} .aiv-head .stt.crit{background:var(--st-crit-bg);color:var(--st-crit-ink);}
+.aiv-head.st-ok{border-left-color:var(--st-ok);} .aiv-head.st-warn{border-left-color:var(--st-warn);} .aiv-head.st-crit{border-left-color:var(--st-crit);}
+.aiv-head.muted,.aiv-head.busy{border-left-width:1px;}
+.aiv-note{display:flex;gap:8px;align-items:flex-start;margin:10px 0 0;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--dx-accent,var(--primary)) 9%,var(--surface));font-size:12.5px;line-height:1.6;color:var(--g700);}
+.aiv-note b{flex:none;font-size:10px;font-weight:800;color:var(--surface);background:var(--dx-accent,var(--primary));border-radius:4px;padding:1px 6px;margin-top:2px;}
+.aiv-h.first{margin-top:0;}
+.aiv-bars.nb{--nm:86px;padding-top:0;}
+.aiv-row .nm .dot,.aiv-drow .nm .dot,.aiv-heat .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:0;}
+.aiv-div.wide .aiv-drow{grid-template-columns:128px 1fr 1fr 58px;height:20px;}
+.aiv-heat-wrap{overflow-x:auto;}
+.aiv-heat{border-collapse:separate;border-spacing:2px;width:100%;font-variant-numeric:tabular-nums;}
+.aiv-heat th{font-size:11px;font-weight:700;color:var(--g600);white-space:nowrap;padding:2px 6px;text-align:left;}
+.aiv-heat thead th{text-align:center;font-size:10.5px;}
+.aiv-heat td{height:30px;min-width:52px;text-align:center;font-size:12px;font-weight:700;color:var(--g800);border-radius:5px;cursor:default;}
+.aiv-heat td.hi{color:var(--surface);}
+.aiv-heat td.z{background:var(--panel);}
+.aiv-heat td sup{font-size:8.5px;font-weight:800;margin-left:1px;opacity:.85;}
+.aiv-heat td:not(.z):not(.tot):hover{outline:2px solid var(--g800);outline-offset:-1px;}
+.aiv-heat .tot{background:none;color:var(--g500);font-weight:800;}
+.aiv-heat tr.sum td,.aiv-heat tr.sum th{color:var(--g500);font-weight:800;background:none;}
+.aiv-legend.hm{margin-left:0;align-items:center;}
+.aiv-legend .ramp{width:90px!important;height:8px!important;border-radius:4px!important;background:linear-gradient(90deg,color-mix(in srgb,var(--dx-accent,var(--primary)) 10%,var(--surface)),var(--dx-accent,var(--primary)));}
+.aiv-act .aiv-actions li{background:var(--panel);}
 @media (max-width:820px){ .aiv-kpis{grid-template-columns:repeat(2,minmax(0,1fr));} .aiv-grid{grid-template-columns:minmax(0,1fr);} }
 /* ランキング3カラム */
 .d-stat .sd{font-size:11px;color:var(--g500);margin-top:3px;font-weight:700;}
@@ -7363,7 +7391,72 @@ function _aiVisuals(p) {
         }).join('')}
       </div></div>`;
   }
-  return {kpis, otChart, mixChart, fyChart};
+  // ④ 残業はどの業務で発生したか（大分類別の残業h、◆=前月期）
+  const otOf = (P, nm) => { const o = {}; nm.forEach(a => Object.entries(P[a].subs || {}).forEach(([cd, v]) => {
+    const sb = SUB_MAP[cd] || {}, k = sb.mainCd || '?';
+    const x = o[k] = o[k] || {cd: k, label: sb.mainLabel || k, color: sb.color || 'var(--g400)', h: 0, who: {}};
+    x.h += v[1] || 0; if (v[1]) x.who[a] = (x.who[a] || 0) + v[1];
+  })); return o; };
+  const oc = otOf(p.cur, names), op = prev ? otOf(prev, prevNames) : {};
+  const ocRows = Object.values(oc).filter(x => x.h >= 0.05).sort((x, y) => y.h - x.h);
+  const ocMax = Math.max(1, ...ocRows.map(x => Math.max(x.h, (op[x.cd] && op[x.cd].h) || 0)));
+  const ocTot = ocRows.reduce((t, x) => t + x.h, 0);
+  const otCatChart = `<div class="aiv-chart">
+    <div class="aiv-ttl">残業はどの業務で発生したか<span>日報の残業入力を大分類で集計　◆=前月期</span></div>
+    ${ocRows.length ? `<div class="aiv-bars nb">${ocRows.map(x => {
+      const pv = op[x.cd] ? op[x.cd].h : (prev ? 0 : null);
+      const top = Object.entries(x.who).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([a, h]) => `${a} ${_aiFmtH(h)}h`).join('、');
+      return `<div class="aiv-row" title="${escHtml(`${x.label} 残業 ${_aiFmtH(x.h)}h（残業全体の${(x.h / ocTot * 100).toFixed(0)}%）` + (pv != null ? ` / 前月期 ${_aiFmtH(pv)}h` : '') + `\n主な担当: ${top}`)}">
+        <span class="nm"><i class="dot" style="background:${x.color}"></i>${escHtml(x.label)}</span>
+        <span class="trk"><span class="bar" style="width:${x.h / ocMax * 100}%;background:${x.color}"></span>${pv != null ? `<span class="pv" style="left:${pv / ocMax * 100}%"></span>` : ''}</span>
+        <span class="val">${_aiFmtH(x.h)}h<small>${(x.h / ocTot * 100).toFixed(0)}%</small></span></div>`;
+    }).join('')}</div>` : '<p class="dx-empty">この月期は日報に残業の入力がありません</p>'}</div>`;
+
+  // ⑤ 担当 × 業務 の時間配分（ヒートマップ）
+  const hmNames = Object.keys(p.cur).filter(a => Object.keys(p.cur[a].subs || {}).length)
+    .sort((x, y) => (x === 'ヘルプ') - (y === 'ヘルプ') || (p.cur[y].n + p.cur[y].ot) - (p.cur[x].n + p.cur[x].ot));
+  const cell = {}; let cMax = 0; const colTot = {};
+  hmNames.forEach(a => Object.entries(p.cur[a].subs || {}).forEach(([cd, v]) => {
+    const k = (SUB_MAP[cd] || {}).mainCd || '?', c = (cell[a] = cell[a] || {})[k] = cell[a][k] || {h: 0, ot: 0, subs: []};
+    c.h += (v[0] || 0) + (v[1] || 0); c.ot += v[1] || 0; c.subs.push([(SUB_MAP[cd] || {}).label || cd, (v[0] || 0) + (v[1] || 0)]);
+    colTot[k] = (colTot[k] || 0) + (v[0] || 0) + (v[1] || 0);
+  }));
+  Object.values(cell).forEach(r => Object.values(r).forEach(c => { cMax = Math.max(cMax, c.h); }));
+  const hCols = order.filter(cd => colTot[cd]);
+  const fmtC = h => h >= 10 ? Math.round(h) : _aiFmtH(h);
+  const heatChart = hmNames.length && hCols.length ? `<div class="aiv-chart">
+    <div class="aiv-ttl">担当 × 業務の時間配分<span>日報に入力した時間（通常＋残業）　色が濃いほど時間が多い</span></div>
+    <div class="aiv-heat-wrap"><table class="aiv-heat"><thead><tr><th></th>${hCols.map(cd => `<th><i class="dot" style="background:${meta(cd).color}"></i>${escHtml(meta(cd).label)}</th>`).join('')}<th class="tot">計</th></tr></thead><tbody>
+    ${hmNames.map(a => {
+      const r = cell[a] || {}, tot = Object.values(r).reduce((t, c) => t + c.h, 0);
+      return `<tr><th>${escHtml(a)}</th>${hCols.map(cd => {
+        const c = r[cd]; if (!c || c.h < 0.05) return '<td class="z"></td>';
+        const k = Math.round(10 + 80 * Math.sqrt(c.h / cMax));
+        const tip = `${a} × ${meta(cd).label}: ${_aiFmtH(c.h)}h（担当の${(c.h / tot * 100).toFixed(0)}%、うち残業 ${_aiFmtH(c.ot)}h）\n` + c.subs.sort((x, y) => y[1] - x[1]).map(([l, h]) => `・${l} ${_aiFmtH(h)}h`).join('\n');
+        return `<td class="${k > 52 ? 'hi' : ''}" style="background:color-mix(in srgb,var(--dx-accent,var(--primary)) ${k}%,var(--surface))" title="${escHtml(tip)}">${fmtC(c.h)}${c.ot >= 1 ? '<sup>残</sup>' : ''}</td>`;
+      }).join('')}<td class="tot">${fmtC(tot)}</td></tr>`;
+    }).join('')}
+    <tr class="sum"><th>計</th>${hCols.map(cd => `<td>${fmtC(colTot[cd])}</td>`).join('')}<td class="tot">${fmtC(Object.values(colTot).reduce((t, v) => t + v, 0))}</td></tr>
+    </tbody></table></div><div class="aiv-legend hm"><span>少</span><i class="ramp"></i><span>多</span><span class="t-muted">残 = 残業1h以上を含む　マスにカーソルを合わせると中分類の内訳</span></div></div>` : '';
+
+  // ⑥ 中分類の増減（前月期比 上位）
+  let subChart = '';
+  if (prev) {
+    const tot = P => { const o = {}; Object.values(P).forEach(x => Object.entries(x.subs || {}).forEach(([cd, v]) => { o[cd] = (o[cd] || 0) + (v[0] || 0) + (v[1] || 0); })); return o; };
+    const tc = tot(p.cur), tp = tot(prev);
+    const all = [...new Set([...Object.keys(tc), ...Object.keys(tp)])].map(cd => ({cd, now: tc[cd] || 0, d: (tc[cd] || 0) - (tp[cd] || 0)})).filter(x => Math.abs(x.d) >= 1);
+    const ups = all.filter(x => x.d > 0).sort((a, b) => b.d - a.d).slice(0, 5), dns = all.filter(x => x.d < 0).sort((a, b) => a.d - b.d).slice(0, 4);
+    const list = ups.concat(dns), maxD = Math.max(1, ...list.map(x => Math.abs(x.d)));
+    subChart = `<div class="aiv-chart">
+      <div class="aiv-ttl">中分類の増減（前月期比）<span>増えた上位5件・減った上位4件</span></div>
+      ${list.length ? `<div class="aiv-div wide">${list.map(x => { const sb = SUB_MAP[x.cd] || {}; return `
+        <div class="aiv-drow" title="${escHtml(`${sb.mainLabel || ''}/${sb.label || x.cd} ${_aiDelta(x.d)}h（今月期 ${_aiFmtH(x.now)}h／前月期 ${_aiFmtH(x.now - x.d)}h）`)}"><span class="nm"><i class="dot" style="background:${sb.color || 'var(--g400)'}"></i>${escHtml(sb.label || x.cd)}</span>
+          <span class="neg">${x.d < 0 ? `<span class="bar dn" style="width:${Math.abs(x.d) / maxD * 100}%"></span>` : ''}</span>
+          <span class="pos">${x.d > 0 ? `<span class="bar up" style="width:${x.d / maxD * 100}%"></span>` : ''}</span>
+          <span class="val">${_aiDelta(x.d)}h</span></div>`; }).join('')}</div>
+        <div class="aiv-legend"><span><i style="background:var(--dx-accent,var(--primary))"></i>増えた</span><span><i style="background:var(--g400)"></i>減った</span></div>` : '<p class="dx-empty">前月期から1h以上増減した中分類はありません</p>'}</div>`;
+  }
+  return {kpis, otChart, mixChart, fyChart, otCatChart, heatChart, subChart};
 }
 
 // AIの返答（JSON）を読み取る。古い保存結果（Markdown）は null
@@ -7393,29 +7486,33 @@ function renderAiCard(msg, isErr) {
   const sec = (rep && rep.sections) || {};
   const stale = s && ready && s.hash && p && _aiHash(JSON.stringify(p)) !== s.hash;
 
+  const ST = {good: ['ok', '良好'], warn: ['warn', '注意'], bad: ['crit', '要対応']}[rep && rep.status] || null;
   let head;
   if (st.busy) head = `<div class="aiv-head busy"><span class="spin"></span>Claude が分析しています（20〜60秒ほどかかります）…</div>`;
-  else if (rep && rep.headline) head = `<div class="aiv-head"><span class="lbl">AIの総括</span>${escHtml(rep.headline)}</div>`;
+  else if (rep && rep.headline) head = `<div class="aiv-head${ST ? ' st-' + ST[0] : ''}"><span class="lbl">AIの総括</span>${ST ? `<span class="stt ${ST[0]}">${ST[1]}</span>` : ''}<span class="txt">${escHtml(rep.headline)}</span></div>`;
   else if (!s) head = `<div class="aiv-head muted">${msg ? `<span class="${isErr ? 'ai-err' : ''}">${escHtml(msg)}</span>` : 'この月期はまだ分析していません。「分析する」を押すと、下の図表に AI のコメントが加わります。'}</div>`;
   else head = '';
 
+  const notes = (rep && rep.notes) || {};
+  const note = k => notes[k] ? `<div class="aiv-note"><b>AIの読み</b><span>${escHtml(notes[k])}</span></div>` : '';
+  const panel = (inner, cls) => inner ? `<div class="aiv-panel${cls ? ' ' + cls : ''}">${inner}</div>` : '';
+  const row = (...cells) => { const c = cells.filter(Boolean); return !c.length ? '' : c.length === 1 ? `<div class="aiv-full">${c[0]}</div>` : `<div class="aiv-grid">${c.join('')}</div>`; };
+  const sub = (title, items) => items && items.length ? `<div class="aiv-h">${title}</div>${_aiItems(items)}` : '';
+  const actions = rep && (rep.actions || []).length ? panel(`<div class="aiv-h first">来月期に向けて</div>
+    <ol class="aiv-actions">${rep.actions.map(x => `<li><span>${escHtml(x.text || '')}</span>${x.who ? `<em>${escHtml(x.who)}</em>` : ''}</li>`).join('')}</ol>`, 'aiv-act') : '';
+  const concerns = rep ? panel(sub('気になる点', sec.concerns).replace('class="aiv-h"', 'class="aiv-h first"')) : '';
+
   let html = head + (V ? V.kpis : '');
-  if (rep) {
-    html += _aiItems(sec.overview);
-    html += `<div class="aiv-grid">
-      <div class="aiv-panel">${V ? V.otChart : ''}<div class="aiv-h">残業の傾向</div>${_aiItems(sec.overtime)}</div>
-      <div class="aiv-panel">${V ? V.mixChart : ''}<div class="aiv-h">業務構成の変化</div>${_aiItems(sec.workmix)}</div>
-    </div>
-    <div class="aiv-grid">
-      <div class="aiv-panel">${V ? V.fyChart : ''}<div class="aiv-h">気になる点</div>${_aiItems(sec.concerns)}</div>
-      <div class="aiv-panel"><div class="aiv-h">来月期に向けて</div>
-        <ol class="aiv-actions">${(rep.actions || []).map(x => `<li><span>${escHtml(x.text || '')}</span>${x.who ? `<em>${escHtml(x.who)}</em>` : ''}</li>`).join('')}</ol></div>
-    </div>`;
-  } else {
-    html += V ? `<div class="aiv-grid"><div class="aiv-panel">${V.otChart}</div><div class="aiv-panel">${V.mixChart}</div></div>
-      ${V.fyChart ? `<div class="aiv-grid"><div class="aiv-panel">${V.fyChart}</div><div></div></div>` : ''}` : '';
-    if (s) html += `<div class="aiv-panel aiv-md">${_aiMd(s.text)}</div>`;   // 旧形式（文章のみ）の保存結果
+  if (rep) html += _aiItems(sec.overview);
+  if (V) {
+    html += row(panel(V.otChart + note('ot') + sub('残業の傾向', sec.overtime)), panel(V.otCatChart + note('otcat')));
+    html += row(panel(V.heatChart + note('heat')));
+    html += row(panel(V.mixChart + note('mix') + sub('業務構成の変化', sec.workmix)), panel(V.subChart + note('sub')));
+    html += V.fyChart ? row(panel(V.fyChart + note('fy')), concerns) + row(actions) : row(concerns, actions);
+  } else if (rep) {
+    html += row(concerns, actions);
   }
+  if (s && !rep) html += `<div class="aiv-panel aiv-md">${_aiMd(s.text)}</div>`;   // 旧形式（文章のみ）の保存結果
   if (s) html += `<div class="ai-meta">${escHtml(_aiFmtAt(s.at))} 作成${s.model ? '（' + escHtml(s.model) + '）' : ''}` +
     (stale ? '　<span class="warn">分析後に日報が更新されています。最新にするには「再分析」を押してください。</span>' : '') +
     (msg ? `　<span class="${isErr ? 'ai-err' : ''}">${escHtml(msg)}</span>` : '') +
