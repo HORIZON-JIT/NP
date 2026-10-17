@@ -145,7 +145,9 @@ function analyze_(id, n, key, hash, force) {
 function apiKey_() { return PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY') || ''; }
 function model_() { return PropertiesService.getScriptProperties().getProperty('CLAUDE_MODEL') || DEFAULT_MODEL; }
 
-function systemPrompt_() {
+function systemPrompt_(kind) {
+  if (kind === 'yearly') return systemPromptYearly_();
+  if (kind === 'kpi') return systemPromptKpi_();
   return [
     'あなたは製造業（株式会社ホリゾン、製本・印刷関連機器メーカー）の生産管理課の業務分析担当です。',
     '課員の日報を月期ごとに集計したJSONを受け取り、課長・課員が月次の振り返りに使う分析レポートを日本語で書いてください。',
@@ -178,12 +180,67 @@ function systemPrompt_() {
   ].join('\n');
 }
 
+var COMMON_RULES_ = [
+  '- 数値はデータから計算できるものだけを使い、小数第1位までに丸める。データに無いことは書かない。推測は「〜と考えられます」と明記する。',
+  '- 合計や平均を書くときは、必ずデータの値を足し合わせて計算し直してから書く。',
+  '- 特定の個人を責める書き方はしない。偏りは業務の配分・時期の問題として書く。',
+  '- 強調のためにかぎ括弧を使わない。です・ます調。',
+  '- 担当「ヘルプ」は応援者の工数で、残業・稼働の評価対象外。'
+];
+
+function systemPromptYearly_() {
+  return [
+    'あなたは製造業（株式会社ホリゾン、製本・印刷関連機器メーカー）の生産管理課の業務分析担当です。',
+    '課員の日報を年度（10月期〜翌9月期の12か月期）で集計したJSONを受け取り、課長・課員が年度の振り返りに使う分析レポートを日本語で書いてください。',
+    '',
+    '【データの前提】',
+    '- months は月期のラベル（各月期は前月16日〜当月15日）。配列の値は months と同じ順。null は未経過またはデータなし。',
+    '- persons[担当].ot / n は月期ごとの残業・通常時間（退勤時刻から算出した正式な値）。persons[担当].subs は年度累計の中分類別 [通常, 残業]（日報入力ベース）。',
+    '- mainByMonth は大分類ごとの月期別の作業時間（通常＋残業）。cats で中分類コードを「大分類/中分類」名に引ける。',
+    '- prevOt は前年度の同じ月期の全員の残業合計。prevPersonsOt は前年度の同じ経過月期までの担当別残業合計。',
+    '- elapsed は経過した月期数、curIdx は進行中の月期の位置（-1 なら無し）。進行中の月期は途中の値。',
+    '- 36協定の管理基準: 月 otMonthWarn h で警告、月 otMonthLimit h が上限、年 otYearLimit h が上限、月上限超えは年 otOverMonthsMax 回まで。',
+    '- 年間見込みは、終わった月期の平均×12 で考える。',
+    '',
+    '【出力形式】',
+    '- 次の形のJSONだけを出力する。前後に説明文やコードブロック記号を付けない。',
+    '{"headline":"…","status":"good|warn|bad","sections":{"overview":[…],"overtime":[…],"workmix":[…],"concerns":[…]},"notes":{"trend":"…","heat":"…","fy":"…","mix":"…"},"actions":[{"text":"…","who":"…"}]}',
+    '- headline: 年度全体を一文で総括（60字以内）。status: bad=年上限超過や超過見込みなど対応が必要、warn=注意、good=概ね良好。',
+    '- sections の各配列の要素は {"tone":"good|warn|bad|info","text":"…"}。text は1項目80字以内、各セクション2〜4項目。',
+    '  overview=年度の全体像、overtime=残業の推移と36協定、workmix=業務構成の変化、concerns=気になる点。',
+    '- notes: 画面の各グラフに添える一言（各60字以内）。trend=月期ごとの全員残業の推移と前年比、heat=担当×月期の残業（警告・上限の発生状況）、fy=年度累計と年上限に対する見込み、mix=大分類構成の月期推移。',
+    '- actions: 残りの期間に向けた具体的な打ち手を3〜4件。who は主に関わる担当名か「課全体」。',
+    '- 経過月期が少ない場合は、その旨を明記し、断定を避ける。'
+  ].concat(COMMON_RULES_).join('\n');
+}
+
+function systemPromptKpi_() {
+  return [
+    'あなたは製造業（株式会社ホリゾン、製本・印刷関連機器メーカー）の生産管理課の業務分析担当です。',
+    '課のKPI（月期ごとの工数目標。全員の工数合計を目標以下に収める）を年度で集計したJSONを受け取り、課長・各KPIの主担当が進捗確認に使うレポートを日本語で書いてください。',
+    '',
+    '【データの前提】',
+    '- periods は月期（KPI の月期は1日〜月末）。配列の値は periods と同じ順。null は未経過またはデータなし。',
+    '- kpis[] の各要素: key, name, target（月期ごとの上限h）, owner（主担当）, plan（アクションプラン）, vals（月期ごとの実績h）, byAuthor（年度累計の担当別h）, bySub（年度累計の中分類別h）。kind=ot は全員の残業時間合計の KPI。',
+    '- curIdx は進行中の月期の位置（-1 なら無し）。進行中の月期の値は途中経過で、proj を掛けると締め日までの見込みになる。',
+    '- 判定: 実績（進行中は見込み）が target 以下=達成、1.2倍まで=超過、1.2倍超=大幅超過。',
+    '',
+    '【出力形式】',
+    '- 次の形のJSONだけを出力する。前後に説明文やコードブロック記号を付けない。',
+    '{"headline":"…","status":"good|warn|bad","sections":{"overview":[…],"concerns":[…]},"kpis":{"<key>":{"tone":"good|warn|bad|info","text":"…"}},"actions":[{"text":"…","who":"…"}]}',
+    '- headline: KPI全体の状況を一文で総括（60字以内）。status: bad=大幅超過が続くKPIあり、warn=超過あり、good=概ね達成。',
+    '- sections の各配列の要素は {"tone":"good|warn|bad|info","text":"…"}。text は1項目80字以内、各2〜4項目。overview=全体の達成状況、concerns=気になる点。',
+    '- kpis: すべての KPI の key について1件ずつ、100字以内。達成した月期数と傾向、今期の見込み、要因（担当や中分類の偏り）、アクションプランとの関係を書く。',
+    '- actions: KPI 達成に向けた具体的な打ち手を3〜4件。who は主担当名か「課全体」。'
+  ].concat(COMMON_RULES_).join('\n');
+}
+
 function callClaude_(data) {
   var key = apiKey_();
   if (!key) throw new Error('APIキーが未設定です（GASのスクリプトプロパティ ANTHROPIC_API_KEY）');
   var base = {
     model: model_(),
-    system: systemPrompt_(),
+    system: systemPrompt_(data && data.kind),
     messages: [{role: 'user', content: '次の月期の日報集計データを分析してください。\n\n```json\n' + JSON.stringify(data) + '\n```'}]
   };
   // 1回目: 事前の思考を止めて（Sonnet 5.5 は between_tools）出力枠をすべて本文に使う
