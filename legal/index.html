@@ -7934,25 +7934,29 @@ function _aiYearPayload(c) {
   const yL = R.otYearLimit || 360, mL = R.otMonthLimit || 45, wL = R.otMonthWarn || 36;
   const nm = Object.keys(persons).filter(a => a !== 'ヘルプ');
   const done = i => has[i] && i !== curIdx;
+  const remainingMonths = ranges.filter(r => r.endDate >= today).length;   // 締まっていない月期（進行中＋未来）
   const monthTotalOt = c.periods.map((_, i) => has[i] ? _aiR(nm.reduce((t, a) => t + (persons[a].ot[i] || 0), 0)) : null);
   const sumP = {};
   nm.forEach(a => {
     const o = persons[a].ot, ds = o.filter((v, i) => done(i) && v != null);
     const cum = o.reduce((t, v) => t + (v || 0), 0), avg = ds.length ? ds.reduce((t, v) => t + v, 0) / ds.length : null;
+    const cumDone = ds.reduce((t, v) => t + v, 0);
     sumP[a] = {cumOt: _aiR(cum), overMonthLimit: o.filter(v => v != null && v > mL).length, warnMonths: o.filter(v => v != null && v >= wL && v <= mL).length,
-      avgOt: avg == null ? null : _aiR(avg), projYearOt: avg == null ? null : _aiR(avg * 12), prevSameOt: prevPersonsOt[a] == null ? null : prevPersonsOt[a]};
+      avgOt: avg == null ? null : _aiR(avg), projYearOt: avg == null || !remainingMonths ? null : _aiR(cumDone + avg * remainingMonths),
+      prevSameOt: prevPersonsOt[a] == null ? null : prevPersonsOt[a]};
   });
   const totalOt = _aiR(monthTotalOt.reduce((t, v) => t + (v || 0), 0));
   const prevSameOt = _aiR(prevOt.reduce((t, v, i) => t + (has[i] && v != null ? v : 0), 0));
   const summary = {
-    note: 'すべて計算済みの正しい値。合計・累計・平均・回数・差はここから引用し、自分で計算しないこと。',
+    note: 'すべて計算済みの正しい値。合計・累計・平均・回数・差はここから引用し、自分で計算しないこと。projYearOt は締まった月期の累計＋平均×残り月期（remainingMonths）。残り月期が0なら null（年度は確定）。',
+    remainingMonths,
     totalOt, prevSameOt, diffVsPrev: _aiR(totalOt - prevSameOt), ratioVsPrev: prevSameOt ? _aiR(totalOt / prevSameOt) : null,
     monthTotalOt, monthPrevOt: prevOt, persons: sumP,
     overYearLimit: nm.filter(a => sumP[a].cumOt > yL), projOverYearLimit: nm.filter(a => sumP[a].cumOt <= yL && (sumP[a].projYearOt || 0) > yL),
     overMonthLimitTotal: nm.reduce((t, a) => t + sumP[a].overMonthLimit, 0), warnMonthsTotal: nm.reduce((t, a) => t + sumP[a].warnMonths, 0)
   };
   return {
-    kind: 'yearly', dept: (DEPARTMENT_CONFIG.branding || {}).dept || '', summary,
+    kind: 'yearly', dept: (DEPARTMENT_CONFIG.branding || {}).dept || '', summary, remainingMonths,
     fy: `${c.fy + 1}年度（${fiscalKi(c.fy)}期）`, months: c.periods.map(x => `${x.month}月期`),
     elapsed: has.filter(Boolean).length, curIdx,
     rules: {otMonthWarn: R.otMonthWarn, otMonthLimit: R.otMonthLimit, otYearLimit: R.otYearLimit, otOverMonthsMax: R.otOverMonthsMax},
@@ -7972,7 +7976,8 @@ function _aiYearVisuals(p) {
   const cells = []; names.forEach(a => p.persons[a].ot.forEach(v => { if (v != null) cells.push(v); }));
   const nOver = cells.filter(v => v > limit).length, nWarn = cells.filter(v => v >= warn && v <= limit).length;
   const nDone = p.months.filter((_, i) => done(i)).length;
-  const proj = a => { const o = p.persons[a].ot, ds = o.filter((v, i) => done(i) && v != null); return ds.length ? ds.reduce((t, v) => t + v, 0) / ds.length * 12 : null; };
+  const rem = p.remainingMonths || 0;
+  const proj = a => { if (!rem) return null; const o = p.persons[a].ot, ds = o.filter((v, i) => done(i) && v != null); return ds.length ? ds.reduce((t, v) => t + v, 0) * (1 + rem / ds.length) : null; };
   const cum = a => p.persons[a].ot.reduce((t, v) => t + (v || 0), 0);
   const nPjOver = names.filter(a => (proj(a) || 0) > yLimit || cum(a) > yLimit).length;
   const tile = (label, val, sub, tone) => `<div class="aiv-kpi${tone ? ' ' + tone : ''}"><div class="k">${label}</div><div class="v">${val}</div><div class="s">${sub || '&nbsp;'}</div></div>`;
@@ -7981,7 +7986,7 @@ function _aiYearVisuals(p) {
     ${tile('月平均 / 人', _aiFmtH(names.length && p.elapsed ? totOt / p.elapsed / names.length : 0) + '<small>h</small>', `${names.length}名・${p.elapsed}か月期`)}
     ${tile(`月 ${warn}〜${limit}h`, nWarn + '<small>回</small>', '警告ラインの延べ回数', nWarn ? 'warn' : '')}
     ${tile(`月 ${limit}h 超え`, nOver + '<small>回</small>', `年${R.otOverMonthsMax || 6}回まで（1人あたり）`, nOver ? 'crit' : 'ok')}
-    ${tile(`年 ${yLimit}h 超え見込み`, nPjOver + '<small>名</small>', nDone ? `終わった${nDone}か月期の平均×12` : '終わった月期なし', nPjOver ? 'crit' : 'ok')}
+    ${tile(rem ? `年 ${yLimit}h 超え（見込み含む）` : `年 ${yLimit}h 超え`, nPjOver + '<small>名</small>', rem ? `残り${rem}か月期は締まった月期の平均で推計` : '年度確定', nPjOver ? 'crit' : 'ok')}
   </div>`;
 
   // ① 月期ごとの残業（全員合計）と前年
@@ -8012,7 +8017,7 @@ function _aiYearVisuals(p) {
   const fr = names.map(a => ({a, c: cum(a), pj: proj(a)})).sort((x, y) => Math.max(y.c, y.pj || 0) - Math.max(x.c, x.pj || 0));
   const mf = Math.max(yLimit * 1.1, ...fr.map(r => Math.max(r.c, r.pj || 0))) || 1;
   const fy = `<div class="aiv-chart">
-    <div class="aiv-ttl">年度累計と年間見込み<span>棒=累計　薄い帯=年間見込み（終わった月期の平均×12）　縦線=年${yLimit}h</span></div>
+    <div class="aiv-ttl">年度累計と年間見込み<span>棒=累計　${rem ? `薄い帯=年間見込み（残り${rem}か月期を締まった月期の平均で推計）　` : ''}縦線=年${yLimit}h</span></div>
     <div class="aiv-bars">
       <i class="aiv-ref crit" style="--x:${yLimit / mf * 100}"><b>${yLimit}h</b></i>
       ${fr.map(r => { const tone = r.c > yLimit ? 'crit' : (r.pj || 0) > yLimit ? 'warn' : '';
