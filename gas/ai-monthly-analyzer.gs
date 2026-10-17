@@ -30,7 +30,7 @@
  */
 
 var DEFAULT_MODEL = 'claude-sonnet-5-5';
-var MAX_TOKENS = 2000;
+var MAX_TOKENS = 8000;            // 思考分も含む出力上限（思考で使い切ると本文が空になるため余裕を持たせる）
 var PART_TTL = 600;               // 分割送信の断片を保持する秒数
 var MAX_PAYLOAD_CHARS = 60000;    // 受け付ける集計データの上限（文字数）
 var MIN_INTERVAL_MS = 20 * 1000;  // 同じ期間の再分析を受け付ける最短間隔
@@ -176,7 +176,10 @@ function callClaude_(data) {
   }
   var text = (out.content || []).filter(function (c) { return c.type === 'text'; })
     .map(function (c) { return c.text; }).join('\n').trim();
-  if (!text) throw new Error('Claude API から本文が返りませんでした');
+  if (!text) {
+    var types = (out.content || []).map(function (c) { return c.type; }).join(',') || 'なし';
+    throw new Error('Claude API から本文が返りませんでした（stop_reason: ' + out.stop_reason + ' / 内容: ' + types + '）');
+  }
   return text;
 }
 
