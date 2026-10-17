@@ -7303,7 +7303,7 @@ function _aiMainOf(subs) {
 function _aiVisuals(p) {
   const R = DEPARTMENT_CONFIG.rules, warn = R.otMonthWarn || 36, limit = R.otMonthLimit || 45, yLimit = R.otYearLimit || 360;
   const names = Object.keys(p.cur).filter(a => a !== 'ヘルプ');
-  const prev = p.prev || null;
+  const prev = p.prev && Object.keys(p.prev).length ? p.prev : null;   // 前月期のデータが無い月は比較を出さない
   const totOt = names.reduce((t, a) => t + p.cur[a].ot, 0);
   const prevNames = prev ? Object.keys(prev).filter(a => a !== 'ヘルプ') : [];
   const prevOt = prev ? prevNames.reduce((t, a) => t + prev[a].ot, 0) : null;

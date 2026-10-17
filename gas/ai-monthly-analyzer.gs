@@ -181,33 +181,44 @@ function systemPrompt_() {
 function callClaude_(data) {
   var key = apiKey_();
   if (!key) throw new Error('APIキーが未設定です（GASのスクリプトプロパティ ANTHROPIC_API_KEY）');
-  var body = {
+  var base = {
     model: model_(),
-    max_tokens: MAX_TOKENS,
     system: systemPrompt_(),
     messages: [{role: 'user', content: '次の月期の日報集計データを分析してください。\n\n```json\n' + JSON.stringify(data) + '\n```'}]
   };
-  var res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
-    method: 'post',
-    contentType: 'application/json',
-    headers: {'x-api-key': key, 'anthropic-version': '2023-06-01'},
-    payload: JSON.stringify(body),
-    muteHttpExceptions: true
-  });
-  var code = res.getResponseCode();
-  var out = {};
-  try { out = JSON.parse(res.getContentText()); } catch (e) {}
-  if (code !== 200) {
-    var msg = (out && out.error && out.error.message) || res.getContentText().slice(0, 300);
-    throw new Error('Claude API エラー（' + code + '）: ' + msg);
-  }
-  var text = (out.content || []).filter(function (c) { return c.type === 'text'; })
-    .map(function (c) { return c.text; }).join('\n').trim();
-  if (!text) {
+  // 1回目: 事前の思考を止めて（Sonnet 5.5 は between_tools）出力枠をすべて本文に使う
+  // 2回目: 指定が通らないモデルや枠切れのときは、思考ありのまま出力枠を広げて再試行
+  var tries = [
+    {max_tokens: MAX_TOKENS, thinking: {type: 'between_tools'}, output_config: {effort: 'medium'}},
+    {max_tokens: 16000, output_config: {effort: 'low'}}
+  ];
+  var lastErr = null;
+  for (var t = 0; t < tries.length; t++) {
+    var body = JSON.parse(JSON.stringify(base));
+    Object.keys(tries[t]).forEach(function (k) { body[k] = tries[t][k]; });
+    var res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: {'x-api-key': key, 'anthropic-version': '2023-06-01'},
+      payload: JSON.stringify(body),
+      muteHttpExceptions: true
+    });
+    var code = res.getResponseCode();
+    var out = {};
+    try { out = JSON.parse(res.getContentText()); } catch (e) {}
+    if (code !== 200) {
+      var msg = (out && out.error && out.error.message) || res.getContentText().slice(0, 300);
+      lastErr = new Error('Claude API エラー（' + code + '）: ' + msg);
+      if (code === 400) continue;   // パラメータ非対応 → 次の設定で再試行
+      throw lastErr;
+    }
+    var text = (out.content || []).filter(function (c) { return c.type === 'text'; })
+      .map(function (c) { return c.text; }).join('\n').trim();
+    if (text && out.stop_reason !== 'max_tokens') return text;
     var types = (out.content || []).map(function (c) { return c.type; }).join(',') || 'なし';
-    throw new Error('Claude API から本文が返りませんでした（stop_reason: ' + out.stop_reason + ' / 内容: ' + types + '）');
+    lastErr = new Error('Claude API から本文が最後まで返りませんでした（stop_reason: ' + out.stop_reason + ' / 内容: ' + types + '）');
   }
-  return text;
+  throw lastErr;
 }
 
 // ─── 設置確認（エディタから手動実行） ───
