@@ -7249,6 +7249,18 @@ async function runAiAnalysis() {
   try {
     // 前月期・年度累計の読込（管理者サマリー用に裏で取得中）を最大15秒待つ
     for (let i = 0; i < 30 && st.ctx.fy == null; i++) await new Promise(r => setTimeout(r, 500));
+    // 前月期が空のときは、古いキャッシュの可能性があるので取り直してから送る
+    if (!st.ctx.prev || !Object.keys(st.ctx.prev).length) {
+      const p = st.ctx.period;
+      const pp = p.month === 1 ? {year: p.year - 1, month: 12} : {year: p.year, month: p.month - 1};
+      const {startDate, endDate} = getPeriodDates(pp.year, pp.month);
+      const ck = `range_${startDate}_${endDate}`;
+      try {
+        _cache.delete(ck); lsCacheDelete(ck);
+        const prev = await withTimeout(loadRangeData(startDate, endDate, pp.year, pp.month), 15000, 'timeout');
+        if (prev) { st.ctx.prev = _otByAuthor(prev); st.ctx.prevRaw = prev; }
+      } catch (e) { console.warn('[AI分析] 前月期の再取得に失敗:', e.message); }
+    }
     const payload = buildAiPayload();
     if (!payload || !Object.keys(payload.cur).length) throw new Error('この月期のデータがありません');
     const json = JSON.stringify(payload);
