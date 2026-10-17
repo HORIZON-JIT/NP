@@ -8067,7 +8067,13 @@ function _aiKpiPayload() {
       avgDone: past.length ? _aiR(past.reduce((t, x) => t + x.v, 0) / past.length) : null, judge,
       curValue: cv, curProjection: cv == null ? null : _aiR(cv * proj), totalByAuthor: k.byAuthor};
   });
-  return {kind: 'kpi', dept: (DEPARTMENT_CONFIG.branding || {}).dept || '', fy: `${c.fy + 1}年度（${fiscalKi(c.fy)}期）`,
+  // 判定ごとの件数（最新の月期＝進行中なら見込み）も計算して渡す
+  const li = c.curIdx >= 0 ? c.curIdx : c.lastIdx, latest = {};
+  kpis.forEach(k => { const l = li >= 0 ? k.summary.judge[li] : null; if (l) (latest[l] = latest[l] || []).push(k.name); });
+  const summary = {note: 'すべて計算済みの正しい値。件数はここから引用し、自分で数えないこと。',
+    latestPeriod: li >= 0 ? `${c.periods[li].month}月期` + (li === c.curIdx ? '（進行中・見込み）' : '') : null,
+    latestJudgeCounts: Object.fromEntries(Object.entries(latest).map(([l, a]) => [l, a.length])), latestJudgeKpis: latest, kpiCount: kpis.length};
+  return {kind: 'kpi', summary, dept: (DEPARTMENT_CONFIG.branding || {}).dept || '', fy: `${c.fy + 1}年度（${fiscalKi(c.fy)}期）`,
     periods: c.periods.map((x, i) => ({label: `${x.month}月期`, range: c.ranges[i].range})), curIdx: c.curIdx, proj: _aiR(c.proj || 1), kpis};
 }
 
