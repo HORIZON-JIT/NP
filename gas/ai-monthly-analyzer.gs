@@ -63,10 +63,35 @@ function storeKey_(key) {
   return STORE_PREFIX + key;
 }
 function getStored_(key) {
-  var raw = PropertiesService.getScriptProperties().getProperty(storeKey_(key));
-  if (!raw) return {ok: true, found: false};
-  var s = JSON.parse(raw);
+  var s = readRec_(storeKey_(key));
+  if (!s) return {ok: true, found: false};
   return {ok: true, found: true, text: s.text, at: s.at, model: s.model, hash: s.hash, cached: true};
+}
+// スクリプトプロパティは1件9KBまでなので、長い結果は sk, sk#1, sk#2 … に分けて保存する
+function readRec_(sk) {
+  var props = PropertiesService.getScriptProperties();
+  var raw = props.getProperty(sk);
+  if (!raw) return null;
+  var head = JSON.parse(raw);
+  if (head.parts) {
+    var txt = '';
+    for (var i = 1; i <= head.parts; i++) txt += props.getProperty(sk + '#' + i) || '';
+    head.text = txt;
+  }
+  return head;
+}
+function writeRec_(sk, rec) {
+  var props = PropertiesService.getScriptProperties();
+  var old = props.getProperty(sk);
+  if (old) { try { var o = JSON.parse(old); for (var j = 1; j <= (o.parts || 0); j++) props.deleteProperty(sk + '#' + j); } catch (e) {} }
+  var CH = 2500;   // 日本語3バイト換算で約7.5KB
+  var parts = [];
+  for (var i = 0; i < rec.text.length; i += CH) parts.push(rec.text.slice(i, i + CH));
+  if (parts.length > 8) throw new Error('分析結果が長すぎて保存できません');
+  var head = {at: rec.at, model: rec.model, hash: rec.hash, parts: parts.length};
+  var kv = {}; kv[sk] = JSON.stringify(head);
+  parts.forEach(function (t, k) { kv[sk + '#' + (k + 1)] = t; });
+  props.setProperties(kv);
 }
 
 // ─── 分割送信 ───
@@ -95,9 +120,7 @@ function joinParts_(id, n) {
 // ─── 分析本体 ───
 function analyze_(id, n, key, hash, force) {
   var sk = storeKey_(key);
-  var props = PropertiesService.getScriptProperties();
-  var prevRaw = props.getProperty(sk);
-  var prev = prevRaw ? JSON.parse(prevRaw) : null;
+  var prev = readRec_(sk);
   if (prev && !force && prev.hash && prev.hash === hash) {
     return {ok: true, found: true, text: prev.text, at: prev.at, model: prev.model, hash: prev.hash, cached: true};
   }
@@ -112,13 +135,7 @@ function analyze_(id, n, key, hash, force) {
   try {
     var text = callClaude_(data);
     var rec = {text: text, at: new Date().toISOString(), model: model_(), hash: String(hash || '')};
-    var s = JSON.stringify(rec);
-    // スクリプトプロパティは1件9KBまで。超える場合は末尾を切り詰めて保存する
-    while (Utilities.newBlob(s).getBytes().length > 8800 && rec.text.length > 200) {
-      rec.text = rec.text.slice(0, Math.floor(rec.text.length * 0.9)) + '\n\n（保存容量の都合で以降を省略）';
-      s = JSON.stringify(rec);
-    }
-    props.setProperty(sk, s);
+    writeRec_(sk, rec);
     return {ok: true, found: true, text: rec.text, at: rec.at, model: rec.model, hash: rec.hash, cached: false};
   } finally {
     lock.releaseLock();
@@ -141,13 +158,19 @@ function systemPrompt_() {
     '- 36協定の管理基準: 月 otMonthWarn h で警告、月 otMonthLimit h が上限、年 otYearLimit h が上限。',
     '- 担当「ヘルプ」は応援者の工数で、残業・稼働の評価対象外。',
     '',
-    '【書き方】',
-    '- Markdown。見出しは「## 」、箇条書きは「- 」のみ使う。表は使わない。',
-    '- 次の見出しをこの順で出す: ## 全体概況 / ## 残業の傾向 / ## 業務構成の変化 / ## 気になる点 / ## 来月期に向けて',
-    '- 数値は必ずデータから計算できるものだけを書き、小数第1位までに丸める。データに無いことは書かない。推測は「〜と考えられます」と明記する。',
-    '- 前月期との差は増減の大きいものに絞る。期の途中なら、その旨と稼働日ベースの見込みに触れる。',
+    '【出力形式】',
+    '- 次の形のJSONだけを出力する。前後に説明文やコードブロック記号を付けない。',
+    '{"headline":"…","sections":{"overview":[…],"overtime":[…],"workmix":[…],"concerns":[…]},"actions":[{"text":"…","who":"…"}]}',
+    '- headline: 月期全体を一文で総括（60字以内）。',
+    '- sections の各配列の要素は {"tone":"good|warn|bad|info","text":"…"}。text は1項目80字以内、各セクション2〜4項目。',
+    '  overview=全体概況、overtime=残業の傾向、workmix=業務構成の変化（前月期との差）、concerns=気になる点。',
+    '  tone: good=改善・良い傾向、warn=注意が必要、bad=基準超過など対応が必要、info=事実の説明。',
+    '- actions: 来月期に向けた具体的な打ち手を3〜4件。who は主に関わる担当名か「課全体」。',
+    '- 画面には担当別残業・業務構成・年度累計のグラフが別に表示される。グラフを読めば分かる数値の羅列は避け、増減の理由・偏り・注意点など解釈を中心に書く。',
+    '- 数値はデータから計算できるものだけを使い、小数第1位までに丸める。データに無いことは書かない。推測は「〜と考えられます」と明記する。',
+    '- 期の途中（inProgress=true）なら、その旨と稼働日ベースの見込みに触れる。',
     '- 特定の個人を責める書き方はしない。偏りは業務の配分・時期の問題として書く。',
-    '- 強調のためにかぎ括弧を使わない。です・ます調。全体で900〜1300字程度。'
+    '- 強調のためにかぎ括弧を使わない。です・ます調。'
   ].join('\n');
 }
 
