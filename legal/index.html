@@ -480,6 +480,8 @@ em.warn{background:var(--st-warn-bg);color:var(--st-warn-ink);} em.crit{backgrou
 .aiv-md{margin-bottom:12px;}
 /* ── 月次: 通常の分析 ⇄ AI分析 の画面切替 ── */
 #mv-stage{position:relative;view-transition-name:mv-stage;}
+#yv-stage{position:relative;view-transition-name:yv-stage;}
+#kv-stage{position:relative;view-transition-name:kv-stage;}
 .mv-off{position:absolute!important;left:0;right:0;top:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none;}
 .btn-ai-view{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:6px;border:none;border-radius:999px;padding:6px 15px 6px 12px;font-size:12.5px;font-weight:800;font-family:inherit;cursor:pointer;color:#fff;letter-spacing:.02em;
   background:linear-gradient(135deg,#6d4fd8 0%,#2f6fe0 55%,#16a3b8 100%);box-shadow:0 4px 14px -4px rgba(63,90,220,.55),inset 0 0 0 1px rgba(255,255,255,.18);transition:transform .18s,box-shadow .18s;}
@@ -491,16 +493,16 @@ em.warn{background:var(--st-warn-bg);color:var(--st-warn-ink);} em.crit{backgrou
 .btn-ai-view.on::after{display:none;}
 .btn-ai-view.on svg{display:none;}
 @keyframes aiShine{0%,62%{left:-60%}100%{left:130%}}
-#ai-card{border:none;background:linear-gradient(var(--surface),var(--surface)) padding-box,linear-gradient(135deg,#6d4fd8,#2f6fe0 55%,#16a3b8) border-box;border:1.5px solid transparent;}
-#ai-card .card-hd h2{background:linear-gradient(135deg,#6d4fd8,#2f6fe0 55%,#16a3b8);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:15px;}
+#ai-card,.ai-card{border:none;background:linear-gradient(var(--surface),var(--surface)) padding-box,linear-gradient(135deg,#6d4fd8,#2f6fe0 55%,#16a3b8) border-box;border:1.5px solid transparent;}
+#ai-card .card-hd h2,.ai-card .card-hd h2{background:linear-gradient(135deg,#6d4fd8,#2f6fe0 55%,#16a3b8);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:15px;}
 /* ページ切替（View Transitions） */
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.2s;}
-::view-transition-group(mv-stage){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,.8,.2,1);}
-::view-transition-old(mv-stage),::view-transition-new(mv-stage){height:auto;object-fit:none;object-position:50% 0;}
-::view-transition-old(mv-stage){animation:mvOutL .34s cubic-bezier(.55,0,.75,.2) both;}
-::view-transition-new(mv-stage){animation:mvInR .55s cubic-bezier(.16,.84,.3,1) .08s both;}
-html[data-mv-dir="back"]::view-transition-old(mv-stage){animation-name:mvOutR;}
-html[data-mv-dir="back"]::view-transition-new(mv-stage){animation-name:mvInL;}
+::view-transition-group(mv-stage),::view-transition-group(yv-stage),::view-transition-group(kv-stage){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,.8,.2,1);}
+::view-transition-old(mv-stage),::view-transition-new(mv-stage),::view-transition-old(yv-stage),::view-transition-new(yv-stage),::view-transition-old(kv-stage),::view-transition-new(kv-stage){height:auto;object-fit:none;object-position:50% 0;}
+::view-transition-old(mv-stage),::view-transition-old(yv-stage),::view-transition-old(kv-stage){animation:mvOutL .34s cubic-bezier(.55,0,.75,.2) both;}
+::view-transition-new(mv-stage),::view-transition-new(yv-stage),::view-transition-new(kv-stage){animation:mvInR .55s cubic-bezier(.16,.84,.3,1) .08s both;}
+html[data-mv-dir="back"]::view-transition-old(mv-stage),html[data-mv-dir="back"]::view-transition-old(yv-stage),html[data-mv-dir="back"]::view-transition-old(kv-stage){animation-name:mvOutR;}
+html[data-mv-dir="back"]::view-transition-new(mv-stage),html[data-mv-dir="back"]::view-transition-new(yv-stage),html[data-mv-dir="back"]::view-transition-new(kv-stage){animation-name:mvInL;}
 @keyframes mvOutL{to{opacity:0;transform:translateX(-6%) scale(.96);filter:blur(4px);}}
 @keyframes mvOutR{to{opacity:0;transform:translateX(6%) scale(.96);filter:blur(4px);}}
 @keyframes mvInR{from{opacity:0;transform:translateX(8%) scale(.98);filter:blur(6px);}}
@@ -516,7 +518,7 @@ html[data-mv-dir="back"]::view-transition-new(mv-stage){animation-name:mvInL;}
 @keyframes mvFade{from{opacity:0;}}
 .aiv-row .bar,.aiv-drow .pos .bar,.aiv-stk .seg span{transform-origin:left;}
 @media (prefers-reduced-motion:reduce){
-  ::view-transition-group(mv-stage),::view-transition-old(mv-stage),::view-transition-new(mv-stage){animation:none!important;}
+  ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important;}
   .mv-enter *{animation:none!important;}
   .btn-ai-view::after{display:none;}
 }
@@ -549,6 +551,56 @@ html[data-mv-dir="back"]::view-transition-new(mv-stage){animation-name:mvInL;}
 .aiv-legend.hm{margin-left:0;align-items:center;}
 .aiv-legend .ramp{width:90px!important;height:8px!important;border-radius:4px!important;background:linear-gradient(90deg,color-mix(in srgb,var(--dx-accent,var(--primary)) 10%,var(--surface)),var(--dx-accent,var(--primary)));}
 .aiv-act .aiv-actions li{background:var(--panel);}
+/* 年次: 月期ごとの縦棒 */
+.aiv-cols{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px;height:190px;align-items:stretch;}
+.aiv-cols .col{display:flex;flex-direction:column;align-items:center;min-width:0;cursor:default;}
+.aiv-cols .cv{font-size:10.5px;font-weight:800;color:var(--g600);height:15px;font-variant-numeric:tabular-nums;}
+.aiv-cols .ctrk{position:relative;flex:1;width:100%;max-width:34px;border-bottom:1px solid var(--g300);}
+.aiv-cols .cbar{position:absolute;left:3px;right:3px;bottom:0;background:var(--dx-accent,var(--primary));border-radius:4px 4px 0 0;transform-origin:bottom;}
+.aiv-cols .col.cur .cbar{background:repeating-linear-gradient(135deg,var(--dx-accent,var(--primary)) 0 4px,color-mix(in srgb,var(--dx-accent,var(--primary)) 55%,var(--surface)) 4px 7px);}
+.aiv-cols .cpv{position:absolute;left:50%;width:8px;height:8px;margin:0 0 -4px -4px;background:var(--g700);transform:rotate(45deg);box-shadow:0 0 0 2px var(--surface);}
+.aiv-cols .cl{font-size:10.5px;font-weight:700;color:var(--g500);margin-top:4px;}
+.aiv-cols .col:hover .ctrk{background:var(--g100);border-radius:4px 4px 0 0;}
+.aiv-cols-unit{text-align:right;font-size:10px;color:var(--g400);margin-top:2px;}
+.mv-enter .aiv-cols .cbar{animation:mvGrowY .8s cubic-bezier(.16,.84,.3,1) both;animation-delay:calc(var(--i,0) * 55ms + 260ms);}
+@keyframes mvGrowY{from{transform:scaleY(0);}}
+.aiv-heat.yh td{min-width:44px;height:26px;font-size:11px;}
+.aiv-heat.yh td.warn{background:color-mix(in srgb,var(--st-warn) 34%,var(--surface));color:var(--st-warn-ink);}
+.aiv-heat.yh td.crit{background:color-mix(in srgb,var(--st-crit) 30%,var(--surface));color:var(--st-crit-ink);}
+.aiv-heat.yh td.cur,.aiv-heat.yh th.cur{box-shadow:inset 0 0 0 1.5px var(--g500);}
+.aiv-row .bar.pj{opacity:.28;border-radius:0 4px 4px 0;}
+/* KPI: カード */
+.aik-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;margin-bottom:12px;}
+.aik-card{background:var(--surface);border:1px solid var(--g200);border-radius:10px;padding:12px 14px;border-top:3px solid var(--g300);min-width:0;}
+.aik-card.is-ok{border-top-color:var(--st-ok);} .aik-card.is-warn{border-top-color:var(--st-warn);} .aik-card.is-crit{border-top-color:var(--st-crit);}
+.aik-hd{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.aik-hd b{font-size:13px;font-weight:800;color:var(--g800);}
+.aik-hd .own{font-size:10.5px;font-weight:700;color:var(--g600);background:var(--g100);border-radius:10px;padding:1px 8px;}
+.aik-hd .tg{margin-left:auto;font-size:11px;font-weight:700;color:var(--g500);}
+.aik-chart{position:relative;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:3px;height:96px;padding-top:4px;}
+.aik-tl{position:absolute;left:0;right:0;bottom:calc(15px + 77px * var(--tf, 0));border-top:1.5px dashed var(--g400);pointer-events:none;z-index:1;}
+.aik-tl b{position:absolute;right:0;top:-13px;font-size:9px;font-weight:800;color:var(--g500);}
+.aik-chart .kc{display:flex;flex-direction:column;min-width:0;cursor:default;}
+.aik-chart .kb{position:relative;flex:1;border-bottom:1px solid var(--g300);}
+.aik-chart .kv,.aik-chart .kpj{position:absolute;left:1px;right:1px;bottom:0;border-radius:3px 3px 0 0;transform-origin:bottom;}
+.aik-chart .kv.is-ok{background:var(--st-ok);} .aik-chart .kv.is-warn{background:var(--st-warn);} .aik-chart .kv.is-crit{background:var(--st-crit);}
+.aik-chart .kpj{background:repeating-linear-gradient(135deg,var(--g300) 0 3px,transparent 3px 6px);}
+.aik-chart .kpj.is-crit{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--st-crit) 55%,transparent) 0 3px,transparent 3px 6px);}
+.aik-chart .kpj.is-warn{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--st-warn) 60%,transparent) 0 3px,transparent 3px 6px);}
+.aik-chart .kc.na .kb{background:repeating-linear-gradient(135deg,transparent 0 3px,var(--g100) 3px 5px);}
+.aik-chart .kl{font-size:9px;font-weight:700;color:var(--g400);text-align:center;height:15px;line-height:15px;}
+.aik-chart .kc.cur .kl{color:var(--g800);}
+.aik-chart .kc:hover .kb{background:var(--g100);}
+.mv-enter .aik-chart .kv,.mv-enter .aik-chart .kpj{animation:mvGrowY .8s cubic-bezier(.16,.84,.3,1) both;animation-delay:calc(var(--i,0) * 55ms + 260ms);}
+.aik-ft{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:11.5px;color:var(--g600);}
+.aik-ft b{font-size:13px;color:var(--g800);}
+.aik-ft .dx-tag{margin-left:auto;}
+.aik-ai{display:flex;gap:8px;align-items:flex-start;margin-top:8px;padding:7px 9px;border-radius:7px;background:var(--panel);border-left:3px solid var(--g300);font-size:12px;line-height:1.6;color:var(--g700);}
+.aik-ai .tag{flex:none;font-size:9.5px;font-weight:800;border-radius:3px;padding:0 4px;margin-top:2px;background:var(--g100);color:var(--g600);}
+.aik-ai.ok{border-left-color:var(--st-ok);} .aik-ai.ok .tag{background:var(--st-ok-bg);color:var(--st-ok-ink);}
+.aik-ai.warn{border-left-color:var(--st-warn);} .aik-ai.warn .tag{background:var(--st-warn-bg);color:var(--st-warn-ink);}
+.aik-ai.crit{border-left-color:var(--st-crit);} .aik-ai.crit .tag{background:var(--st-crit-bg);color:var(--st-crit-ink);}
+.aik-plan{margin-top:6px;font-size:10.5px;color:var(--g400);line-height:1.5;}
 @media (max-width:820px){ .aiv-kpis{grid-template-columns:repeat(2,minmax(0,1fr));} .aiv-grid{grid-template-columns:minmax(0,1fr);} }
 /* ランキング3カラム */
 .d-stat .sd{font-size:11px;color:var(--g500);margin-top:3px;font-weight:700;}
@@ -1832,8 +1884,14 @@ html[data-mv-dir="back"]::view-transition-new(mv-stage){animation-name:mvInL;}
       </div>
       <span class="period-range-label" id="yearly-range">—</span>
       <button class="btn-refresh no-print" onclick="refreshYearly()">再読込</button>
+      <button class="btn-ai-view no-print" id="btn-ai-view-yearly" style="display:none;" onclick="toggleAiView('yearly')" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+        <span class="lbl">AI分析</span>
+      </button>
       <button class="btn-pdf no-print" onclick="exportPdf('yearly')">PDF出力</button>
     </div>
+    <div id="yv-stage" class="ai-stage">
+    <div id="yearly-std">
     <!-- 統計カード（7枚） -->
     <div class="dash-stats dash-stats-7">
       <div class="d-stat"><div class="sv"    id="ys-persons">—</div><div class="sl">記録者数</div></div>
@@ -1912,6 +1970,20 @@ html[data-mv-dir="back"]::view-transition-new(mv-stage){animation-name:mvInL;}
           </select></span></div>
       <div class="card-body"><div id="task-stats" style="overflow-x:auto;"></div></div>
     </div>
+    </div><!-- /yearly-std -->
+    <div id="yearly-ai" class="mv-off" aria-hidden="true">
+    <div class="card ai-card" id="ai-card-yearly">
+      <div class="card-hd">
+        <h2>AI分析</h2>
+        <span class="card-sub">年度の集計を Claude が読み取り、推移と見込み、気付きをまとめます</span>
+        <span class="no-print" style="display:flex;gap:6px;margin-left:auto;">
+          <button class="btn-refresh" id="ai-run-btn-yearly" style="margin-left:0;" onclick="aiScopeRun('yearly')">分析する</button>
+        </span>
+      </div>
+      <div class="card-body"><div id="ai-body-yearly" class="ai-body"><p class="dx-empty">読み込み中…</p></div></div>
+    </div>
+    </div><!-- /yearly-ai -->
+    </div><!-- /yv-stage -->
   </div><!-- /dash-yearly -->
 
   <!-- ─── 個人ビュー ─── -->
@@ -1968,8 +2040,14 @@ html[data-mv-dir="back"]::view-transition-new(mv-stage){animation-name:mvInL;}
       </div>
       <span class="period-range-label" id="kpi-range">—</span>
       <button class="btn-refresh no-print" onclick="renderKpiDash(true)">再読込</button>
+      <button class="btn-ai-view no-print" id="btn-ai-view-kpi" style="display:none;" onclick="toggleAiView('kpi')" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+        <span class="lbl">AI分析</span>
+      </button>
       <button class="btn-pdf no-print" onclick="exportPdf('kpi')">PDF出力</button>
     </div>
+    <div id="kv-stage" class="ai-stage">
+    <div id="kpi-std">
     <div class="dash-stats kpi-tiles" id="kpi-tiles"></div>
     <div class="card">
       <div class="card-hd"><h2>年度の推移</h2><span class="card-sub" id="kpi-sub">月期ごとの工数合計（全員・通常＋残業）を目標と比較</span></div>
@@ -1986,6 +2064,20 @@ html[data-mv-dir="back"]::view-transition-new(mv-stage){animation-name:mvInL;}
       <div class="card-hd"><h2 id="kpi-bd-title">内訳</h2><span class="card-sub" id="kpi-bd-sub">ヒートマップの月期をクリックで切替</span></div>
       <div class="card-body"><div id="kpi-breakdown"></div></div>
     </div>
+    </div><!-- /kpi-std -->
+    <div id="kpi-ai" class="mv-off" aria-hidden="true">
+    <div class="card ai-card" id="ai-card-kpi">
+      <div class="card-hd">
+        <h2>AI分析</h2>
+        <span class="card-sub">KPI の推移を Claude が読み取り、達成状況と要因、打ち手をまとめます</span>
+        <span class="no-print" style="display:flex;gap:6px;margin-left:auto;">
+          <button class="btn-refresh" id="ai-run-btn-kpi" style="margin-left:0;" onclick="aiScopeRun('kpi')">分析する</button>
+        </span>
+      </div>
+      <div class="card-body"><div id="ai-body-kpi" class="ai-body"><p class="dx-empty">読み込み中…</p></div></div>
+    </div>
+    </div><!-- /kpi-ai -->
+    </div><!-- /kv-stage -->
   </div><!-- /dash-kpi -->
 </div><!-- /view-dash -->
 
@@ -7013,6 +7105,7 @@ async function renderKpiDash(force) {
     }
   }
   dxGrow(document.getElementById('dash-kpi'), !!ctx._grown && reuse); ctx._grown = true;
+  aiScopeSet('kpi', 'kpi_' + fy, `${fy + 1}年度（${fiscalKi(fy)}期）`, _aiKpiPayload);
 }
 // ヒートマップのセルにカーソルを合わせたときの担当者別内訳
 function _kpiTipEl() {
@@ -7573,29 +7666,39 @@ function renderAiCard(msg, isErr) {
   body.innerHTML = html;
 }
 
-// ── 月次: 通常の分析 ⇄ AI分析 の画面切替（View Transitions で横にスライド） ──
-let _mvMode = 'std';
-function toggleMonthlyView() { setMonthlyView(_mvMode === 'ai' ? 'std' : 'ai'); }
+// ── 通常の分析 ⇄ AI分析 の画面切替（月次・年次・KPI 共通。View Transitions で横にスライド） ──
+const AIV = {
+  monthly: {std: 'mv-std', ai: 'mv-ai', btn: 'btn-ai-view', top: 'dash-monthly'},
+  yearly:  {std: 'yearly-std', ai: 'yearly-ai', btn: 'btn-ai-view-yearly', top: 'dash-yearly'},
+  kpi:     {std: 'kpi-std', ai: 'kpi-ai', btn: 'btn-ai-view-kpi', top: 'dash-kpi'}
+};
+const _aiViewMode = {monthly: 'std', yearly: 'std', kpi: 'std'};
+let _mvMode = 'std';   // 互換（月次）
+function toggleAiView(scope) { setAiView(scope, _aiViewMode[scope] === 'ai' ? 'std' : 'ai'); }
+function toggleMonthlyView() { toggleAiView('monthly'); }
+function setMonthlyView(mode, instant) { setAiView('monthly', mode, instant); }
 function _mvStagger(root) {
   if (!root) return;
   root.classList.remove('mv-enter');
-  const sel = root.id === 'mv-ai'
-    ? '.card-hd, .aiv-head, .aiv-kpi, #ai-body > .aiv-items > li, .aiv-full, .aiv-grid > .aiv-panel, .ai-meta'
-    : ':scope > .card, :scope > .dash-stats > .d-stat, :scope > .dash-layout > .card';
+  const isAi = /-ai$/.test(root.id);
+  const sel = isAi
+    ? '.card-hd, .aiv-head, .aiv-kpi, .ai-body > .aiv-items > li, .aiv-full, .aiv-grid > .aiv-panel, .aik-card, .ai-meta'
+    : ':scope > .card, :scope > .dash-stats > *, :scope > .dash-layout > .card';
   let i = 0;
   root.querySelectorAll(sel).forEach(el => { el.classList.add('mv-i'); el.style.setProperty('--i', Math.min(i++, 14)); });
   root.querySelectorAll('.aiv-heat tr').forEach((tr, r) => tr.querySelectorAll('td').forEach(td => td.style.setProperty('--i', Math.min(r + 3, 14))));
   void root.offsetWidth;   // 再生し直すためにリフロー
   root.classList.add('mv-enter');
   clearTimeout(root._mvT);
-  root._mvT = setTimeout(() => root.classList.remove('mv-enter'), 2200);
+  root._mvT = setTimeout(() => root.classList.remove('mv-enter'), 2400);
 }
-function setMonthlyView(mode, instant) {
-  if (mode === _mvMode && !instant) return;
-  const std = document.getElementById('mv-std'), ai = document.getElementById('mv-ai'), btn = document.getElementById('btn-ai-view');
+function setAiView(scope, mode, instant) {
+  const C = AIV[scope]; if (!C) return;
+  if (mode === _aiViewMode[scope] && !instant) return;
+  const std = document.getElementById(C.std), ai = document.getElementById(C.ai), btn = document.getElementById(C.btn);
   if (!std || !ai) return;
   const apply = () => {
-    _mvMode = mode;
+    _aiViewMode[scope] = mode; if (scope === 'monthly') _mvMode = mode;
     std.classList.toggle('mv-off', mode === 'ai'); std.setAttribute('aria-hidden', mode === 'ai');
     ai.classList.toggle('mv-off', mode !== 'ai'); ai.setAttribute('aria-hidden', mode !== 'ai');
     if (btn) {
@@ -7603,7 +7706,7 @@ function setMonthlyView(mode, instant) {
       btn.setAttribute('aria-pressed', mode === 'ai');
       btn.querySelector('.lbl').textContent = mode === 'ai' ? '← 通常の分析に戻る' : 'AI分析';
     }
-    const top = document.getElementById('dash-monthly');
+    const top = document.getElementById(C.top);
     if (top && top.getBoundingClientRect().top < 0) top.scrollIntoView({block: 'start'});
   };
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -7691,6 +7794,285 @@ async function runAiAnalysis() {
     st.busy = false;
     renderAiCard('分析できませんでした: ' + e.message, true);
   }
+}
+
+// ═══════════════════════════════════════════
+//  年次・KPI の AI分析（月次と同じ GAS を使い、data.kind でプロンプトを切り替える）
+// ═══════════════════════════════════════════
+const _aiS = {yearly: null, kpi: null};   // {key, label, payloadFn, stored, busy, loading}
+function aiScopeSet(scope, key, label, payloadFn) {
+  const url = aiAnalysisUrl(), btn = document.getElementById(AIV[scope].btn);
+  if (btn) btn.style.display = url ? '' : 'none';
+  if (!url) { if (_aiViewMode[scope] === 'ai') setAiView(scope, 'std', true); return; }
+  const cur = _aiS[scope];
+  if (cur && cur.key === key) { cur.payloadFn = payloadFn; cur.label = label; if (!cur.busy) aiScopeRender(scope); return; }
+  const st = _aiS[scope] = {key, label, payloadFn, stored: null, busy: false, loading: true};
+  aiScopeRender(scope);
+  _aiJsonp(url, {action: 'get', key}, 20000).then(d => {
+    if (_aiS[scope] !== st) return;
+    if (!d || !d.ok) throw new Error((d && d.error) || '取得に失敗しました');
+    st.stored = d.found ? d : null; st.loading = false; aiScopeRender(scope);
+  }).catch(e => {
+    if (_aiS[scope] !== st) return;
+    st.loading = false; aiScopeRender(scope, '保存済みの分析を取得できませんでした: ' + (e.message === 'timeout' ? 'タイムアウト' : e.message), true);
+  });
+}
+async function _aiSend(url, key, payload, force, prevAt) {
+  const json = JSON.stringify(payload), hash = _aiHash(json), b64 = _aiB64(json);
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const parts = [];
+  for (let i = 0; i < b64.length; i += 1500) parts.push(b64.slice(i, i + 1500));
+  await Promise.all(parts.map((d, i) => _aiJsonp(url, {action: 'part', id, i, d}, 25000).then(r => {
+    if (!r || !r.ok) throw new Error((r && r.error) || '集計データの送信に失敗しました');
+  })));
+  let d;
+  try {
+    d = await _aiJsonp(url, {action: 'analyze', id, n: parts.length, key, hash, force: force ? '1' : '0'}, 120000);
+  } catch (e) {
+    if (e.message !== 'timeout') throw e;
+    d = await _aiJsonp(url, {action: 'get', key}, 20000);   // 応答待ちが切れても GAS 側で完了している場合がある
+    if (!d || !d.found || (prevAt && d.at === prevAt)) throw new Error('応答がありませんでした。少し待ってから再読込してください');
+  }
+  if (!d || !d.ok) throw new Error((d && d.error) || '分析に失敗しました');
+  return d;
+}
+async function aiScopeRun(scope) {
+  const st = _aiS[scope], url = aiAnalysisUrl();
+  if (!st || !url || st.busy) return;
+  if (st.stored && !confirm('再分析します（Claude APIの利用料が発生します）。よろしいですか？')) return;
+  st.busy = true; aiScopeRender(scope);
+  try {
+    const payload = st.payloadFn && st.payloadFn();
+    if (!payload) throw new Error('この年度のデータがありません');
+    const d = await _aiSend(url, st.key, payload, !!st.stored, st.stored && st.stored.at);
+    if (_aiS[scope] !== st) return;
+    st.stored = d; st.busy = false;
+    aiScopeRender(scope, d.note || '');
+    if (_aiViewMode[scope] === 'ai') _mvStagger(document.getElementById(AIV[scope].ai));
+  } catch (e) {
+    if (_aiS[scope] !== st) return;
+    st.busy = false; aiScopeRender(scope, '分析できませんでした: ' + e.message, true);
+  }
+}
+function _aivPanel(inner, cls) { return inner ? `<div class="aiv-panel${cls ? ' ' + cls : ''}">${inner}</div>` : ''; }
+function _aivRow(...cells) { const c = cells.filter(Boolean); return !c.length ? '' : c.length === 1 ? `<div class="aiv-full">${c[0]}</div>` : `<div class="aiv-grid">${c.join('')}</div>`; }
+function _aivNote(rep, k) { const n = rep && rep.notes && rep.notes[k]; return n ? `<div class="aiv-note"><b>AIの読み</b><span>${escHtml(n)}</span></div>` : ''; }
+function _aivSub(title, items, first) { return items && items.length ? `<div class="aiv-h${first ? ' first' : ''}">${title}</div>${_aiItems(items)}` : ''; }
+function _aivActions(rep, title) {
+  return rep && (rep.actions || []).length ? _aivPanel(`<div class="aiv-h first">${title}</div>
+    <ol class="aiv-actions">${rep.actions.map(x => `<li><span>${escHtml(x.text || '')}</span>${x.who ? `<em>${escHtml(x.who)}</em>` : ''}</li>`).join('')}</ol>`, 'aiv-act') : '';
+}
+function aiScopeRender(scope, msg, isErr) {
+  const st = _aiS[scope], body = document.getElementById('ai-body-' + scope), btn = document.getElementById('ai-run-btn-' + scope);
+  if (!body || !st) return;
+  if (btn) { btn.disabled = !!st.busy || !!st.loading; btn.textContent = st.busy ? '分析中…' : (st.stored ? '再分析' : '分析する'); }
+  let p = null; try { p = st.payloadFn && st.payloadFn(); } catch (e) { console.warn('[AI分析] 集計に失敗:', e); }
+  const s = st.stored, rep = s ? _aiParse(s.text) : null, sec = (rep && rep.sections) || {};
+  const stale = s && p && s.hash && _aiHash(JSON.stringify(p)) !== s.hash;
+  const ST = {good: ['ok', '良好'], warn: ['warn', '注意'], bad: ['crit', '要対応']}[rep && rep.status] || null;
+  let head;
+  if (st.busy) head = `<div class="aiv-head busy"><span class="spin"></span>Claude が分析しています（30〜90秒ほどかかります）…</div>`;
+  else if (rep && rep.headline) head = `<div class="aiv-head${ST ? ' st-' + ST[0] : ''}"><span class="lbl">AIの総括</span>${ST ? `<span class="stt ${ST[0]}">${ST[1]}</span>` : ''}<span class="txt">${escHtml(rep.headline)}</span></div>`;
+  else if (!s) head = `<div class="aiv-head muted">${msg ? `<span class="${isErr ? 'ai-err' : ''}">${escHtml(msg)}</span>` : st.loading ? '読み込み中…' : 'まだ分析していません。「分析する」を押すと、下の図表に AI のコメントが加わります。'}</div>`;
+  else head = '';
+  let html = head;
+  if (p) {
+    if (scope === 'yearly') {
+      const V = _aiYearVisuals(p);
+      html += V.kpis + (rep ? _aiItems(sec.overview) : '');
+      html += _aivRow(_aivPanel(V.trend + _aivNote(rep, 'trend') + _aivSub('残業の傾向', sec.overtime)), _aivPanel(V.fy + _aivNote(rep, 'fy')));
+      html += _aivRow(_aivPanel(V.heat + _aivNote(rep, 'heat')));
+      html += _aivRow(_aivPanel(V.mix + _aivNote(rep, 'mix') + _aivSub('業務構成の変化', sec.workmix)), rep ? _aivPanel(_aivSub('気になる点', sec.concerns, true)) : '');
+      html += _aivRow(_aivActions(rep, '残りの期間に向けて'));
+    } else {
+      const V = _aiKpiVisuals(p, rep);
+      html += V.kpis + (rep ? _aiItems(sec.overview) : '') + V.cards;
+      html += _aivRow(rep ? _aivPanel(_aivSub('気になる点', sec.concerns, true)) : '', _aivActions(rep, 'KPI 達成に向けて'));
+    }
+  }
+  if (s && !rep) html += `<div class="aiv-panel aiv-md">${_aiMd(s.text)}</div>`;
+  if (s) html += `<div class="ai-meta">${escHtml(_aiFmtAt(s.at))} 作成${s.model ? '（' + escHtml(s.model) + '）' : ''}` +
+    (stale ? '　<span class="warn">分析後に日報が更新されています。最新にするには「再分析」を押してください。</span>' : '') +
+    (msg ? `　<span class="${isErr ? 'ai-err' : ''}">${escHtml(msg)}</span>` : '') +
+    `<br>図表の数値は日報の集計から算出しています。コメントはAIによる自動分析のため、内容は図表と照らしてご確認ください。</div>`;
+  body.innerHTML = html;
+}
+
+// ── 年次: 送るデータ ──
+let _yAiCtx = null;   // {fy, periods, data, prev}
+function _aiYearPayload(c) {
+  if (!c || !c.data) return null;
+  const R = DEPARTMENT_CONFIG.rules, N = c.periods.length, today = todayStr();
+  const ranges = c.periods.map(x => getPeriodDates(x.year, x.month));
+  const curIdx = ranges.findIndex(r => r.startDate <= today && today <= r.endDate);
+  const has = c.data.map(d => !!(d && Object.keys(d._leaveMap || {}).length));
+  if (!has.some(Boolean)) return null;
+  const persons = {}, used = new Set(), mainByMonth = {};
+  const P = a => persons[a] || (persons[a] = {n: Array(N).fill(null), ot: Array(N).fill(null), subs: {}});
+  c.data.forEach((d, i) => {
+    if (!has[i]) return;
+    const ob = _otByAuthor(d);
+    Object.keys(ob).forEach(a => { const o = P(a); o.n[i] = _aiR(ob[a].n); o.ot[i] = _aiR(ob[a].ot); });
+    Object.keys(d).forEach(a => {
+      if (a.startsWith('_')) return;
+      (d[a] || []).forEach(r => {
+        const n = r.hoursNormal || 0, ot = r.hoursOT || 0; if (!n && !ot) return;
+        const o = P(a), v = o.subs[r.cdSub] || (o.subs[r.cdSub] = [0, 0]); v[0] += n; v[1] += ot; used.add(r.cdSub);
+        const mc = (SUB_MAP[r.cdSub] || {}).mainCd || '?', mm = mainByMonth[mc] || (mainByMonth[mc] = Array(N).fill(0));
+        mm[i] += n + ot;
+      });
+    });
+  });
+  Object.values(persons).forEach(o => Object.keys(o.subs).forEach(cd => { o.subs[cd] = [_aiR(o.subs[cd][0]), _aiR(o.subs[cd][1])]; }));
+  Object.keys(mainByMonth).forEach(k => { mainByMonth[k] = mainByMonth[k].map((v, i) => has[i] ? _aiR(v) : null); });
+  const prevOt = (c.prev || []).map(d => d && Object.keys(d._leaveMap || {}).length ? _aiR(Object.values(_otByAuthor(d)).reduce((t, x) => t + x.ot, 0)) : null);
+  const lastIdx = has.lastIndexOf(true), prevPersonsOt = {};
+  (c.prev || []).forEach((d, i) => { if (i > lastIdx || !d) return; const ob = _otByAuthor(d); Object.keys(ob).forEach(a => { prevPersonsOt[a] = _aiR((prevPersonsOt[a] || 0) + ob[a].ot); }); });
+  const cats = {}; [...used].sort().forEach(cd => { const sb = SUB_MAP[cd]; cats[cd] = sb ? `${sb.mainLabel}/${sb.label}` : cd; });
+  const mains = {}; Object.keys(mainByMonth).forEach(k => { mains[k] = (typeof CAT_LABEL !== 'undefined' && CAT_LABEL[k]) || k; });
+  return {
+    kind: 'yearly', dept: (DEPARTMENT_CONFIG.branding || {}).dept || '',
+    fy: `${c.fy + 1}年度（${fiscalKi(c.fy)}期）`, months: c.periods.map(x => `${x.month}月期`),
+    elapsed: has.filter(Boolean).length, curIdx,
+    rules: {otMonthWarn: R.otMonthWarn, otMonthLimit: R.otMonthLimit, otYearLimit: R.otYearLimit, otOverMonthsMax: R.otOverMonthsMax},
+    cats, mains, persons, mainByMonth, prevOt, prevPersonsOt
+  };
+}
+
+// ── 年次: 図表 ──
+function _aiYearVisuals(p) {
+  const R = DEPARTMENT_CONFIG.rules, warn = R.otMonthWarn || 36, limit = R.otMonthLimit || 45, yLimit = R.otYearLimit || 360;
+  const N = p.months.length, names = Object.keys(p.persons).filter(a => a !== 'ヘルプ' && p.persons[a].ot.some(v => v != null));
+  const has = p.months.map((_, i) => names.some(a => p.persons[a].ot[i] != null));
+  const tot = p.months.map((_, i) => has[i] ? names.reduce((t, a) => t + (p.persons[a].ot[i] || 0), 0) : null);
+  const done = i => has[i] && i !== p.curIdx;
+  const totOt = tot.reduce((t, v) => t + (v || 0), 0);
+  const prevSame = p.prevOt.reduce((t, v, i) => t + (has[i] && v != null ? v : 0), 0), prevAny = p.prevOt.some((v, i) => has[i] && v != null);
+  const cells = []; names.forEach(a => p.persons[a].ot.forEach(v => { if (v != null) cells.push(v); }));
+  const nOver = cells.filter(v => v > limit).length, nWarn = cells.filter(v => v >= warn && v <= limit).length;
+  const nDone = p.months.filter((_, i) => done(i)).length;
+  const proj = a => { const o = p.persons[a].ot, ds = o.filter((v, i) => done(i) && v != null); return ds.length ? ds.reduce((t, v) => t + v, 0) / ds.length * 12 : null; };
+  const cum = a => p.persons[a].ot.reduce((t, v) => t + (v || 0), 0);
+  const nPjOver = names.filter(a => (proj(a) || 0) > yLimit || cum(a) > yLimit).length;
+  const tile = (label, val, sub, tone) => `<div class="aiv-kpi${tone ? ' ' + tone : ''}"><div class="k">${label}</div><div class="v">${val}</div><div class="s">${sub || '&nbsp;'}</div></div>`;
+  const kpis = `<div class="aiv-kpis">
+    ${tile('年度の残業 合計', _aiFmtH(totOt) + '<small>h</small>', prevAny ? `前年同期 ${_aiFmtH(prevSame)}h（${_aiDelta(totOt - prevSame)}）` : '前年データなし')}
+    ${tile('月平均 / 人', _aiFmtH(names.length && p.elapsed ? totOt / p.elapsed / names.length : 0) + '<small>h</small>', `${names.length}名・${p.elapsed}か月期`)}
+    ${tile(`月 ${warn}〜${limit}h`, nWarn + '<small>回</small>', '警告ラインの延べ回数', nWarn ? 'warn' : '')}
+    ${tile(`月 ${limit}h 超え`, nOver + '<small>回</small>', `年${R.otOverMonthsMax || 6}回まで（1人あたり）`, nOver ? 'crit' : 'ok')}
+    ${tile(`年 ${yLimit}h 超え見込み`, nPjOver + '<small>名</small>', nDone ? `終わった${nDone}か月期の平均×12` : '終わった月期なし', nPjOver ? 'crit' : 'ok')}
+  </div>`;
+
+  // ① 月期ごとの残業（全員合計）と前年
+  const mx = Math.max(1, ...tot.map(v => v || 0), ...p.prevOt.map(v => v || 0));
+  const trend = `<div class="aiv-chart">
+    <div class="aiv-ttl">月期ごとの残業（全員合計）<span>棒=今年度　◆=前年度の同じ月期　斜線=進行中</span></div>
+    <div class="aiv-cols">${p.months.map((m, i) => {
+      const v = tot[i], pv = p.prevOt[i];
+      const tip = `${m}: ` + (v != null ? `${_aiFmtH(v)}h` : 'データなし') + (pv != null ? ` / 前年度 ${_aiFmtH(pv)}h` + (v != null ? `（${_aiDelta(v - pv)}）` : '') : '');
+      return `<div class="col${i === p.curIdx ? ' cur' : ''}" title="${escHtml(tip)}"><span class="cv">${v != null ? Math.round(v) : ''}</span>
+        <span class="ctrk">${v != null ? `<span class="cbar" style="height:${v / mx * 100}%"></span>` : ''}${pv != null ? `<span class="cpv" style="bottom:${pv / mx * 100}%"></span>` : ''}</span>
+        <span class="cl">${m.replace('月期', '')}</span></div>`;
+    }).join('')}</div><div class="aiv-cols-unit">月期</div></div>`;
+
+  // ② 担当 × 月期 の残業（警告・上限で色分け）
+  const heat = `<div class="aiv-chart">
+    <div class="aiv-ttl">担当 × 月期 の残業<span>黄=警告${warn}h以上　赤=上限${limit}h超え　灰=データなし</span></div>
+    <div class="aiv-heat-wrap"><table class="aiv-heat yh"><thead><tr><th></th>${p.months.map((m, i) => `<th class="${i === p.curIdx ? 'cur' : ''}">${m.replace('月期', '月')}</th>`).join('')}<th class="tot">累計</th><th class="tot">${limit}h超</th></tr></thead><tbody>
+    ${names.sort((a, b) => cum(b) - cum(a)).map(a => `<tr><th>${escHtml(a)}</th>${p.persons[a].ot.map((v, i) => {
+      if (v == null) return '<td class="z"></td>';
+      const cls = v > limit ? 'crit' : v >= warn ? 'warn' : '';
+      const k = Math.round(8 + 50 * Math.min(1, v / limit));
+      return `<td class="${cls}${i === p.curIdx ? ' cur' : ''}" ${cls ? '' : `style="background:color-mix(in srgb,var(--dx-accent,var(--primary)) ${k}%,var(--surface))"`} title="${escHtml(`${a} ${p.months[i]} 残業 ${_aiFmtH(v)}h（通常 ${_aiFmtH(p.persons[a].n[i])}h）`)}">${_aiFmtH(v)}</td>`;
+    }).join('')}<td class="tot">${_aiFmtH(cum(a))}</td><td class="tot ${p.persons[a].ot.filter(v => v > limit).length ? 't-crit' : ''}">${p.persons[a].ot.filter(v => v > limit).length}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+
+  // ③ 年度累計と年間見込み
+  const fr = names.map(a => ({a, c: cum(a), pj: proj(a)})).sort((x, y) => Math.max(y.c, y.pj || 0) - Math.max(x.c, x.pj || 0));
+  const mf = Math.max(yLimit * 1.1, ...fr.map(r => Math.max(r.c, r.pj || 0))) || 1;
+  const fy = `<div class="aiv-chart">
+    <div class="aiv-ttl">年度累計と年間見込み<span>棒=累計　薄い帯=年間見込み（終わった月期の平均×12）　縦線=年${yLimit}h</span></div>
+    <div class="aiv-bars">
+      <i class="aiv-ref crit" style="--x:${yLimit / mf * 100}"><b>${yLimit}h</b></i>
+      ${fr.map(r => { const tone = r.c > yLimit ? 'crit' : (r.pj || 0) > yLimit ? 'warn' : '';
+        return `<div class="aiv-row" title="${escHtml(`${r.a} 累計 ${_aiFmtH(r.c)}h` + (r.pj != null ? ` / 年間見込み ${_aiFmtH(r.pj)}h` : ''))}"><span class="nm">${escHtml(r.a)}</span>
+          <span class="trk">${r.pj != null && r.pj > r.c ? `<span class="bar pj ${tone}" style="width:${r.pj / mf * 100}%"></span>` : ''}<span class="bar ${tone}" style="width:${r.c / mf * 100}%"></span></span>
+          <span class="val">${_aiFmtH(r.c)}h${r.pj != null ? `<small>見込 ${Math.round(r.pj)}h</small>` : ''}</span></div>`; }).join('')}
+    </div></div>`;
+
+  // ④ 大分類の構成（月期ごと）
+  const order = (typeof CATS !== 'undefined' ? CATS.map(c => c.cd) : []).filter(cd => p.mainByMonth[cd]);
+  Object.keys(p.mainByMonth).forEach(cd => { if (!order.includes(cd)) order.push(cd); });
+  const color = cd => (typeof CAT_COLOR !== 'undefined' && CAT_COLOR[cd]) || 'var(--g400)', label = cd => p.mains[cd] || cd;
+  const mix = `<div class="aiv-chart">
+    <div class="aiv-ttl">業務構成の推移（大分類）<span>日報に入力した時間の割合</span></div>
+    ${p.months.map((m, i) => { const t = order.reduce((s, cd) => s + (p.mainByMonth[cd][i] || 0), 0); if (!t) return '';
+      return `<div class="aiv-stk"><span class="nm">${m}</span><span class="seg">${order.map(cd => { const h = p.mainByMonth[cd][i] || 0; if (!h) return ''; const w = h / t * 100;
+        return `<span style="width:${w}%;background:${color(cd)}" title="${escHtml(`${m} ${label(cd)} ${_aiFmtH(h)}h（${w.toFixed(0)}%）`)}">${w >= 10 ? Math.round(w) + '%' : ''}</span>`; }).join('')}</span><span class="val">${Math.round(t)}h</span></div>`; }).join('')}
+    <div class="aiv-legend">${order.map(cd => `<span><i style="background:${color(cd)}"></i>${escHtml(label(cd))}</span>`).join('')}</div></div>`;
+  return {kpis, trend, heat, fy, mix};
+}
+
+// ── KPI: 送るデータ ──
+function _aiKpiPayload() {
+  const c = _kpiCtx; if (!c || !c.data || c.lastIdx < 0) return null;
+  const HK = _kpiHoursItems(), OTK = _kpiOtItem(), kpis = [];
+  const subName = cd => { const sb = SUB_MAP[cd]; return sb ? `${sb.mainLabel}/${sb.label}` : cd; };
+  const at = (i, f) => (i > c.lastIdx || !c.data[i]) ? null : f(c.data[i]);
+  if (OTK) {
+    const byAuthor = {};
+    c.data.forEach((d, i) => { if (i > c.lastIdx || !d) return; const ob = _otByAuthor(d); Object.keys(ob).forEach(a => { byAuthor[a] = _aiR((byAuthor[a] || 0) + ob[a].ot); }); });
+    kpis.push({key: OTK.key, name: OTK.name, kind: 'ot', target: OTK.target, owner: OTK.owner || '', plan: OTK.plan || '', vals: c.periods.map((_, i) => at(i, d => _aiR(_kpiOtOf(d)))), byAuthor});
+  }
+  HK.forEach(k => {
+    const byAuthor = {}, bySub = {};
+    c.data.forEach((d, i) => { if (i > c.lastIdx || !d || !k.subs.length) return; const b = _kpiBreakdown(d, k.subs);
+      Object.keys(b.byAuthor).forEach(a => { byAuthor[a] = _aiR((byAuthor[a] || 0) + b.byAuthor[a]); });
+      Object.keys(b.bySub).forEach(cd => { const n = subName(cd); bySub[n] = _aiR((bySub[n] || 0) + b.bySub[cd]); }); });
+    kpis.push({key: k.key, name: k.name, target: k.target, owner: k.owner || '', plan: k.plan || '', subs: k.subs.map(subName),
+      vals: c.periods.map((_, i) => k.subs.length ? at(i, d => _aiR(_kpiHoursOf(d, k.subs))) : null), byAuthor, bySub});
+  });
+  return {kind: 'kpi', dept: (DEPARTMENT_CONFIG.branding || {}).dept || '', fy: `${c.fy + 1}年度（${fiscalKi(c.fy)}期）`,
+    periods: c.periods.map((x, i) => ({label: `${x.month}月期`, range: c.ranges[i].range})), curIdx: c.curIdx, proj: _aiR(c.proj || 1), kpis};
+}
+
+// ── KPI: 図表（KPIごとのカード＋AIコメント） ──
+function _aiKpiVisuals(p, rep) {
+  const cur = p.curIdx, proj = p.proj || 1;
+  const J = (v, k, i) => _kpiJudge(v, k.target, i === cur, proj);
+  let cOk = 0, cAll = 0, cCrit = 0;
+  p.kpis.forEach(k => k.vals.forEach((v, i) => { if (v == null || i === cur) return; cAll++; const lv = J(v, k, i).lv; if (lv === 'ok') cOk++; if (lv === 'crit') cCrit++; }));
+  const ti = cur >= 0 ? cur : p.kpis.reduce((m, k) => Math.max(m, k.vals.map((v, i) => v != null ? i : -1).reduce((a, b) => Math.max(a, b), -1)), -1);
+  const nowLv = p.kpis.map(k => k.vals[ti] == null ? null : J(k.vals[ti], k, ti).lv).filter(Boolean);
+  const nNowOk = nowLv.filter(l => l === 'ok').length;
+  const tile = (label, val, sub, tone) => `<div class="aiv-kpi${tone ? ' ' + tone : ''}"><div class="k">${label}</div><div class="v">${val}</div><div class="s">${sub || '&nbsp;'}</div></div>`;
+  const kpis = `<div class="aiv-kpis">
+    ${tile(ti >= 0 ? `${p.periods[ti].label}${ti === cur ? '（見込）' : ''}の達成` : '今期の達成', nNowOk + `<small>/ ${nowLv.length}</small>`, 'KPI 数', nNowOk === nowLv.length ? 'ok' : 'warn')}
+    ${tile('年度の達成率', (cAll ? Math.round(cOk / cAll * 100) : 0) + '<small>%</small>', `終わった月期 ${cOk}/${cAll} マス`, cAll && cOk / cAll < 0.5 ? 'warn' : 'ok')}
+    ${tile('大幅超過', cCrit + '<small>回</small>', '目標の1.2倍超（延べ）', cCrit ? 'crit' : 'ok')}
+    ${tile('対象 KPI', p.kpis.length + '<small>件</small>', p.fy)}
+  </div>`;
+  const TONE = {good: ['ok', '良'], warn: ['warn', '注意'], bad: ['crit', '要対応'], info: ['info', '情報']};
+  const cards = `<div class="aik-grid">${p.kpis.map(k => {
+    const mx = Math.max(k.target * 1.4, ...k.vals.map((v, i) => v == null ? 0 : J(v, k, i).pj)) || 1;
+    const past = k.vals.filter((v, i) => v != null && i !== cur), ok = past.filter(v => v <= k.target).length;
+    const c = rep && rep.kpis && rep.kpis[k.key], [tc, tl] = c ? (TONE[c.tone] || TONE.info) : [];
+    const nowJ = ti >= 0 && k.vals[ti] != null ? J(k.vals[ti], k, ti) : null;
+    return `<div class="aik-card${nowJ ? ' is-' + nowJ.lv : ''}">
+      <div class="aik-hd"><b>${escHtml(k.name)}</b>${k.owner ? `<span class="own">${escHtml(k.owner)}</span>` : ''}<span class="tg">目標 ≦${k.target}h</span></div>
+      <div class="aik-chart" style="--tf:${(k.target / mx).toFixed(3)}"><i class="aik-tl"><b>${k.target}</b></i>${k.vals.map((v, i) => {
+        if (v == null) return `<span class="kc na"><span class="kb"></span><span class="kl">${p.periods[i].label.replace('月期', '')}</span></span>`;
+        const j = J(v, k, i);
+        return `<span class="kc${i === cur ? ' cur' : ''}" title="${escHtml(`${p.periods[i].label} ${_aiFmtH(v)}h / 目標 ${k.target}h` + (j.hasPj ? `（見込 ${_aiFmtH(j.pj)}h）` : '') + `・${j.label}`)}">
+          <span class="kb">${j.hasPj && j.pj > v ? `<span class="kpj is-${j.lv}" style="height:${j.pj / mx * 100}%"></span>` : ''}<span class="kv is-${j.lv}" style="height:${v / mx * 100}%"></span></span>
+          <span class="kl">${p.periods[i].label.replace('月期', '')}</span></span>`;
+      }).join('')}</div>
+      <div class="aik-ft">${past.length ? `達成 <b>${ok}</b>/${past.length} 月期` : '終わった月期なし'}${nowJ ? `<span class="dx-tag is-${nowJ.lv}">${p.periods[ti].label} ${nowJ.label}</span>` : ''}</div>
+      ${c ? `<div class="aik-ai ${tc}"><span class="tag">${tl}</span><span>${escHtml(c.text || '')}</span></div>` : ''}
+      ${k.plan ? `<div class="aik-plan">プラン: ${escHtml(k.plan)}</div>` : ''}
+    </div>`;
+  }).join('')}</div>`;
+  return {kpis, cards};
 }
 
 function _fiscalYearOf(period) { return period.month >= 10 ? period.year : period.year - 1; }
@@ -8626,6 +9008,8 @@ async function renderYearlyDash(silent) {
       });
     });
     renderPersonPies(yearByAuthorFlat,'yearly-person-grid',leaveNormalY,leaveOTY);
+    _yAiCtx = {fy: currentFiscalYear, periods: fiscalPeriods, data: allData, prev: prevAllData};
+    { const yc = _yAiCtx; aiScopeSet('yearly', 'fy_' + currentFiscalYear, `${dispFY}年度（${kiNum}期）`, () => _aiYearPayload(yc)); }
     _renderCache.yearly = renderKey;
   } finally { if (!silent) setLoading(false); }
 }
