@@ -441,7 +441,7 @@ tfoot .ft-total{text-align:center;font-size:16px;}
 .aiv-row:hover .trk{background:var(--g100);}
 .aiv-row .nm,.aiv-stk .nm,.aiv-drow .nm{font-size:11.5px;font-weight:700;color:var(--g700);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px;}
 .aiv-row .trk{position:relative;height:100%;border-radius:4px;}
-.aiv-row .bar{position:absolute;left:0;top:4px;bottom:4px;background:var(--dx-accent,var(--primary));border-radius:0 4px 4px 0;}
+.aiv-row .bar{position:absolute;left:0;top:4px;bottom:4px;background:var(--g400);border-radius:0 4px 4px 0;}
 .aiv-row .bar.warn{background:var(--st-warn);} .aiv-row .bar.crit{background:var(--st-crit);}
 .aiv-row .pv{position:absolute;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;background:var(--g700);transform:rotate(45deg);box-shadow:0 0 0 2px var(--surface);}
 .aiv-row .val{font-size:11.5px;font-weight:700;color:var(--g700);padding-left:8px;white-space:nowrap;font-variant-numeric:tabular-nums;}
@@ -7347,7 +7347,7 @@ function _aiVisuals(p) {
 
   // ③ 年度累計の残業（年上限に対する進み）
   let fyChart = '';
-  if (p.fy && p.fy.persons) {
+  if (p.fy && p.fy.persons && (p.fy.months || 0) >= 2) {   // 期初1か月目は担当別残業と同じになるので出さない
     const months = p.fy.months || 1, pace = yLimit / 12 * months;
     const fr = Object.entries(p.fy.persons).filter(([a]) => a !== 'ヘルプ').map(([a, f]) => ({a, ot: f.ot, over: f.over45})).sort((x, y) => y.ot - x.ot);
     const maxF = Math.max(yLimit, ...fr.map(r => r.ot)) || 1;
