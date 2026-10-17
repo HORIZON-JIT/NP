@@ -7930,8 +7930,29 @@ function _aiYearPayload(c) {
   (c.prev || []).forEach((d, i) => { if (i > lastIdx || !d) return; const ob = _otByAuthor(d); Object.keys(ob).forEach(a => { prevPersonsOt[a] = _aiR((prevPersonsOt[a] || 0) + ob[a].ot); }); });
   const cats = {}; [...used].sort().forEach(cd => { const sb = SUB_MAP[cd]; cats[cd] = sb ? `${sb.mainLabel}/${sb.label}` : cd; });
   const mains = {}; Object.keys(mainByMonth).forEach(k => { mains[k] = (typeof CAT_LABEL !== 'undefined' && CAT_LABEL[k]) || k; });
+  // 合計・累計・回数は画面側で計算して渡す（AI に足し算させない）
+  const yL = R.otYearLimit || 360, mL = R.otMonthLimit || 45, wL = R.otMonthWarn || 36;
+  const nm = Object.keys(persons).filter(a => a !== 'ヘルプ');
+  const done = i => has[i] && i !== curIdx;
+  const monthTotalOt = c.periods.map((_, i) => has[i] ? _aiR(nm.reduce((t, a) => t + (persons[a].ot[i] || 0), 0)) : null);
+  const sumP = {};
+  nm.forEach(a => {
+    const o = persons[a].ot, ds = o.filter((v, i) => done(i) && v != null);
+    const cum = o.reduce((t, v) => t + (v || 0), 0), avg = ds.length ? ds.reduce((t, v) => t + v, 0) / ds.length : null;
+    sumP[a] = {cumOt: _aiR(cum), overMonthLimit: o.filter(v => v != null && v > mL).length, warnMonths: o.filter(v => v != null && v >= wL && v <= mL).length,
+      avgOt: avg == null ? null : _aiR(avg), projYearOt: avg == null ? null : _aiR(avg * 12), prevSameOt: prevPersonsOt[a] == null ? null : prevPersonsOt[a]};
+  });
+  const totalOt = _aiR(monthTotalOt.reduce((t, v) => t + (v || 0), 0));
+  const prevSameOt = _aiR(prevOt.reduce((t, v, i) => t + (has[i] && v != null ? v : 0), 0));
+  const summary = {
+    note: 'すべて計算済みの正しい値。合計・累計・平均・回数・差はここから引用し、自分で計算しないこと。',
+    totalOt, prevSameOt, diffVsPrev: _aiR(totalOt - prevSameOt), ratioVsPrev: prevSameOt ? _aiR(totalOt / prevSameOt) : null,
+    monthTotalOt, monthPrevOt: prevOt, persons: sumP,
+    overYearLimit: nm.filter(a => sumP[a].cumOt > yL), projOverYearLimit: nm.filter(a => sumP[a].cumOt <= yL && (sumP[a].projYearOt || 0) > yL),
+    overMonthLimitTotal: nm.reduce((t, a) => t + sumP[a].overMonthLimit, 0), warnMonthsTotal: nm.reduce((t, a) => t + sumP[a].warnMonths, 0)
+  };
   return {
-    kind: 'yearly', dept: (DEPARTMENT_CONFIG.branding || {}).dept || '',
+    kind: 'yearly', dept: (DEPARTMENT_CONFIG.branding || {}).dept || '', summary,
     fy: `${c.fy + 1}年度（${fiscalKi(c.fy)}期）`, months: c.periods.map(x => `${x.month}月期`),
     elapsed: has.filter(Boolean).length, curIdx,
     rules: {otMonthWarn: R.otMonthWarn, otMonthLimit: R.otMonthLimit, otYearLimit: R.otYearLimit, otOverMonthsMax: R.otOverMonthsMax},
@@ -8031,6 +8052,15 @@ function _aiKpiPayload() {
       Object.keys(b.bySub).forEach(cd => { const n = subName(cd); bySub[n] = _aiR((bySub[n] || 0) + b.bySub[cd]); }); });
     kpis.push({key: k.key, name: k.name, target: k.target, owner: k.owner || '', plan: k.plan || '', subs: k.subs.map(subName),
       vals: c.periods.map((_, i) => k.subs.length ? at(i, d => _aiR(_kpiHoursOf(d, k.subs))) : null), byAuthor, bySub});
+  });
+  const proj = c.proj || 1;
+  kpis.forEach(k => {
+    const past = k.vals.map((v, i) => ({v, i})).filter(x => x.v != null && x.i !== c.curIdx);
+    const judge = k.vals.map((v, i) => v == null ? null : _kpiJudge(v, k.target, i === c.curIdx, proj).label);
+    const cv = c.curIdx >= 0 ? k.vals[c.curIdx] : null;
+    k.summary = {doneMonths: past.length, achievedMonths: past.filter(x => x.v <= k.target).length,
+      avgDone: past.length ? _aiR(past.reduce((t, x) => t + x.v, 0) / past.length) : null, judge,
+      curValue: cv, curProjection: cv == null ? null : _aiR(cv * proj), totalByAuthor: k.byAuthor};
   });
   return {kind: 'kpi', dept: (DEPARTMENT_CONFIG.branding || {}).dept || '', fy: `${c.fy + 1}年度（${fiscalKi(c.fy)}期）`,
     periods: c.periods.map((x, i) => ({label: `${x.month}月期`, range: c.ranges[i].range})), curIdx: c.curIdx, proj: _aiR(c.proj || 1), kpis};
