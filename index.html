@@ -2173,6 +2173,7 @@ html[data-mv-dir="back"]::view-transition-new(mv-stage),html[data-mv-dir="back"]
         <button type="button" id="tr-mode-n2f" onclick="setTaskRefMode('n2f')">日報 → Folio</button>
       </div>
       <button type="button" class="btn btn-outline" style="padding:5px 10px;font-size:11px;" onclick="openTaskRef(true)">最新に更新</button>
+      <button type="button" class="btn btn-outline" id="tr-xlsx" style="padding:5px 10px;font-size:11px;" onclick="exportTaskRefXlsx()">Excel出力</button>
     </div>
     <div id="tr-sub" style="font-size:11px;color:var(--g500);margin:6px 0 8px;"></div>
     <div id="tr-body" class="tr-body"></div>
@@ -5673,6 +5674,50 @@ function renderTaskRef() {
   const orphan = rows.filter(t => !SUB_MAP[t.cdSub]);
   if (orphan.length && !q) cats.push(`<div class="tr-group"><h4><i style="background:var(--danger)"></i>中分類が未設定のタスク <small style="color:var(--g400);font-weight:600;">「Folio → 日報」で登録できます</small></h4><div class="tr-sub"><div class="nm">未設定<small>${orphan.length}件</small></div>${chips(orphan)}</div></div>`);
   body.innerHTML = cats.join('') || '<div style="padding:16px;color:var(--g400);">該当する項目はありません</div>';
+}
+// 早見表を Excel に出力（シート1: Folio→日報、シート2: 日報→Folio）。常にシートを読み直した最新で出す
+async function exportTaskRefXlsx() {
+  const btn = document.getElementById('tr-xlsx');
+  if (btn) { btn.disabled = true; btn.textContent = '出力中...'; }
+  try {
+    const d = await _gasJsonpTag(taskImportUrl(), {action:'getTaskMaster', nocache:'1'});
+    if (!d || !d.ok) throw new Error((d && d.error) || '取得に失敗しました');
+    _trData = (d.tasks || []).map(t => ({taskId: String(t.taskId || ''), name: String(t.name || ''), std: (t.std == null ? null : Number(t.std)), cdSub: String(t.cdSub || '').trim()}))
+      .sort((x, y) => _trIdCmp(x.taskId, y.taskId));
+    _trAt = Date.now(); renderTaskRef();
+    const XLSX = await ensureXlsxLib();
+    const wb = XLSX.utils.book_new();
+    const a1 = [['タスクID', 'タスク名', '標準工数(h)', '大分類CD', '大分類', '中分類CD', '中分類', '状態']];
+    _trData.forEach(t => {
+      const sb = SUB_MAP[t.cdSub];
+      a1.push([t.taskId, t.name, t.std == null || isNaN(t.std) ? '' : Math.round(t.std * 100) / 100,
+        sb ? sb.mainCd : '', sb ? sb.mainLabel : '', t.cdSub, sb ? sb.label : '',
+        sb ? '' : (t.cdSub ? '日報に無いCD' : '未設定')]);
+    });
+    const ws1 = XLSX.utils.aoa_to_sheet(a1);
+    ws1['!cols'] = [{wch:9},{wch:36},{wch:11},{wch:9},{wch:12},{wch:9},{wch:20},{wch:12}];
+    ws1['!autofilter'] = {ref: `A1:H${a1.length}`};
+    XLSX.utils.book_append_sheet(wb, ws1, 'Folio→日報');
+    const a2 = [['大分類CD', '大分類', '中分類CD', '中分類', 'タスク数', 'タスクID', 'タスク名']];
+    activeInputCats().forEach(c => (c.subs || []).forEach(sb => {
+      const list = _trData.filter(t => t.cdSub === sb.cd);
+      if (!list.length) a2.push([c.cd, c.label, sb.cd, sb.label, 0, '', '']);
+      list.forEach((t, j) => a2.push([c.cd, c.label, sb.cd, sb.label, j === 0 ? list.length : '', t.taskId, t.name]));
+    }));
+    const orphan = _trData.filter(t => !SUB_MAP[t.cdSub]);
+    orphan.forEach((t, j) => a2.push(['', '（未設定）', t.cdSub, '', j === 0 ? orphan.length : '', t.taskId, t.name]));
+    const ws2 = XLSX.utils.aoa_to_sheet(a2);
+    ws2['!cols'] = [{wch:9},{wch:12},{wch:9},{wch:20},{wch:8},{wch:9},{wch:36}];
+    ws2['!autofilter'] = {ref: `A1:G${a2.length}`};
+    XLSX.utils.book_append_sheet(wb, ws2, '日報→Folio');
+    XLSX.writeFile(wb, `タスク早見表_${todayStr()}.xlsx`);
+    const sub = document.getElementById('tr-sub');
+    if (sub) sub.textContent += `　✔ Excel を出力しました（${_trData.length}件）`;
+  } catch(e) {
+    alert(/unknown action/.test(e.message) ? 'この機能には Folio 連携（GAS）の再デプロイが必要です。' : `Excel 出力に失敗しました: ${e.message}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Excel出力'; }
+  }
 }
 // 設定済みの行を変更モードにする（i=null で解除）
 let _trEdit = null;
