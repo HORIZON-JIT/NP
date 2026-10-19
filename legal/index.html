@@ -6112,6 +6112,26 @@ function renderTaskImport() {
   const plan = Object.keys(sums).map(cd => ({cdSub:cd, hoursNormal:_roundTaskHours(sums[cd].normal), hoursOT:_roundTaskHours(sums[cd].ot)}))
     .filter(p => p.hoursNormal > 0 || p.hoursOT > 0);
   const totN = plan.reduce((a, p) => a + p.hoursNormal, 0), totO = plan.reduce((a, p) => a + p.hoursOT, 0);
+  // 差の内訳: 時間割どおり（予定工数の合計）と比べて、取込の合計がどこで増減したか
+  const fh = h => `${h >= 0 ? '+' : '−'}${Math.abs(h).toFixed(2)}h`;
+  const diag = (() => {
+    const chk = _taskImportRows.filter(x => x.ok && x.checked);
+    if (!chk.length) return '';
+    const raw = chk.reduce((t, x) => t + (Number(x.r.hours) || 0), 0);
+    const overRows = chk.filter(x => x.r.actual != null && x.r.plan != null && Math.abs(x.r.actual - x.r.plan) > 0.004)
+      .map(x => ({nm: `${x.r.taskId} ${x.r.taskName || ''}`.trim(), d: x.r.actual - x.r.plan})).sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
+    const over = overRows.reduce((t, x) => t + x.d, 0);
+    const unpRows = chk.filter(x => !x.placed).map(x => ({nm: `${x.r.taskId} ${x.r.taskName || ''}`.trim(), d: Number(x.r.hours) || 0}));
+    const unp = unpRows.reduce((t, x) => t + x.d, 0);
+    const rnd = totN + totO - raw;
+    const base = raw - over - unp;   // 時間割どおりの予定工数の合計
+    if (Math.abs(totN + totO - base) < 0.005) return '';
+    const items = [];
+    if (Math.abs(over) > 0.004) items.push(`実績が予定と違うタスク <b class="${over > 0 ? 't-crit' : 't-ok'}">${fh(over)}</b>（${overRows.slice(0, 4).map(x => `${escHtml(x.nm)} ${fh(x.d)}`).join('、')}${overRows.length > 4 ? ` ほか${overRows.length - 4}件` : ''}）`);
+    if (Math.abs(unp) > 0.004) items.push(`時間割に未配置のタスク <b class="t-crit">${fh(unp)}</b>（${unpRows.slice(0, 4).map(x => `${escHtml(x.nm)} ${x.d.toFixed(2)}h`).join('、')}${unpRows.length > 4 ? ` ほか${unpRows.length - 4}件` : ''}）`);
+    if (Math.abs(rnd) > 0.004) items.push(`0.01h 単位の丸め ${fh(rnd)}`);
+    return `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--g200);"><b>時間割との差</b>：予定どおりなら <b>${base.toFixed(2)}h</b> → 取込 <b>${(totN + totO).toFixed(2)}h</b>（<b class="${totN + totO - base > 0 ? 't-crit' : 't-ok'}">${fh(totN + totO - base)}</b>）<div style="margin-top:2px;color:var(--g600);">${items.map(x => '・' + x).join('<br>')}</div></div>`;
+  })();
   body.innerHTML = `
     <table style="width:100%;border-collapse:collapse;">
       <thead><tr style="color:var(--g500);font-size:11px;text-align:left;border-bottom:1px solid var(--g200);">
@@ -6124,6 +6144,7 @@ function renderTaskImport() {
       ${plan.map(p => `${escHtml(p.cdSub)} ${escHtml(SUB_MAP[p.cdSub].label)} 通常${p.hoursNormal}${p.hoursOT ? ` / 残業${p.hoursOT}` : ''}`).join('、') || 'なし'}
       <div style="margin-top:4px;">合計 通常 <b>${totN.toFixed(2)}h</b> ／ 残業 <b>${totO.toFixed(2)}h</b></div>
       ${pv ? `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--g200);"><b>予実</b>（Folio）：${pv.both ? `実績のある${pv.both}件は 予定 <b>${pv.planB.toFixed(2)}h</b> → 実績 <b>${pv.actual.toFixed(2)}h</b>（差 <b class="${pv.actual - pv.planB > 0.05 ? 't-crit' : pv.actual - pv.planB < -0.05 ? 't-ok' : ''}">${pv.actual - pv.planB >= 0 ? '+' : ''}${(pv.actual - pv.planB).toFixed(2)}h</b>）` : '予定と実績がそろった行はありません'}${pv.over ? `・予定の1.2倍超 <b class="t-crit">${pv.over}件</b>` : ''}${pv.noAct ? `・実績未入力 ${pv.noAct}件（予定工数で取込）` : ''}</div>` : ''}
+      ${diag}
       ${unplaced ? `<div style="margin-top:4px;color:var(--g500);">※ 時間割(Folio)に未配置の完了タスクが ${unplaced} 件あります。既定では取込みません（必要ならチェック）</div>` : ''}
       ${warn ? `<div style="margin-top:4px;color:var(--danger);">※ 中分類が未設定のタスクが ${warn} 件あります（行の「登録」でタスクマスタに設定できます）</div>` : ''}
       <div id="task-import-note" style="margin-top:4px;color:var(--primary);"></div>
