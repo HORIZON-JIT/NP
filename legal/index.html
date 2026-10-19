@@ -5777,10 +5777,10 @@ function splitTaskNormalOT(start, hours, date) {
   return {normal: Math.max(0, h - ot), ot};
 }
 
+// Folio 取込は実際の工数をそのまま加算する（0.25h 単位の丸めはしない）。表示・保存に合わせて 0.01h 単位に整える
 function _roundTaskHours(h) {
-  const step = DEPARTMENT_CONFIG.rules.roundStepHours || 0.25;
-  if (h <= 0) return 0;
-  return Math.max(step, Math.round(h / step) * step);
+  if (!(h > 0)) return 0;
+  return Math.round(h * 100) / 100;
 }
 
 let _taskImportPlan = null;
@@ -6113,7 +6113,7 @@ function renderTaskImport() {
       <tbody>${lines.join('')}</tbody>
     </table>
     <div class="ti-summary" style="--n:${_taskImportRows.length};margin-top:12px;padding:8px 10px;background:var(--g50);border:1px solid var(--g200);border-radius:8px;">
-      <b>反映内容</b>（チェックした行を中分類ごとに合計し ${DEPARTMENT_CONFIG.rules.roundStepHours}h 単位に丸め）：
+      <b>反映内容</b>（チェックした行の実際の工数を中分類ごとに合計）：
       ${plan.map(p => `${escHtml(p.cdSub)} ${escHtml(SUB_MAP[p.cdSub].label)} 通常${p.hoursNormal}${p.hoursOT ? ` / 残業${p.hoursOT}` : ''}`).join('、') || 'なし'}
       <div style="margin-top:4px;">合計 通常 <b>${totN.toFixed(2)}h</b> ／ 残業 <b>${totO.toFixed(2)}h</b></div>
       ${pv ? `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--g200);"><b>予実</b>（Folio）：${pv.both ? `実績のある${pv.both}件は 予定 <b>${pv.planB.toFixed(2)}h</b> → 実績 <b>${pv.actual.toFixed(2)}h</b>（差 <b class="${pv.actual - pv.planB > 0.05 ? 't-crit' : pv.actual - pv.planB < -0.05 ? 't-ok' : ''}">${pv.actual - pv.planB >= 0 ? '+' : ''}${(pv.actual - pv.planB).toFixed(2)}h</b>）` : '予定と実績がそろった行はありません'}${pv.over ? `・予定の1.2倍超 <b class="t-crit">${pv.over}件</b>` : ''}${pv.noAct ? `・実績未入力 ${pv.noAct}件（予定工数で取込）` : ''}</div>` : ''}
