@@ -5116,7 +5116,10 @@ function setHV(inp, hours){                                // 時間(h) → 現�
     ? String(Math.round(hours * 60))                       // 分（整数）
     : (Math.round(hours * 100) / 100).toFixed(2);          // h（従来形式）
 }
-function applyStepAttr(inp){ if(inp){ inp.step = _unit==='min' ? 15 : 0.25; inp.min = 0; } }
+// 上下キー・▲▼ボタンは「今の値 ± 刻み」で動かす（取込の 2.33 などが 0.25 の格子に吸着しないように）。
+// number 入力の刻みの基準は min 属性、無ければ value 属性なので、min は付けずに value 属性を今の値に合わせる
+function applyStepAttr(inp){ if(inp){ inp.step = _unit==='min' ? 15 : 0.25; inp.removeAttribute('min'); _syncStepBase(inp); } }
+function _syncStepBase(inp){ if (inp && inp.getAttribute('value') !== inp.value) inp.setAttribute('value', inp.value); }
 // クリック加算量は常に時間(h)で保持。分モードでは表示ラベルのみ分に変換
 function stepLabelStr(stepH){
   return _unit==='min' ? `${Math.round(stepH*60)}分`
@@ -5199,12 +5202,16 @@ function makeHoursCell(id, cdSub, isOT) {
     if (d > 0) _inpFx(cdSub, inp, d, isOT, null);
     else if (d < 0) { inp.classList.remove('bump', 'bump-ot'); void inp.offsetWidth; inp.classList.add(isOT ? 'bump-ot' : 'bump'); setTimeout(() => inp.classList.remove('bump', 'bump-ot'), 450); }
   };
+  const noNeg = () => { if (getH(inp) < 0) setHV(inp, 0); };
   if (isOT) {
-    inp.oninput=()=>{ refreshCellStyle(inp); fxDiff(); scheduleUpdateTotals(); };
+    inp.oninput=()=>{ noNeg(); refreshCellStyle(inp); fxDiff(); scheduleUpdateTotals(); _syncStepBase(inp); };
   } else {
-    inp.oninput=()=>{ fxDiff(); clampNormal(cdSub); scheduleUpdateTotals(); };
+    inp.oninput=()=>{ noNeg(); fxDiff(); clampNormal(cdSub); scheduleUpdateTotals(); _syncStepBase(inp); };
   }
+  // ▲▼ボタンやキー操作の直前に、刻みの基準を今の値へ（クリック加算・取込などで値が変わった後でも正しく動く）
+  ['pointerdown', 'focus', 'wheel'].forEach(ev => inp.addEventListener(ev, () => _syncStepBase(inp), {passive: true}));
   inp.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') _syncStepBase(this);
     if (e.key === 'Enter') { e.preventDefault(); navMove(this, e.shiftKey ? 'up' : 'down'); }
     else if (e.key === 'Tab') { e.preventDefault(); navMove(this, e.shiftKey ? 'prev' : 'next'); }
     else if (e.key === 'Escape') { this.blur(); }
