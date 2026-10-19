@@ -2058,7 +2058,7 @@ html[data-mv-dir="back"]::view-transition-new(mv-stage),html[data-mv-dir="back"]
     <div id="kpi-std">
     <div class="dash-stats kpi-tiles" id="kpi-tiles"></div>
     <div class="card">
-      <div class="card-hd"><h2>年度の推移</h2><span class="card-sub" id="kpi-sub">月期ごとの工数合計（全員・通常＋残業）を目標と比較</span></div>
+      <div class="card-hd"><h2>年度の推移</h2><span class="card-sub" id="kpi-sub">月期ごとの工数合計（全員・日報の入力時間 通常＋残業）を目標と比較</span></div>
       <div class="card-body"><div id="kpi-heat" style="overflow-x:auto;"></div></div>
     </div>
     <div class="card" id="kpi-ot-card" style="display:none;">
@@ -2614,7 +2614,19 @@ function _normKpis(list) {
 // 工数KPI（中分類の紐づけで集計するもの）と、残業時間KPI
 function _kpiHoursItems() { return KPIS.filter(k => k.kind !== 'ot'); }
 function _kpiOtItem() { return KPIS.find(k => k.kind === 'ot') || null; }
-function _kpiOtOf(d) { const all = _otByAuthor(d); return Object.keys(all).reduce((t, a) => t + all[a].ot, 0); }
+// KPI は日報に入力した時間をそのまま合計する（退勤時刻による補正はしない）
+function _kpiAuthors(d) { return Object.keys(d || {}).filter(a => a !== '_leaveMap' && a !== 'ヘルプ' && Array.isArray(d[a])); }
+// 担当者別の残業（日報の残業欄の合計）。形は _otByAuthor と同じ {担当者: {n, ot}}
+function _kpiOtByAuthor(d) {
+  const out = {};
+  _kpiAuthors(d).forEach(a => {
+    let n = 0, ot = 0;
+    d[a].forEach(r => { n += r.hoursNormal || 0; ot += r.hoursOT || 0; });
+    out[a] = {n, ot};
+  });
+  return out;
+}
+function _kpiOtOf(d) { const all = _kpiOtByAuthor(d); return Object.keys(all).reduce((t, a) => t + all[a].ot, 0); }
 let KPIS = (() => { try { return _normKpis(JSON.parse(localStorage.getItem(KPIS_STORAGE_KEY) || 'null')); } catch(e) { return _normKpis(null); } })();
 function applyKpis(list) { KPIS = _normKpis(list); try { localStorage.setItem(KPIS_STORAGE_KEY, JSON.stringify(KPIS)); } catch(e) {} _syncKpiTab(); }
 function _syncKpiTab() { const b = document.getElementById('stab-kpi'); if (b) b.style.display = KPIS.length ? '' : 'none'; }
@@ -6946,25 +6958,21 @@ async function setGoal(k, field, val) {
 }
 
 // ── KPI（月次工数目標）: 年度ヒートマップ ──
-// 各KPI = 紐づけた中分類の工数（全員・通常＋残業、退勤時刻ベースで補正）の月期合計。目標以下なら緑、超えるほど黄→赤
+// 各KPI = 紐づけた中分類の工数（全員・通常＋残業、日報の入力時間をそのまま合計）の月期合計。目標以下なら緑、超えるほど黄→赤
 function _kpiHoursOf(d, subs) {
-  if (!d || !subs.length) return 0;
-  const by = _effStats(d).bySub;
-  return subs.reduce((t, cd) => t + (by[cd] || 0), 0);
+  return _kpiBreakdown(d, subs).total;
 }
-// 期データから、指定の中分類の工数を 中分類別／担当者別 に集計（_effStats と同じ補正）
+// 期データから、指定の中分類の工数を 中分類別／担当者別 に集計（日報の入力時間 通常＋残業 をそのまま合計）
 function _kpiBreakdown(d, subs) {
   const bySub = {}, byAuthor = {}, byAuthorSub = {};
   if (!d || !subs.length) return {bySub, byAuthor, byAuthorSub, total: 0};
-  const set = new Set(subs), all = _otByAuthor(d);
+  const set = new Set(subs);
   let total = 0;
-  Object.keys(all).forEach(a => {
-    const rows = _scaledRows(d, a, all[a].n + all[a].ot);
-    const logT = rows.reduce((t, r) => t + (r.hoursNormal || 0) + (r.hoursOT || 0), 0);
-    const k = logT > 0 ? (all[a].n + all[a].ot) / logT : 0;
-    rows.forEach(r => {
+  _kpiAuthors(d).forEach(a => {
+    d[a].forEach(r => {
       if (!set.has(r.cdSub)) return;
-      const h = ((r.hoursNormal || 0) + (r.hoursOT || 0)) * k;
+      const h = (r.hoursNormal || 0) + (r.hoursOT || 0);
+      if (!h) return;
       bySub[r.cdSub] = (bySub[r.cdSub] || 0) + h; byAuthor[a] = (byAuthor[a] || 0) + h; total += h;
       const m = byAuthorSub[a] || (byAuthorSub[a] = {}); m[r.cdSub] = (m[r.cdSub] || 0) + h;
     });
@@ -7039,7 +7047,7 @@ async function renderKpiDash(force) {
   const vals = HK.map(k => periods.map((x, i) => (i > lastIdx || !data[i] || !k.subs.length) ? null : _kpiHoursOf(data[i], k.subs)));
   const otVals = periods.map((x, i) => (i > lastIdx || !data[i]) ? null : _kpiOtOf(data[i]));
   // 担当者別の残業（積み上げ棒用）。年度内に残業のある人を多い順に
-  const otBy = periods.map((x, i) => (i > lastIdx || !data[i]) ? null : _otByAuthor(data[i]));
+  const otBy = periods.map((x, i) => (i > lastIdx || !data[i]) ? null : _kpiOtByAuthor(data[i]));
   const otAuthors = (() => { const t = {}; otBy.forEach(m => m && Object.keys(m).forEach(a => { t[a] = (t[a] || 0) + m[a].ot; })); return Object.keys(t).filter(a => t[a] > 0).sort((a, b) => t[b] - t[a]); })();   // KPI は公平に多い順（谷を最後にしない）
   const AUTH_COLORS = ['#2a78d6', '#e0a526', '#8b5cf6', '#10b981', '#f43f5e', '#0ea5e9', '#f97316', '#84cc16', '#ec4899', '#6b7280'];
   // 担当者の色は年度を通して固定（残業の多い順に割当。残業の無い人も内訳のバーで同じ色になるよう全員に振る）
@@ -7117,10 +7125,10 @@ async function renderKpiDash(force) {
     const d = si >= 0 ? data[si] : null;
     if (!d) bd.innerHTML = '<p class="dx-empty">この月期のデータがありません</p>';
     else bd.innerHTML = `<div class="kpi-bd-grid">${(OTK ? [(() => {
-      const all = _otByAuthor(d), auth = Object.keys(all).filter(a => all[a].ot > 0).sort((x, y) => all[y].ot - all[x].ot);   // 多い順（要因が上に来るように）
+      const all = _kpiOtByAuthor(d), auth = Object.keys(all).filter(a => all[a].ot > 0).sort((x, y) => all[y].ot - all[x].ot);   // 多い順（要因が上に来るように）
       const total = auth.reduce((t, a) => t + all[a].ot, 0), maxA = Math.max(0.01, ...auth.map(a => all[a].ot));
       const J = _kpiJudge(total, OTK.target, si === curIdx, proj), lv = J.lv;
-      const prevD = si > 0 ? data[si - 1] : ctx.prev0, prevAll = prevD ? _otByAuthor(prevD) : null;
+      const prevD = si > 0 ? data[si - 1] : ctx.prev0, prevAll = prevD ? _kpiOtByAuthor(prevD) : null;
       const over = Math.max(0, J.pj - OTK.target), avg = auth.length ? total / auth.length : 0;
       const inc = prevAll ? auth.filter(a => (all[a].ot - ((prevAll[a] || {}).ot || 0)) > 0.05) : [];
       return `<div class="kpi-bd kpi-bd-ot is-${lv}">
@@ -7151,7 +7159,7 @@ async function renderKpiDash(force) {
     otCard.style.display = OTK ? '' : 'none';
     if (OTK) {
       const os = document.getElementById('kpi-ot-sub');
-      if (os) os.textContent = `月期ごとの全員の残業時間の合計（担当者ごとの積み上げ）・破線＝目標 ${OTK.target}h・斜線＝今期の見込`;
+      if (os) os.textContent = `月期ごとの全員の残業時間の合計（日報の残業欄・担当者ごとの積み上げ）・破線＝目標 ${OTK.target}h・斜線＝今期の見込`;
       requestAnimationFrame(() => renderKpiOtBar(document.getElementById('kpi-ot-canvas'), periods, ranges, otVals, OTK.target, curIdx, proj, {by: otBy, authors: otAuthors, color: authColor, sel: ctx.sel}));
       const lg = document.getElementById('kpi-ot-legend');
       if (lg) lg.innerHTML = otAuthors.map(a => `<span><i class="dx-sw" style="background:${authColor(a)}"></i>${escHtml(a)}</span>`).join('');
@@ -7296,7 +7304,7 @@ function renderAdminKpis() {
   el.innerHTML = KPIS.map((k, i) => {
     if (k.kind === 'ot') return `<div class="kpi-adm"><div class="kpi-adm-row"><span class="nm">${escHtml(k.name)}</span>
         <span class="tg">目標 <input type="number" step="1" min="0" value="${k.target}" onchange="setKpi(${i},'target',this.value)"> h 以下</span>
-        <span class="pk">全員の残業時間の合計（退勤時刻から算出）。KPIタブでは棒グラフで表示</span></div></div>`;
+        <span class="pk">全員の残業時間の合計（日報の残業欄の入力時間）。KPIタブでは棒グラフで表示</span></div></div>`;
     const used = new Set(k.subs);
     const picked = k.subs.map(cd => (SUB_MAP[cd] || {}).label || cd);
     return `<details class="kpi-adm">
@@ -8112,7 +8120,7 @@ function _aiKpiPayload() {
   const at = (i, f) => (i > c.lastIdx || !c.data[i]) ? null : f(c.data[i]);
   if (OTK) {
     const byAuthor = {};
-    c.data.forEach((d, i) => { if (i > c.lastIdx || !d) return; const ob = _otByAuthor(d); Object.keys(ob).forEach(a => { byAuthor[a] = _aiR((byAuthor[a] || 0) + ob[a].ot); }); });
+    c.data.forEach((d, i) => { if (i > c.lastIdx || !d) return; const ob = _kpiOtByAuthor(d); Object.keys(ob).forEach(a => { byAuthor[a] = _aiR((byAuthor[a] || 0) + ob[a].ot); }); });
     kpis.push({key: OTK.key, name: OTK.name, kind: 'ot', target: OTK.target, owner: OTK.owner || '', plan: OTK.plan || '', vals: c.periods.map((_, i) => at(i, d => _aiR(_kpiOtOf(d)))), byAuthor});
   }
   HK.forEach(k => {
