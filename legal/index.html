@@ -7069,10 +7069,10 @@ async function renderKpiDash(force) {
       if (v == null) return `<div class="${base} is-na"><div class="kt-hd"><span class="kt-nm">${escHtml(k.name)}</span><span class="kt-dot"></span></div><div class="kt-v"><b>—</b><span class="kt-tg">/ ${k.target}h</span></div><div class="kt-m"></div><div class="kt-ft"><span class="kt-tag">${note || 'データなし'}</span></div></div>`;
       const isCur = tIdx === curIdx, J = _kpiJudge(v, k.target, isCur, proj), hasPj = J.hasPj, pj = J.pj, lv = J.lv, judge = J.label, r = J.rAct;
       const scale = Math.max(k.target * 1.35, pj, v, 0.01);
-      const sub = hasPj ? `見込 ${pj.toFixed(0)}h・${Math.round(r * 100)}%` : (v > k.target ? `目標超過 +${(v - k.target).toFixed(1)}h` : `${Math.round(r * 100)}%`);
-      return `<div class="${base} is-${lv}" title="${escHtml(k.name)}: ${v.toFixed(1)}h／目標 ${k.target}h（${Math.round(r * 100)}%）${hasPj ? `・見込 ${pj.toFixed(1)}h` : ''}">
+      const sub = hasPj ? `見込 ${pj.toFixed(2)}h・${Math.round(r * 100)}%` : (v > k.target ? `目標超過 +${(v - k.target).toFixed(2)}h` : `${Math.round(r * 100)}%`);
+      return `<div class="${base} is-${lv}" title="${escHtml(k.name)}: ${v.toFixed(2)}h／目標 ${k.target}h（${Math.round(r * 100)}%）${hasPj ? `・見込 ${pj.toFixed(2)}h` : ''}">
         <div class="kt-hd"><span class="kt-nm">${escHtml(k.name)}</span><span class="kt-dot"></span></div>
-        <div class="kt-v"><b>${v.toFixed(1)}</b><small>h</small><span class="kt-tg">/ ${k.target}h</span></div>
+        <div class="kt-v"><b>${v.toFixed(2)}</b><small>h</small><span class="kt-tg">/ ${k.target}h</span></div>
         <div class="kt-m">${hasPj && pj > v ? `<i class="pj" data-w="${(pj / scale * 100).toFixed(1)}"></i>` : ''}${v > k.target ? `<i class="ov" data-w="${(v / scale * 100).toFixed(1)}"></i>` : ''}<i class="f" data-w="${(Math.min(v, k.target) / scale * 100).toFixed(1)}"></i><i class="tk" style="left:${(k.target / scale * 100).toFixed(1)}%"></i></div>
         <div class="kt-ft"><span class="kt-tag">${judge}</span><span class="kt-sub">${sub}</span></div></div>`;
     };
@@ -7092,7 +7092,7 @@ async function renderKpiDash(force) {
     const str = lv === 'ok' ? 9 + Math.round(r * 11) : lv === 'warn' ? 20 : 24;
     const pj = J.hasPj ? J.pj : null;
     return `<td class="h is-${lv} ${isCur ? 'is-cur' : ''} ${isSel ? 'is-sel' : ''}" onclick="_kpiPick(${i})" data-k="${ki}" data-i="${i}" style="background:color-mix(in srgb,var(--st-${lv}) ${str}%,transparent)">
-      <b>${h.toFixed(1)}</b>${pj != null ? `<small class="${pj > target ? 't-crit' : ''}">見込 ${pj.toFixed(0)}</small>` : ''}</td>`;
+      <b>${h.toFixed(2)}</b>${pj != null ? `<small class="${pj > target ? 't-crit' : ''}">見込 ${pj.toFixed(2)}</small>` : ''}</td>`;
   };
   if (el) el.innerHTML = `<table class="dx-table kpi-heat">
     <thead><tr><th class="sticky">KPI</th><th class="num">目標</th>${periods.map((x, i) => `<th class="num ${i === curIdx ? 'is-cur' : ''} ${i === ctx.sel ? 'is-sel' : ''}" title="${ranges[i].range}" onclick="_kpiPick(${i})">${i === curIdx ? '<span class="kh-cur">今期</span>' : ''}${x.month}月期${calMixed && ranges[i].calendar ? '<span class="kh-cal">月末締</span>' : ''}</th>`).join('')}<th class="num kh-stat" title="終わった月期の平均">平均</th><th class="num kh-stat" title="終わった月期の中央値">中央値</th><th class="num">達成月</th></tr></thead>
@@ -7101,7 +7101,7 @@ async function renderKpiDash(force) {
       const pastVals = v.filter((x, i) => x != null && i !== curIdx), past = pastVals.length, done = pastVals.filter(x => x <= k.target).length;
       const avg = past ? pastVals.reduce((t, x) => t + x, 0) / past : null;
       const med = past ? (() => { const a = pastVals.slice().sort((x, y) => x - y), m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; })() : null;
-      const stat = x => x == null ? '<span class="t-muted">—</span>' : `<b class="${x <= k.target ? 't-ok' : 't-crit'}">${x.toFixed(1)}</b>`;
+      const stat = x => x == null ? '<span class="t-muted">—</span>' : `<b class="${x <= k.target ? 't-ok' : 't-crit'}">${x.toFixed(2)}</b>`;
       return `<tr><td class="sticky" ${k.plan ? `title="アクションプラン: ${escHtml(k.plan)}"` : ''}><b>${escHtml(k.name)}</b>${k.owner ? `<span class="kh-owner" title="主担当">${escHtml(k.owner)}</span>` : ''}${k.subs.length ? '' : '<span class="dx-tag is-warn">未設定</span>'}</td>
         <td class="tg">≦${k.target}h</td>
         ${v.map((x, i) => cell(x, k.target, i, ki)).join('')}
@@ -7132,21 +7132,21 @@ async function renderKpiDash(force) {
       const over = Math.max(0, J.pj - OTK.target), avg = auth.length ? total / auth.length : 0;
       const inc = prevAll ? auth.filter(a => (all[a].ot - ((prevAll[a] || {}).ot || 0)) > 0.05) : [];
       return `<div class="kpi-bd kpi-bd-ot is-${lv}">
-        <div class="kpi-bd-hd"><span class="kb-dot"></span><b>${escHtml(OTK.name)}</b><span class="kb-v"><em>${total.toFixed(1)}h</em>/ ${OTK.target}h${J.hasPj ? `<span class="kb-pj">見込 ${J.pj.toFixed(0)}h</span>` : ''}${over > 0 ? `<span class="kb-over">+${over.toFixed(1)}h</span>` : ''}</span><span class="dx-tag is-${lv}">${J.label}</span></div>
-        ${auth.length ? `<div class="kpi-bd-sec">担当者（多い順）・平均 ${avg.toFixed(1)}h${prevAll ? '・前期比' : ''}</div>
+        <div class="kpi-bd-hd"><span class="kb-dot"></span><b>${escHtml(OTK.name)}</b><span class="kb-v"><em>${total.toFixed(2)}h</em>/ ${OTK.target}h${J.hasPj ? `<span class="kb-pj">見込 ${J.pj.toFixed(2)}h</span>` : ''}${over > 0 ? `<span class="kb-over">+${over.toFixed(2)}h</span>` : ''}</span><span class="dx-tag is-${lv}">${J.label}</span></div>
+        ${auth.length ? `<div class="kpi-bd-sec">担当者（多い順）・平均 ${avg.toFixed(2)}h${prevAll ? '・前期比' : ''}</div>
         <div class="dx-hbars">${auth.map(a => { const v = all[a].ot, pv = prevAll ? ((prevAll[a] || {}).ot || 0) : null, dv = pv == null ? null : v - pv, hi = v > avg + 0.05;
-          return `<div class="dx-hbar"><span class="lb"><i class="dx-sw" style="background:${authColor(a)}"></i>${escHtml(a)}${hi ? '<span class="dx-tag is-crit" title="チーム平均より多い">平均超</span>' : ''}</span><div class="tr"><i style="background:${authColor(a)}" data-w="${(v / maxA * 100).toFixed(1)}"></i></div><span class="vv">${v.toFixed(1)}h<small>${total ? Math.round(v / total * 100) : 0}%</small>${dv == null ? '' : `<small class="${dv > 0.05 ? 't-crit' : dv < -0.05 ? 't-ok' : 't-muted'}" title="前期 ${pv.toFixed(1)}h">${dv > 0 ? '+' : ''}${dv.toFixed(1)}</small>`}</span></div>`; }).join('')}</div>
-        ${inc.length ? `<p class="dx-note">前期より増えた人: ${inc.map(a => `${escHtml(a)} +${(all[a].ot - ((prevAll[a] || {}).ot || 0)).toFixed(1)}h`).join('、')}</p>` : ''}` : '<p class="dx-empty">この月期の残業はありません</p>'}
+          return `<div class="dx-hbar"><span class="lb"><i class="dx-sw" style="background:${authColor(a)}"></i>${escHtml(a)}${hi ? '<span class="dx-tag is-crit" title="チーム平均より多い">平均超</span>' : ''}</span><div class="tr"><i style="background:${authColor(a)}" data-w="${(v / maxA * 100).toFixed(1)}"></i></div><span class="vv">${v.toFixed(2)}h<small>${total ? Math.round(v / total * 100) : 0}%</small>${dv == null ? '' : `<small class="${dv > 0.05 ? 't-crit' : dv < -0.05 ? 't-ok' : 't-muted'}" title="前期 ${pv.toFixed(2)}h">${dv > 0 ? '+' : ''}${dv.toFixed(2)}</small>`}</span></div>`; }).join('')}</div>
+        ${inc.length ? `<p class="dx-note">前期より増えた人: ${inc.map(a => `${escHtml(a)} +${(all[a].ot - ((prevAll[a] || {}).ot || 0)).toFixed(2)}h`).join('、')}</p>` : ''}` : '<p class="dx-empty">この月期の残業はありません</p>'}
       </div>`; })()] : []).join('')}${HK.map((k, ki) => {
       const b = _kpiBreakdown(d, k.subs);
       const J = _kpiJudge(b.total, k.target, si === curIdx, proj), lv = !k.subs.length ? '' : J.lv;
       const subs = Object.keys(b.bySub).filter(cd => b.bySub[cd] > 0.005).sort((x, y) => b.bySub[y] - b.bySub[x]);
       const auth = Object.keys(b.byAuthor).filter(a => b.byAuthor[a] > 0.005).sort((x, y) => b.byAuthor[y] - b.byAuthor[x]);
       const maxS = Math.max(0.01, ...subs.map(cd => b.bySub[cd])), maxA = Math.max(0.01, ...auth.map(a => b.byAuthor[a]));
-      const bar = (label, h, max, color) => `<div class="dx-hbar"><span class="lb">${label}</span><div class="tr"><i style="background:${color}" data-w="${(h / max * 100).toFixed(1)}"></i></div><span class="vv">${h.toFixed(1)}h<small>${b.total ? Math.round(h / b.total * 100) : 0}%</small></span></div>`;
+      const bar = (label, h, max, color) => `<div class="dx-hbar"><span class="lb">${label}</span><div class="tr"><i style="background:${color}" data-w="${(h / max * 100).toFixed(1)}"></i></div><span class="vv">${h.toFixed(2)}h<small>${b.total ? Math.round(h / b.total * 100) : 0}%</small></span></div>`;
       const empty = k.subs.length && !subs.length && !auth.length;
       return `<div class="kpi-bd ${lv ? 'is-' + lv : ''} ${empty || !k.subs.length ? 'is-quiet' : ''}">
-        <div class="kpi-bd-hd"><span class="kb-dot"></span><b>${escHtml(k.name)}</b><span class="kb-v">${k.subs.length ? `<em>${b.total.toFixed(1)}h</em>/ ${k.target}h${J.hasPj ? `<span class="kb-pj">見込 ${J.pj.toFixed(0)}h</span>` : ''}` : `/ ${k.target}h`}</span>${lv ? `<span class="dx-tag is-${lv}">${J.label}</span>` : '<span class="dx-tag is-warn">未設定</span>'}</div>
+        <div class="kpi-bd-hd"><span class="kb-dot"></span><b>${escHtml(k.name)}</b><span class="kb-v">${k.subs.length ? `<em>${b.total.toFixed(2)}h</em>/ ${k.target}h${J.hasPj ? `<span class="kb-pj">見込 ${J.pj.toFixed(2)}h</span>` : ''}` : `/ ${k.target}h`}</span>${lv ? `<span class="dx-tag is-${lv}">${J.label}</span>` : '<span class="dx-tag is-warn">未設定</span>'}</div>
         ${!k.subs.length ? '<p class="dx-empty">管理タブ「KPI」で中分類を紐づけてください</p>' : empty ? '<p class="dx-empty">この月期は該当の作業がありません</p>' :
         `<div class="kpi-bd-sec">中分類</div><div class="dx-hbars">${subs.map(cd => { const sb = SUB_MAP[cd] || {}; return bar(escHtml(sb.label || cd), b.bySub[cd], maxS, 'var(--k)'); }).join('')}</div>
         <div class="kpi-bd-sec">担当者</div><div class="dx-hbars">${auth.map(a => bar(`<i class="dx-sw" style="background:${authColor(a)}"></i>${escHtml(a)}`, b.byAuthor[a], maxA, authColor(a))).join('')}</div>`}
@@ -7186,11 +7186,11 @@ function _kpiTipShow(td) {
   const maxS = Math.max(0.01, ...subs.map(cd => b.bySub[cd])), multi = subs.length > 1;
   const subName = cd => (SUB_MAP[cd] || {}).label || cd;
   const pct = h => b.total ? Math.round(h / b.total * 100) : 0;
-  const row = (nm, h, w, color, full) => `<div class="kt-row" ${full ? `title="${escHtml(full)}"` : ''}><span class="nm">${nm}</span><span class="bar"><i style="width:${w.toFixed(1)}%;${color ? `background:${color}` : ''}"></i></span><span class="hv">${h.toFixed(1)}h<small>${pct(h)}%</small></span></div>`;
+  const row = (nm, h, w, color, full) => `<div class="kt-row" ${full ? `title="${escHtml(full)}"` : ''}><span class="nm">${nm}</span><span class="bar"><i style="width:${w.toFixed(2)}%;${color ? `background:${color}` : ''}"></i></span><span class="hv">${h.toFixed(2)}h<small>${pct(h)}%</small></span></div>`;
   const tip = _kpiTipEl();
   tip.innerHTML = `<div class="kt-top"><b>${escHtml(k.name)}</b><span>${ctx.periods[i].month}月期 ${escHtml(ctx.ranges[i].range)}</span></div>
-    <div class="kt-tot"><em class="t-${lv}">${b.total.toFixed(1)}h</em><span>／ 目標 ${k.target}h（${Math.round(r * 100)}%）</span></div>
-    ${J.hasPj ? `<div class="kt-pj">月末見込 <b class="t-${lv}">${J.pj.toFixed(1)}h</b>（${Math.round(J.r * 100)}%）・${J.label}</div>` : ''}
+    <div class="kt-tot"><em class="t-${lv}">${b.total.toFixed(2)}h</em><span>／ 目標 ${k.target}h（${Math.round(r * 100)}%）</span></div>
+    ${J.hasPj ? `<div class="kt-pj">月末見込 <b class="t-${lv}">${J.pj.toFixed(2)}h</b>（${Math.round(J.r * 100)}%）・${J.label}</div>` : ''}
     ${!auth.length ? '<div class="kt-none">この月期は該当の作業がありません</div>' : `
     <div class="kt-sec">日報のタスク（中分類）</div>
     <div class="kt-rows">${subs.map(cd => row(escHtml(subName(cd)), b.bySub[cd], b.bySub[cd] / maxS * 100, `var(--st-${lv})`, `${cd} ${subName(cd)}`)).join('')}</div>
@@ -7198,7 +7198,7 @@ function _kpiTipShow(td) {
     <div class="kt-rows">${auth.map(a => {
       const ms = b.byAuthorSub[a] || {}, list = subs.filter(cd => (ms[cd] || 0) > 0.005);
       return row(escHtml(a), b.byAuthor[a], b.byAuthor[a] / max * 100, '') +
-        (multi ? `<div class="kt-sub">${list.map(cd => `<span>${escHtml(subName(cd))} <b>${ms[cd].toFixed(1)}h</b></span>`).join('')}</div>` : '');
+        (multi ? `<div class="kt-sub">${list.map(cd => `<span>${escHtml(subName(cd))} <b>${ms[cd].toFixed(2)}h</b></span>`).join('')}</div>` : '');
     }).join('')}</div>`}`;
   tip.classList.add('on');
   const r0 = td.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
@@ -7247,7 +7247,7 @@ function renderKpiOtBar(canvas, periods, ranges, vals, target, curIdx, proj, sta
           ctx.fillStyle = stack.color(a); ctx.fillRect(x - barW / 2, y0 - ah, barW, ah);
           // 区切り線＋セグメント内に名前と時間（高さがあるときだけ）
           ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - barW / 2, y0); ctx.lineTo(x + barW / 2, y0); ctx.stroke();
-          if (frac >= 1 && ah >= 30 && barW >= 44) { ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 11px sans-serif'; ctx.fillText(a.length > 4 ? a.slice(0, 4) : a, x, y0 - ah / 2 - 6); ctx.font = '600 10px Inter, sans-serif'; ctx.fillText(av.toFixed(1), x, y0 - ah / 2 + 7); }
+          if (frac >= 1 && ah >= 30 && barW >= 44) { ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 11px sans-serif'; ctx.fillText(a.length > 4 ? a.slice(0, 4) : a, x, y0 - ah / 2 - 6); ctx.font = '600 10px Inter, sans-serif'; ctx.fillText(av.toFixed(2), x, y0 - ah / 2 + 7); }
           else if (frac >= 1 && ah >= 15 && barW >= 44) { ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '700 10px sans-serif'; ctx.fillText(a.length > 3 ? a.slice(0, 3) : a, x, y0 - ah / 2); }
           y0 -= ah;
         });
@@ -7267,8 +7267,8 @@ function renderKpiOtBar(canvas, periods, ranges, vals, target, curIdx, proj, sta
       if (frac >= 1) {
         ctx.fillStyle = over ? CHT_OT_INK : CHT_OK_INK; ctx.font = '800 14px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
         const topY = PT + cH - (i === curIdx && pj != null && pj > v ? pj / maxV * cH : h);
-        ctx.fillText(v.toFixed(1) + 'h', x, topY - (i === curIdx && pj != null && pj > v ? 16 : 4));
-        if (i === curIdx && pj != null && pj > v) { ctx.font = '600 11px Inter, sans-serif'; ctx.fillStyle = pj > target ? CHT_OT_INK : CHT_OK_INK; ctx.fillText(`見込 ${pj.toFixed(0)}h`, x, topY - 3); }
+        ctx.fillText(v.toFixed(2) + 'h', x, topY - (i === curIdx && pj != null && pj > v ? 16 : 4));
+        if (i === curIdx && pj != null && pj > v) { ctx.font = '600 11px Inter, sans-serif'; ctx.fillStyle = pj > target ? CHT_OT_INK : CHT_OK_INK; ctx.fillText(`見込 ${pj.toFixed(2)}h`, x, topY - 3); }
       }
     });
     // 目標の破線
@@ -7279,7 +7279,7 @@ function renderKpiOtBar(canvas, periods, ranges, vals, target, curIdx, proj, sta
     const lt = `目標 ${target}h`; ctx.textAlign = 'left';
     ctx.fillStyle = _cssVar('--dx-accent', '#8A6A37'); ctx.fillText(lt, PL + cW + 6, ty);
   };
-  const key = vals.map(v => v == null ? '' : v.toFixed(2)).join('|') + `|${target}|${pj == null ? '' : pj.toFixed(1)}|${stack.sel}|${stack.authors.join(',')}`;
+  const key = vals.map(v => v == null ? '' : v.toFixed(2)).join('|') + `|${target}|${pj == null ? '' : pj.toFixed(2)}|${stack.sel}|${stack.authors.join(',')}`;
   if (!canvas._kpiBound) {
     canvas._kpiBound = true;
     canvas.style.cursor = 'pointer';
