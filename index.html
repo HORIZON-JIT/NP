@@ -6083,8 +6083,25 @@ function renderTaskImport() {
   const sums = {};   // cdSub -> {normal, ot}
   let warn = 0, unplaced = 0;
   const hasPv = _taskImportRows.some(x => 'plan' in x.r || 'actual' in x.r);   // 旧GASは予実を返さない
+  // 通常の上限（REGULAR_H）を超えた分は残業へ振り替える。時間割に未配置のタスク → 開始が遅いタスクの順に回す
+  _taskImportRows.forEach(x => { x.spAdj = {normal: x.sp.normal, ot: x.sp.ot}; });
+  const chk = _taskImportRows.filter(x => x.ok && x.checked);
+  let shifted = 0;
+  {
+    let excess = Math.round((chk.reduce((t, x) => t + x.sp.normal, 0) - REGULAR_H) * 100) / 100;
+    if (excess > 0) {
+      const order = chk.slice().sort((a, b) => (a.placed === b.placed ? _hmToMin(b.start || '0:00') - _hmToMin(a.start || '0:00') : (a.placed ? 1 : -1)));
+      for (const x of order) {
+        if (excess <= 0) break;
+        const mv = Math.min(x.spAdj.normal, excess);
+        if (mv <= 0) continue;
+        x.spAdj.normal = Math.round((x.spAdj.normal - mv) * 100) / 100; x.spAdj.ot = Math.round((x.spAdj.ot + mv) * 100) / 100;
+        excess = Math.round((excess - mv) * 100) / 100; shifted = Math.round((shifted + mv) * 100) / 100;
+      }
+    }
+  }
   const lines = _taskImportRows.map((x, i) => {
-    const {r, cd, ok, reason, start, placed, sp, checked} = x;
+    const {r, cd, ok, reason, start, placed, checked} = x, sp = x.spAdj;
     if (!ok) warn++;
     if (ok && !placed) unplaced++;
     if (ok && checked) {
@@ -6142,7 +6159,7 @@ function renderTaskImport() {
     <div class="ti-summary" style="--n:${_taskImportRows.length};margin-top:12px;padding:8px 10px;background:var(--g50);border:1px solid var(--g200);border-radius:8px;">
       <b>反映内容</b>（チェックした行の実際の工数を中分類ごとに合計）：
       ${plan.map(p => `${escHtml(p.cdSub)} ${escHtml(SUB_MAP[p.cdSub].label)} 通常${p.hoursNormal}${p.hoursOT ? ` / 残業${p.hoursOT}` : ''}`).join('、') || 'なし'}
-      <div style="margin-top:4px;">合計 通常 <b>${totN.toFixed(2)}h</b> ／ 残業 <b>${totO.toFixed(2)}h</b></div>
+      <div style="margin-top:4px;">合計 通常 <b>${totN.toFixed(2)}h</b> ／ 残業 <b>${totO.toFixed(2)}h</b>${shifted ? `<span style="margin-left:8px;color:var(--danger);font-size:11px;">※ 通常の上限 ${REGULAR_H}h を超えた ${shifted.toFixed(2)}h は残業に振り替え</span>` : ''}</div>
       ${pv ? `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--g200);"><b>予実</b>（Folio）：${pv.both ? `実績のある${pv.both}件は 予定 <b>${pv.planB.toFixed(2)}h</b> → 実績 <b>${pv.actual.toFixed(2)}h</b>（差 <b class="${pv.actual - pv.planB > 0.05 ? 't-crit' : pv.actual - pv.planB < -0.05 ? 't-ok' : ''}">${pv.actual - pv.planB >= 0 ? '+' : ''}${(pv.actual - pv.planB).toFixed(2)}h</b>）` : '予定と実績がそろった行はありません'}${pv.over ? `・予定の1.2倍超 <b class="t-crit">${pv.over}件</b>` : ''}${pv.noAct ? `・実績未入力 ${pv.noAct}件（予定工数で取込）` : ''}</div>` : ''}
       ${diag}
       ${unplaced ? `<div style="margin-top:4px;color:var(--g500);">※ 時間割(Folio)に未配置の完了タスクが ${unplaced} 件あります。既定では取込みません（必要ならチェック）</div>` : ''}
