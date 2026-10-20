@@ -173,6 +173,41 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
 @keyframes savedSweep{from{background-position:120% 0;}to{background-position:-30% 0;}}
 .input-live-pie.saved-flash .live-pie-canvas{animation:numPop .6s cubic-bezier(.2,1.4,.4,1);}
 @media (prefers-reduced-motion:reduce){#entry-tbody tr.hit td,.td-ripple,.add-chip,.num-pop,.hours-wrap input.bump,.hours-wrap input.bump-ot,.input-live-pie.saved-flash::after,.input-live-pie.saved-flash .live-pie-canvas,.row-sweep::before,.fx-spark,.fx-ring,.table-flash,.fx-combo,.live-pie-canvas.glow,.side-totals.hit,.side-totals.hit::after{animation:none!important;}.fx-fly{transition:none!important;}}
+/* ══ メガフィーバー ══════════════════════════════════════════
+   全画面の発光・虹色・揺れ・特大の火花。10コンボごとに吹き出し、保存で「もう一回遊べるドン！！！」。
+   画面全体の点滅は光過敏への配慮で 1秒に3回まで（_megaFlash で間引く）。 */
+.mega-flash{position:fixed;inset:0;pointer-events:none;z-index:997;opacity:0;
+  background:radial-gradient(circle at var(--x,50%) var(--y,50%),rgba(255,255,255,.95) 0,color-mix(in srgb,var(--cat-color,#f43f5e) 75%,#fff) 14%,transparent 55%),
+    linear-gradient(115deg,rgba(255,0,128,.42),rgba(255,214,0,.42) 25%,rgba(0,255,170,.42) 50%,rgba(0,170,255,.42) 75%,rgba(170,0,255,.42));
+  mix-blend-mode:screen;animation:megaFlash .32s ease-out forwards;}
+[data-theme="dark"] .mega-flash{mix-blend-mode:normal;}
+@keyframes megaFlash{0%{opacity:1;}100%{opacity:0;}}
+.mega-shake{animation:megaShake .32s linear;}
+@keyframes megaShake{0%,100%{transform:none;}20%{transform:translate(-6px,3px) rotate(-.4deg);}40%{transform:translate(6px,-3px) rotate(.4deg);}60%{transform:translate(-4px,-2px);}80%{transform:translate(3px,2px);}}
+.table-wrap.mega-rainbow{animation:megaRainbow .7s linear;}
+@keyframes megaRainbow{0%{box-shadow:0 0 0 3px #ff0080,0 0 28px #ff0080;}25%{box-shadow:0 0 0 3px #ffd600,0 0 28px #ffd600;}50%{box-shadow:0 0 0 3px #00ffaa,0 0 28px #00ffaa;}75%{box-shadow:0 0 0 3px #00aaff,0 0 28px #00aaff;}100%{box-shadow:0 0 0 0 transparent;}}
+.fx-spark.mega{width:12px;height:12px;box-shadow:0 0 14px currentColor,0 0 4px #fff;}
+.fx-spark.mega.streak{width:5px;height:26px;}
+.fx-combo.mega{background:linear-gradient(90deg,#ff0080,#ffd600,#00ffaa,#00aaff,#aa00ff,#ff0080);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:2px #fff;filter:drop-shadow(0 0 6px rgba(255,0,128,.7)) drop-shadow(0 3px 0 rgba(0,0,0,.35));animation:fxCombo .9s cubic-bezier(.2,1.6,.4,1) forwards,megaHue .45s linear infinite;}
+.fx-combo.mega small{-webkit-text-stroke:1px #fff;}
+@keyframes megaHue{to{background-position:200% 0;}}
+.mega-bubble{position:fixed;z-index:1001;pointer-events:none;background:#fff;color:#e11d48;border:4px solid #111;border-radius:22px;padding:10px 20px 12px;
+  font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;font-weight:900;font-size:30px;line-height:1.1;letter-spacing:.02em;white-space:nowrap;
+  box-shadow:6px 6px 0 #111;transform:translate(-50%,-100%);animation:megaBubble 1.7s cubic-bezier(.2,1.6,.4,1) forwards;}
+.mega-bubble b{font-size:1.35em;color:#f59e0b;-webkit-text-stroke:2px #b45309;margin-right:2px;}
+.mega-bubble::before,.mega-bubble::after{content:'';position:absolute;left:34px;width:0;height:0;border-style:solid;}
+.mega-bubble::before{bottom:-24px;border-width:24px 14px 0 4px;border-color:#111 transparent transparent transparent;}
+.mega-bubble::after{bottom:-15px;left:38px;border-width:16px 9px 0 3px;border-color:#fff transparent transparent transparent;}
+@keyframes megaBubble{0%{opacity:0;transform:translate(-50%,-100%) scale(.2) rotate(-12deg);}18%{opacity:1;transform:translate(-50%,-100%) scale(1.18) rotate(4deg);}30%{transform:translate(-50%,-100%) scale(.96) rotate(-2deg);}40%{transform:translate(-50%,-100%) scale(1.04) rotate(1deg);}82%{opacity:1;transform:translate(-50%,-110%) scale(1);}100%{opacity:0;transform:translate(-50%,-150%) scale(.9);}}
+.mega-save{position:fixed;left:50%;top:42%;z-index:1002;pointer-events:none;transform:translate(-50%,-50%);text-align:center;}
+.mega-save .mega-bubble{position:relative;display:inline-block;font-size:clamp(28px,5vw,58px);padding:16px 30px 20px;border-width:6px;box-shadow:10px 10px 0 #111;transform:none;animation:megaSaveIn 2.4s cubic-bezier(.2,1.6,.4,1) forwards;}
+.mega-save .mega-bubble::before{left:calc(50% - 20px);bottom:-34px;border-width:34px 20px 0 6px;}
+.mega-save .mega-bubble::after{left:calc(50% - 14px);bottom:-22px;border-width:24px 13px 0 4px;}
+.mega-save .mega-bubble span{display:inline-block;animation:megaBounce .5s ease-in-out infinite alternate;}
+@keyframes megaSaveIn{0%{opacity:0;transform:scale(.2) rotate(-10deg);}15%{opacity:1;transform:scale(1.15) rotate(3deg);}25%{transform:scale(.95) rotate(-1deg);}33%{transform:scale(1.03);}85%{opacity:1;transform:scale(1);}100%{opacity:0;transform:scale(1.1) translateY(-20px);}}
+@keyframes megaBounce{from{transform:translateY(0);}to{transform:translateY(-6px);}}
+@media (prefers-reduced-motion:reduce){.mega-flash,.mega-shake,.table-wrap.mega-rainbow,.fx-combo.mega,.mega-bubble,.mega-save .mega-bubble,.mega-save .mega-bubble span{animation:none!important;}.mega-flash{display:none;}}
+@media print{.mega-flash,.mega-bubble,.mega-save{display:none!important;}}
 /* ── 右パネル合計ストリップ ── */
 .side-totals{display:flex;gap:0;width:100%;border-radius:8px;overflow:hidden;border:1px solid var(--g200);background:var(--panel);}
 .side-totals .st-cell{flex:1;text-align:center;padding:11px 6px 9px;display:flex;flex-direction:column;gap:2px;}
@@ -2264,6 +2299,7 @@ tr.neon-row td.td-name{animation:neonText .8s ease-out;}
       </label>
       <div id="s-input-fx-modes" class="fx-modes">
         <button type="button" data-mode="fever" onclick="setInputFxMode('fever')"><b>フィーバー</b><small>火花・コンボ・紙吹雪で派手に</small></button>
+        <button type="button" data-mode="mega" onclick="setInputFxMode('mega')"><b>メガフィーバー</b><small>画面ごと光って揺れる。10コンボごとに「ドン！」</small></button>
         <button type="button" data-mode="elegant" onclick="setInputFxMode('elegant')"><b>エレガント</b><small>柔らかな光と小さな動きで上品に</small></button>
         <button type="button" data-mode="minimal" onclick="setInputFxMode('minimal')"><b>ミニマル</b><small>入力欄が一度だけ淡く明滅するだけ</small></button>
         <button type="button" data-mode="neon" onclick="setInputFxMode('neon')"><b>ネオン</b><small>セルと行が発光し、合計へ光の軌跡</small></button>
@@ -5328,7 +5364,7 @@ function setInputFx(on) {
 }
 // 演出モード: 'fever'（従来の派手な演出）／'elegant'（控えめ）。既定は部署設定 inputFxMode、無ければ fever
 const INPUT_FX_MODE_KEY = LS_NS + '__inputFxMode__';
-const INPUT_FX_MODES = {fever: 'フィーバー', elegant: 'エレガント', minimal: 'ミニマル', neon: 'ネオン'};
+const INPUT_FX_MODES = {fever: 'フィーバー', mega: 'メガフィーバー', elegant: 'エレガント', minimal: 'ミニマル', neon: 'ネオン'};
 function inputFxMode() {
   const def = INPUT_FX_MODES[DEPARTMENT_CONFIG.inputFxMode] ? DEPARTMENT_CONFIG.inputFxMode : 'fever';
   try { const v = localStorage.getItem(INPUT_FX_MODE_KEY); return INPUT_FX_MODES[v] ? v : def; } catch(e) { return def; }
@@ -5408,12 +5444,30 @@ function _inpFxNeon(cdSub, inp, added, isOT) {
   const tot = document.querySelector('.side-totals');
   if (tot) { tot.style.setProperty('--fx-neon', color); tot.classList.remove('neon-hit'); void tot.offsetWidth; setTimeout(() => { tot.classList.add('neon-hit'); setTimeout(() => tot.classList.remove('neon-hit'), 700); }, 380); }
 }
+// メガフィーバー: 全画面の発光（光過敏への配慮で 1秒に3回まで＝340ms 以上あける）
+let _megaLastFlash = 0;
+function _megaFlash(x, y, color) {
+  const now = performance.now();
+  if (now - _megaLastFlash < 340) return false;
+  _megaLastFlash = now;
+  const f = document.createElement('div'); f.className = 'mega-flash';
+  f.style.setProperty('--x', x + 'px'); f.style.setProperty('--y', y + 'px'); if (color) f.style.setProperty('--cat-color', color);
+  document.body.appendChild(f); setTimeout(() => f.remove(), 360);
+  return true;
+}
+function _megaBubble(x, y, html) {
+  const b = document.createElement('div'); b.className = 'mega-bubble'; b.innerHTML = html;
+  const w = Math.min(window.innerWidth - 20, 420);
+  b.style.left = Math.max(w / 2 + 10, Math.min(window.innerWidth - w / 2 - 10, x + 140)) + 'px'; b.style.top = Math.max(170, y) + 'px';
+  document.body.appendChild(b); setTimeout(() => b.remove(), 1750);
+}
 function _inpFx(cdSub, inp, added, isOT, ev) {
   if (!inp || _fxReduce()) return;
   const mode = inputFxMode();
   if (mode === 'elegant') return _inpFxElegant(cdSub, inp, added, isOT);
   if (mode === 'minimal') return _inpFxMinimal(cdSub, inp, added, isOT);
   if (mode === 'neon')    return _inpFxNeon(cdSub, inp, added, isOT);
+  const mega = mode === 'mega';   // メガフィーバー = フィーバー＋全画面の発光・揺れ・10コンボごとの吹き出し
   const tr = inp.closest('tr');
   const color = (tr && tr.style.getPropertyValue('--cat-color')) || '#6b7280';
   // 行の色フラッシュ ＋ 行を横切る光の帯（オーバーレイなので表のレイアウトは動かさない）
@@ -5447,21 +5501,31 @@ function _inpFx(cdSub, inp, added, isOT, ev) {
     }
     const fxColor = isOT ? '#e11d48' : color;
     ['', 'r2'].forEach(c => { const rg = document.createElement('i'); rg.className = 'fx-ring ' + c; rg.style.left = px + 'px'; rg.style.top = py + 'px'; rg.style.setProperty('--cat-color', fxColor); document.body.appendChild(rg); setTimeout(() => rg.remove(), 750); });
-    const nSp = Math.min(40, 18 + combo * 4);
+    const nSp = mega ? Math.min(90, 40 + combo * 6) : Math.min(40, 18 + combo * 4);
+    const RAINBOW = ['#ff0080', '#ffd600', '#00ffaa', '#00aaff', '#aa00ff', '#ff5a00'];
     for (let i = 0; i < nSp; i++) {
-      const sp = document.createElement('i'); sp.className = 'fx-spark' + (i % 3 === 0 ? ' streak' : '');
-      const ang = Math.random() * Math.PI * 2, dist = 50 + Math.random() * (90 + combo * 10);
-      sp.style.left = px + 'px'; sp.style.top = py + 'px'; sp.style.background = fxColor; sp.style.color = fxColor;
+      const sp = document.createElement('i'); sp.className = 'fx-spark' + (i % 3 === 0 ? ' streak' : '') + (mega ? ' mega' : '');
+      const ang = Math.random() * Math.PI * 2, dist = (mega ? 90 : 50) + Math.random() * ((mega ? 200 : 90) + combo * 10);
+      const spc = mega && i % 2 ? RAINBOW[i % RAINBOW.length] : fxColor;
+      sp.style.left = px + 'px'; sp.style.top = py + 'px'; sp.style.background = spc; sp.style.color = spc;
       sp.style.setProperty('--dx', Math.cos(ang) * dist + 'px'); sp.style.setProperty('--dy', (Math.sin(ang) * dist + 30) + 'px');
       sp.style.setProperty('--rot', (ang * 180 / Math.PI + 90).toFixed(0) + 'deg');
       sp.style.animationDelay = (Math.random() * 0.08) + 's';
       document.body.appendChild(sp); setTimeout(() => sp.remove(), 950);
     }
     if (combo >= 2) {
-      const cb = document.createElement('div'); cb.className = 'fx-combo';
-      cb.style.left = (px + 70) + 'px'; cb.style.top = (py - 10) + 'px'; cb.style.fontSize = Math.min(64, 26 + combo * 5) + 'px'; cb.style.setProperty('--cat-color', fxColor);
-      cb.innerHTML = `×${combo}<small>${combo >= 10 ? 'FEVER!!' : combo >= 5 ? 'HOT!' : 'COMBO'}</small>`;
+      const cb = document.createElement('div'); cb.className = 'fx-combo' + (mega ? ' mega' : '');
+      cb.style.left = (px + 70) + 'px'; cb.style.top = (py - 10) + 'px'; cb.style.fontSize = Math.min(mega ? 96 : 64, (mega ? 34 : 26) + combo * 5) + 'px'; cb.style.setProperty('--cat-color', fxColor);
+      cb.innerHTML = mega ? `×${combo}<small>${combo >= 20 ? 'ULTRA!!!' : combo >= 10 ? 'MEGA FEVER!!' : combo >= 5 ? 'FEVER!' : 'COMBO'}</small>`
+                          : `×${combo}<small>${combo >= 10 ? 'FEVER!!' : combo >= 5 ? 'HOT!' : 'COMBO'}</small>`;
       document.body.appendChild(cb); setTimeout(() => cb.remove(), 950);
+    }
+    if (mega) {
+      _megaFlash(px, py, fxColor);
+      const card = tr && tr.closest('.submit-card');
+      if (card) { card.classList.remove('mega-shake'); void card.offsetWidth; card.classList.add('mega-shake'); setTimeout(() => card.classList.remove('mega-shake'), 340); }
+      if (twrap) { twrap.classList.remove('mega-rainbow'); void twrap.offsetWidth; twrap.classList.add('mega-rainbow'); setTimeout(() => twrap.classList.remove('mega-rainbow'), 720); }
+      if (combo % 10 === 0) _megaBubble(px, py - 30, `<b>${combo}</b>コンボだドン！！！`);
     }
   }
   // ドーナツが光る
@@ -5629,7 +5693,7 @@ function updateSideBars(calc, normal, ot) {
   if (!wasDone && nPct >= 100 && normal > 0 && updateSideBars._lastDone !== currentDate && !_fxReduce()) {
     updateSideBars._lastDone = currentDate;
     const panel = document.querySelector('.input-live-pie');
-    if (panel && inputFxMode() === 'fever' && typeof _confetti === 'function') _confetti(panel);   // 紙吹雪はフィーバーだけ
+    if (panel && (inputFxMode() === 'fever' || inputFxMode() === 'mega') && typeof _confetti === 'function') _confetti(panel);   // 紙吹雪はフィーバー系だけ
   }
 }
 function checkHoursSafety(normal, ot) {
@@ -6412,6 +6476,17 @@ function _saveFx(btn) {
   if (mode === 'elegant') { once('saved-soft', 1600); if (panel) { const r = panel.getBoundingClientRect(); _fxGlitter(r.left + r.width / 2, r.top + 40, 22, r.width * .8); } return; }
   if (mode === 'minimal') return;                          // ボタンのチェックだけ
   if (mode === 'neon')    { once('saved-neon', 1200); return; }
+  if (mode === 'mega') {
+    const r = panel ? panel.getBoundingClientRect() : null;
+    const cx = r ? r.left + r.width / 2 : window.innerWidth / 2, cy = r ? r.top + 120 : window.innerHeight / 2;
+    _megaLastFlash = 0; _megaFlash(cx, cy, '#ff0080');
+    setTimeout(() => _megaFlash(window.innerWidth / 2, window.innerHeight / 2, '#ffd600'), 400);
+    setTimeout(() => _megaFlash(cx, cy, '#00aaff'), 800);
+    const box = document.createElement('div'); box.className = 'mega-save';
+    box.innerHTML = '<div class="mega-bubble"><span>もう一回遊べるドン！！！</span></div>';
+    document.body.appendChild(box); setTimeout(() => box.remove(), 2450);
+    if (panel && typeof _confetti === 'function') _confetti(panel);
+  }
   if (panel) { panel.classList.remove('saved-flash'); void panel.offsetWidth; panel.classList.add('saved-flash'); setTimeout(() => panel.classList.remove('saved-flash'), 1200); }
 }
 
