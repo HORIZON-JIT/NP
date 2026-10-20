@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>日報 統合ビュー｜ホリゾン</title>
+<link rel="icon" type="image/png" sizes="32x32" href="../icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="../icons/favicon-192.png">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+:root{
+  --primary:#8A6A37;--primary-dk:#5F4825;--primary-lt:#F7F3EC;
+  --g50:#FCFBF8;--g100:#F7F3EC;--g200:#E7DEC9;--g300:#D7C29B;--g400:#9A8A72;--g500:#6F665C;--g600:#4B4741;--g700:#282624;--g800:#111111;
+  --surface:#FFFFFF;--page:#F7F6F3;--line:#E7DEC9;
+  --ok:#16a34a;--ok-bg:rgba(22,163,74,.10);--warn:#c98a13;--warn-bg:rgba(201,138,19,.12);--crit:#dc2626;--crit-bg:rgba(220,38,38,.10);
+  --info:#2563eb;--info-bg:rgba(37,99,235,.08);
+  --track:#EFEAE0;
+  --sh:0 1px 2px rgba(17,17,17,.04),0 8px 18px rgba(17,17,17,.06);
+  --dept-np:#8A6A37;--dept-legal:#2563eb;--dept-law:#7c3aed;
+}
+[data-theme="dark"]{
+  --primary:#D7B77C;--primary-dk:#E8CF9F;--primary-lt:#2A241B;
+  --g50:#1B1A18;--g100:#22201D;--g200:#34302A;--g300:#4A4338;--g400:#8E8475;--g500:#A9A092;--g600:#C9C1B4;--g700:#E4DED4;--g800:#F4F1EC;
+  --surface:#1E1D1B;--page:#151412;--line:#34302A;
+  --ok:#4ade80;--ok-bg:rgba(74,222,128,.12);--warn:#fbbf24;--warn-bg:rgba(251,191,36,.12);--crit:#f87171;--crit-bg:rgba(248,113,113,.12);
+  --info:#60a5fa;--info-bg:rgba(96,165,250,.12);
+  --track:#2C2924;
+  --sh:0 1px 2px rgba(0,0,0,.3),0 8px 18px rgba(0,0,0,.25);
+  --dept-np:#D7B77C;--dept-legal:#60a5fa;--dept-law:#a78bfa;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--page);}
+body{font-family:'Inter','Noto Sans JP','Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;color:var(--g800);font-size:13px;-webkit-font-smoothing:antialiased;min-height:100vh;}
+button,select{font:inherit;}
+header{background:var(--surface);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;position:sticky;top:0;z-index:50;border-bottom:1px solid var(--line);}
+.hd-left{display:flex;align-items:center;gap:12px;}
+.brand-mark{position:relative;display:inline-grid;place-items:center;flex:none;width:38px;height:38px;border-radius:9px;background:#161a24;box-shadow:inset 0 0 0 1px rgba(201,166,101,.35),0 8px 18px rgba(17,17,17,.12);font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;font-weight:700;font-size:15px;}
+.brand-mark::before{content:"JIT";position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(135deg,#e2c98f,#b08d57);-webkit-background-clip:text;background-clip:text;color:transparent;}
+h1{font-size:17px;font-weight:850;}
+.sub{font-size:10px;color:var(--g500);font-weight:700;letter-spacing:.08em;}
+.hd-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.btn{background:var(--surface);border:1px solid var(--g200);color:var(--g700);border-radius:7px;padding:5px 11px;cursor:pointer;font-size:12px;font-weight:700;white-space:nowrap;}
+.btn:hover{background:var(--primary-lt);border-color:var(--g300);color:var(--primary);}
+.btn.icon{padding:5px 7px;line-height:0;}
+.btn.icon svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+.btn.icon .sun{display:none;}
+[data-theme="dark"] .btn.icon .moon{display:none;}
+[data-theme="dark"] .btn.icon .sun{display:inline;}
+.btn.dark{background:#0A0A0A;color:#fff;border-color:#0A0A0A;}
+[data-theme="dark"] .btn.dark{background:var(--g800);color:var(--page);border-color:var(--g800);}
+.pnav{display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--g200);border-radius:8px;padding:3px 6px;}
+.pnav button{background:none;border:none;color:var(--g600);cursor:pointer;padding:2px 6px;font-weight:800;}
+.pnav select{background:transparent;border:none;color:var(--g800);font-weight:800;font-size:12px;cursor:pointer;}
+.pnav select option{background:var(--surface);color:var(--g800);}
+.container{max-width:1440px;margin:0 auto;padding:18px 20px 40px;}
+.eyebrow{font-size:10px;font-weight:800;letter-spacing:.14em;color:var(--primary);text-transform:uppercase;}
+.ttl-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+.ttl-row h2{font-size:24px;font-weight:850;margin-top:2px;}
+.range{font-size:12px;color:var(--g500);font-weight:700;}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);margin-bottom:14px;}
+.card-hd{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:12px 16px 4px;flex-wrap:wrap;}
+.card-hd h3{font-size:14px;font-weight:850;}
+.card-sub{font-size:11px;color:var(--g500);}
+.card-body{padding:8px 16px 14px;}
+.tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px;}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);padding:12px 14px;}
+.tile .l{font-size:11px;font-weight:800;color:var(--g500);}
+.tile .v{font-size:24px;font-weight:850;margin-top:4px;font-variant-numeric:tabular-nums;}
+.tile .v small{font-size:12px;font-weight:700;color:var(--g500);margin-left:2px;}
+.tile .s{font-size:11px;color:var(--g500);margin-top:2px;}
+.tile.is-crit .v{color:var(--crit);} .tile.is-warn .v{color:var(--warn);}
+.chips{display:flex;flex-wrap:wrap;gap:6px;}
+.chip{display:inline-block;line-height:1.5;border-radius:12px;padding:4px 10px;font-size:11.5px;font-weight:600;border:1px solid transparent;}
+.chip.is-crit{background:var(--crit-bg);color:var(--crit);border-color:color-mix(in srgb,var(--crit) 30%,transparent);}
+.chip.is-warn{background:var(--warn-bg);color:var(--warn);border-color:color-mix(in srgb,var(--warn) 30%,transparent);}
+.chip.is-info{background:var(--info-bg);color:var(--info);}
+.chip.is-ok{background:var(--ok-bg);color:var(--ok);}
+.chip b{font-weight:850;}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 16px 0;}
+.seg{display:inline-flex;flex-wrap:wrap;background:var(--g100);border:1px solid var(--g200);border-radius:999px;padding:3px;gap:2px;}
+.seg button{background:none;border:none;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:800;color:var(--g500);cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+.seg button.on{background:var(--surface);color:var(--g800);box-shadow:0 1px 3px rgba(0,0,0,.08);}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+.scroll{overflow-x:auto;}
+table.mt{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;}
+table.mt th{font-size:11px;font-weight:800;color:var(--g500);text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+table.mt td{padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle;}
+table.mt th.num,table.mt td.num{text-align:right;}
+table.mt tbody tr{cursor:pointer;transition:background .12s;}
+table.mt tbody tr:hover{background:var(--primary-lt);}
+table.mt tbody tr.grp td{background:var(--g100);font-size:11px;font-weight:850;color:var(--g600);cursor:default;padding:5px 8px;}
+.dept{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;color:var(--g600);}
+.name{font-weight:850;font-size:13.5px;}
+.t-crit{color:var(--crit);font-weight:800;} .t-warn{color:var(--warn);font-weight:800;} .t-muted{color:var(--g400);} .t-ok{color:var(--ok);font-weight:800;}
+.meter{position:relative;height:10px;background:var(--track);border-radius:999px;min-width:180px;overflow:visible;}
+.meter .f{position:absolute;left:0;top:0;bottom:0;border-radius:999px;}
+.meter .pj{position:absolute;top:0;bottom:0;border-radius:0 999px 999px 0;opacity:.55;background-image:repeating-linear-gradient(135deg,currentColor 0 2px,transparent 2px 4px);}
+.meter .tk{position:absolute;top:-3px;bottom:-3px;width:1.5px;background:var(--warn);}
+.meter .tk.lim{background:var(--crit);}
+.lv-ok{background:var(--ok);color:var(--ok);} .lv-warn{background:var(--warn);color:var(--warn);} .lv-crit{background:var(--crit);color:var(--crit);}
+.pj.lv-ok,.pj.lv-warn,.pj.lv-crit{background-color:transparent;}
+.mix{display:flex;height:10px;border-radius:999px;overflow:hidden;min-width:140px;background:var(--track);}
+.mix span{display:block;height:100%;}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--g500);padding:10px 16px 14px;}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+.empty{padding:28px;text-align:center;color:var(--g500);}
+.banner{border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.banner.err{background:var(--crit-bg);color:var(--crit);}
+.banner.info{background:var(--info-bg);color:var(--info);}
+.login{max-width:560px;margin:60px auto;text-align:center;}
+.login .card-body{padding:26px;}
+.login h3{font-size:18px;margin-bottom:8px;}
+.login p{color:var(--g500);line-height:1.7;margin-bottom:16px;}
+.login .src{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-top:8px;text-align:left;}
+.login .src b{font-size:13px;} .login .src small{display:block;color:var(--g500);font-size:11px;}
+#loading{position:fixed;inset:0;background:rgba(0,0,0,.08);display:none;align-items:center;justify-content:center;z-index:200;}
+#loading.on{display:flex;}
+#loading div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 18px;font-weight:700;color:var(--g600);box-shadow:var(--sh);}
+/* 詳細パネル */
+#drawer-bg{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:90;display:none;}
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(860px,100%);background:var(--page);z-index:100;box-shadow:-10px 0 30px rgba(0,0,0,.15);transform:translateX(100%);transition:transform .22s ease;overflow-y:auto;}
+body.dr-open #drawer{transform:none;} body.dr-open #drawer-bg{display:block;}
+.dr-hd > div:last-child{flex:none;}
+.dr-hd{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--line);padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;z-index:2;}
+.dr-hd h3{font-size:18px;font-weight:850;}
+.dr-body{padding:16px 18px 30px;}
+.dr-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px;}
+.hbar{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) 92px;gap:10px;align-items:center;padding:4px 0;font-size:12px;}
+.hbar .lb{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:6px;}
+.hbar .tr{height:9px;background:var(--track);border-radius:999px;overflow:hidden;}
+.hbar .tr span{display:block;height:100%;border-radius:999px;}
+.hbar .vl{text-align:right;font-weight:800;font-variant-numeric:tabular-nums;}
+.hbar .vl small{color:var(--g500);font-weight:700;margin-left:4px;}
+.trend td,.trend th{padding:6px 8px!important;}
+.trend tr.cur td{background:var(--primary-lt);}
+.trend tr.fut td{color:var(--g400);}
+.mini{position:relative;height:8px;background:var(--track);border-radius:999px;min-width:120px;}
+.mini span{position:absolute;left:0;top:0;bottom:0;border-radius:999px;}
+.mini i{position:absolute;top:-2px;bottom:-2px;width:1.5px;background:var(--crit);}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media (max-width:900px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr));}.two{grid-template-columns:1fr;}.dr-tiles{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media (max-width:520px){.container{padding:12px 16px 30px;}header{padding:10px 16px;}.ttl-row h2{font-size:20px;}}
+@page{size:A4 landscape;margin:8mm;}
+@media print{
+  header,.no-print,#drawer,#drawer-bg{display:none!important;}
+  body,html{background:#fff!important;}
+  .card,.tile{box-shadow:none!important;}
+  table.mt td,table.mt th{padding:5px 6px;font-size:10px;}
+  .meter{min-width:120px;}
+  body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+}
+</style>
+</head>
+<body>
+<div id="loading"><div>読み込み中...</div></div>
+<header>
+  <div class="hd-left">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <div><h1>日報 統合ビュー</h1><div class="sub">HORIZON / 上長ビュー（全部署）</div></div>
+  </div>
+  <div class="hd-right">
+    <div class="pnav">
+      <button onclick="shiftPeriod(-1)" title="前月期">◀</button>
+      <select id="sel-year" onchange="onSelPeriod()"></select>
+      <select id="sel-month" onchange="onSelPeriod()"></select>
+      <button onclick="shiftPeriod(1)" title="次月期">▶</button>
+    </div>
+    <button class="btn" onclick="goCurrent()">今月期</button>
+    <button class="btn" onclick="reload(true)">再読込</button>
+    <button class="btn" onclick="window.print()">PDF出力</button>
+    <button class="btn icon" id="theme-btn" onclick="toggleTheme()" title="ダーク／ライト切替" aria-label="ダーク／ライト切替"><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.4 14.6A8.3 8.3 0 0 1 9.4 3.6a8.5 8.5 0 1 0 11 11Z"></path></svg><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg></button>
+    <span id="user-chip" class="sub" style="text-transform:none;letter-spacing:0;"></span>
+  </div>
+</header>
+
+<div class="container">
+  <div id="login-area"></div>
+  <div id="main" style="display:none;">
+    <div class="ttl-row">
+      <div><div class="eyebrow">All departments</div><h2 id="ttl">月次 全員一覧</h2></div>
+      <div class="range" id="range"></div>
+    </div>
+    <div id="banners"></div>
+    <div class="tiles" id="tiles"></div>
+    <div class="card">
+      <div class="card-hd"><h3>アラート</h3><span class="card-sub">36協定の基準（月36h警告・月45h上限・年360h・45h超は年6回まで）と未入力</span></div>
+      <div class="card-body"><div class="chips" id="alerts"></div></div>
+    </div>
+    <div class="card">
+      <div class="toolbar no-print">
+        <div class="seg" id="dept-seg"></div>
+        <div class="seg" id="sort-seg">
+          <button data-sort="ot" class="on" onclick="setSort('ot')">残業の多い順</button>
+          <button data-sort="dept" onclick="setSort('dept')">部署ごと</button>
+        </div>
+      </div>
+      <div class="card-hd" style="padding-top:10px;"><h3>全員の残業・36協定・入力状況</h3><span class="card-sub" id="tbl-sub">行をクリックすると個人の詳細（推移・業務構成・日別）を開きます</span></div>
+      <div class="scroll"><div id="tbl"></div></div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <p class="card-sub" style="line-height:1.7;">
+      ※ 残業・通常時間は各アプリと同じく退勤時刻から算出しています（17:30以降を15分単位）。月期は15日締め、年度は10月期〜9月期です。<br>
+      ※ 未入力は「平日の過去日で、その人が入力を始めた日以降」に退勤時刻がない日です。全員が未入力の平日は休日とみなします。<br>
+      ※ 業務構成は各部署の大分類で表示します（部署ごとに分類が異なるため、色と名称は部署ごとです）。
+    </p>
+  </div>
+</div>
+
+<div id="drawer-bg" onclick="closeDrawer()"></div>
+<aside id="drawer" aria-hidden="true"><div id="drawer-inner"></div></aside>
+
+<script>
+// ═══════════════════════════════════════════
+//  設定: 対象部署（データ源）
+//  各アプリの config.js と同じ Firebase / コレクション / マスタ
+// ═══════════════════════════════════════════
+const FB_PROJECTS = {
+  np: {
+    apiKey: 'AIzaSyA-15zZIlEHpPY2ogwaY88ZH85m6kKYmjs', authDomain: 'nippou-f191c.firebaseapp.com', projectId: 'nippou-f191c',
+    storageBucket: 'nippou-f191c.firebasestorage.app', messagingSenderId: '572692409927', appId: '1:572692409927:web:598e7009b1dbe9e04a0b62'
+  },
+  legal: {
+    apiKey: 'AIzaSyDLiYOfkKmPZ2rGFaUd1oTQek5XVK7hfMk', authDomain: 'nippou-legal.firebaseapp.com', projectId: 'nippou-legal',
+    storageBucket: 'nippou-legal.firebasestorage.app', messagingSenderId: '802361483209', appId: '1:802361483209:web:e4c2bd66666e93d4d45218'
+  }
+};
+const SOURCES = [
+  {id: 'np',    name: '生産管理課',       short: '生産管理', project: 'np',    collection: 'dailyReports',     master: 'np_master_categories',    url: '../',      color: 'var(--dept-np)'},
+  {id: 'legal', name: '法務知財部 知財',  short: '法務知財', project: 'legal', collection: 'dailyReports',     master: 'legal_master_categories', url: '../legal/', color: 'var(--dept-legal)'},
+  {id: 'law',   name: '法務知財部 法務',  short: '法務',     project: 'legal', collection: 'dailyReports_law', master: 'law_master_categories',   url: '../law/',   color: 'var(--dept-law)'}
+];
+const PROJECT_LABEL = {np: '生産管理課（nippou-f191c）', legal: '法務知財部（nippou-legal）'};
+const ALLOWED_DOMAINS = ['horizon.co.jp', 'bp.horizon.co.jp'];
+const EXCLUDE_AUTHORS = ['ヘルプ'];
+// 勤務ルール（各アプリの既定値と同じ）
+const R = {
+  workStart: '08:30', normalEnd: '17:20', otStart: '17:30', roundStepMin: 15, roundStepHours: 0.25,
+  otMonthWarn: 36, otMonthLimit: 45, otYearLimit: 360, otOverMonthsMax: 6,
+  lunch: {odd: {start: '12:40', end: '13:30'}, even: {start: '12:20', end: '13:10'}}
+};
+
+// ═══════════════════════════════════════════
+//  ユーティリティ
+// ═══════════════════════════════════════════
+const pad = n => String(n).padStart(2, '0');
+const fmtD = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const todayStr = () => fmtD(new Date());
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const h1 = v => (Math.round(v * 10) / 10).toFixed(1);
+const h2 = v => (Math.round(v * 100) / 100).toFixed(2);
+const WD = ['日', '月', '火', '水', '木', '金', '土'];
+function _hm(hm) { const [h, m] = String(hm).split(':').map(Number); return h * 60 + m; }
+function periodOfDate(s) { const [y, m, d] = s.split('-').map(Number); if (d > 15) return m === 12 ? {year: y + 1, month: 1} : {year: y, month: m + 1}; return {year: y, month: m}; }
+function periodDates(year, month) {
+  const pm = month === 1 ? 12 : month - 1, py = month === 1 ? year - 1 : year;
+  return {startDate: `${py}-${pad(pm)}-16`, endDate: `${year}-${pad(month)}-15`, label: `${year}年${month}月期`, range: `${py}/${pad(pm)}/16 〜 ${year}/${pad(month)}/15`};
+}
+function addPeriod(p, n) { let y = p.year, m = p.month + n; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return {year: y, month: m}; }
+const fiscalYearOf = p => p.month >= 10 ? p.year : p.year - 1;
+const fiscalPeriods = fy => { const a = []; for (let m = 10; m <= 12; m++) a.push({year: fy, month: m}); for (let m = 1; m <= 9; m++) a.push({year: fy + 1, month: m}); return a; };
+const fiscalKi = fy => fy - 1951;
+function eachDate(s, e) { const out = []; for (let t = new Date(s + 'T00:00:00'); fmtD(t) <= e; t.setDate(t.getDate() + 1)) out.push(fmtD(t)); return out; }
+// 退勤時刻 → 通常・残業（各アプリの calcFromLeave と同じ）
+const _clCache = new Map();
+function calcFromLeave(leave, date) {
+  if (!leave) return null;
+  const k = leave + '|' + date; if (_clCache.has(k)) return _clCache.get(k);
+  const [hh, mm] = leave.split(':').map(Number); if (isNaN(hh) || isNaN(mm)) return null;
+  const L = hh * 60 + mm, st = _hm(R.workStart), ne = _hm(R.normalEnd), os = _hm(R.otStart), sm = R.roundStepMin, sh = R.roundStepHours;
+  if (L <= st) { const r = {normal: 0, ot: 0}; _clCache.set(k, r); return r; }
+  let ot = 0; if (L > os) { const m = L - os; ot = m < sm ? 0 : Math.ceil(m / sm) * sh; }
+  const we = Math.min(L, ne), mo = Number(date.slice(5, 7)), lw = mo % 2 === 1 ? R.lunch.odd : R.lunch.even;
+  const ls = _hm(lw.start), le = _hm(lw.end);
+  let ld = 0; if (we > ls) ld = Math.max(0, Math.min(we, le) - ls);
+  const wm = Math.max(0, we - st - ld);
+  const normal = wm < sm ? 0 : Math.ceil(wm / sm) * sh;
+  const r = {normal, ot}; _clCache.set(k, r); return r;
+}
+const lvOf = v => v > R.otMonthLimit ? 'crit' : v >= R.otMonthWarn ? 'warn' : 'ok';
+function setLoading(on, msg) { const el = document.getElementById('loading'); el.classList.toggle('on', !!on); if (msg) el.firstElementChild.textContent = msg; }
+
+// ═══════════════════════════════════════════
+//  テーマ
+// ═══════════════════════════════════════════
+const THEME_KEY = 'mgr:theme';
+function applyTheme(t) { if (t === 'dark') document.documentElement.dataset.theme = 'dark'; else delete document.documentElement.dataset.theme; }
+function toggleTheme() { const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; try { localStorage.setItem(THEME_KEY, t); } catch (e) {} applyTheme(t); }
+(function () { let t = null; try { t = localStorage.getItem(THEME_KEY); } catch (e) {} if (!t && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark'; applyTheme(t); })();
+
+// ═══════════════════════════════════════════
+//  Firebase（プロジェクトごとに別アプリとして初期化）
+// ═══════════════════════════════════════════
+const FB = {};   // project -> {app, auth, db, user, ready, err}
+const emailOk = e => !!e && ALLOWED_DOMAINS.some(d => e.toLowerCase().endsWith('@' + d));
+function initFb() {
+  if (window.__mgrFetch) return Promise.resolve();   // テスト用の差し替え
+  return Promise.all(Object.keys(FB_PROJECTS).map(p => new Promise(res => {
+    const app = firebase.initializeApp(FB_PROJECTS[p], 'mgr-' + p);
+    const o = FB[p] = {app, auth: app.auth(), db: app.firestore(), user: null};
+    const off = o.auth.onAuthStateChanged(u => { off(); if (u && emailOk(u.email)) o.user = u; res(); });
+    setTimeout(res, 8000);
+  })));
+}
+async function loginProject(p) {
+  const o = FB[p]; if (!o) return;
+  try {
+    const prov = new firebase.auth.GoogleAuthProvider();
+    prov.setCustomParameters({hd: 'horizon.co.jp', prompt: 'select_account'});
+    const cred = await o.auth.signInWithPopup(prov);
+    if (!cred.user || !emailOk(cred.user.email)) { await o.auth.signOut(); throw new Error('会社のGoogleアカウント（@horizon.co.jp）でログインしてください'); }
+    o.user = cred.user;
+  } catch (e) { alert('ログインできませんでした: ' + (e.code || e.message)); }
+  renderLogin();
+}
+const needLogin = () => !window.__mgrFetch && Object.keys(FB_PROJECTS).some(p => !FB[p] || !FB[p].user);
+function renderLogin() {
+  const area = document.getElementById('login-area'), main = document.getElementById('main');
+  if (!needLogin()) {
+    area.innerHTML = ''; main.style.display = '';
+    const u = Object.values(FB).map(o => o.user && o.user.email).find(Boolean);
+    document.getElementById('user-chip').textContent = u || '';
+    if (!STATE.loadedOnce) reload();
+    return;
+  }
+  main.style.display = 'none';
+  area.innerHTML = `<div class="card login"><div class="card-body">
+    <h3>Googleアカウントでログイン</h3>
+    <p>日報データは部署ごとに2つの保存先に分かれています。<br>それぞれ一度だけログインしてください（次回からは自動でログインします）。</p>
+    ${Object.keys(FB_PROJECTS).map(p => `<div class="src"><div><b>${esc(PROJECT_LABEL[p])}</b><small>${esc(SOURCES.filter(s => s.project === p).map(s => s.name).join('・'))}</small></div>
+      ${FB[p] && FB[p].user ? `<span class="t-ok">✓ ${esc(FB[p].user.email)}</span>` : `<button class="btn dark" onclick="loginProject('${p}')">ログイン</button>`}</div>`).join('')}
+  </div></div>`;
+}
+
+// ═══════════════════════════════════════════
+//  データ取得
+// ═══════════════════════════════════════════
+const _fetchCache = new Map();
+async function fetchSource(src, start, end, force) {
+  const key = `${src.id}|${start}|${end}`;
+  if (!force && _fetchCache.has(key)) return _fetchCache.get(key);
+  let res;
+  if (window.__mgrFetch) res = await window.__mgrFetch(src, start, end);
+  else {
+    const db = FB[src.project].db;
+    const [snap, ms] = await Promise.all([
+      db.collection(src.collection).where('date', '>=', start).where('date', '<=', end).get(),
+      db.collection(src.collection).doc(src.master).get().catch(() => null)
+    ]);
+    const docs = snap.docs.map(d => d.data() || {}).filter(d => d.date && d.author);
+    const cats = ms && ms.exists && Array.isArray((ms.data() || {}).cats) ? ms.data().cats : [];
+    res = {docs, cats};
+  }
+  _fetchCache.set(key, res);
+  return res;
+}
+
+// ═══════════════════════════════════════════
+//  状態と集計
+// ═══════════════════════════════════════════
+const STATE = {period: periodOfDate(todayStr()), dept: 'all', sort: 'ot', data: null, loadedOnce: false, errors: {}, detail: null, detailScope: 'period'};
+
+function buildCatIndex(cats) {
+  const sub = {}, cat = {};
+  (cats || []).forEach(c => { cat[c.cd] = {cd: c.cd, label: c.label || c.cd, color: c.color || '#9ca3af'}; (c.subs || []).forEach(s => { sub[s.cd] = {cd: s.cd, label: s.label || s.cd, cat: c.cd}; }); });
+  return {sub, cat};
+}
+function catOf(ix, cdSub) {
+  const s = ix.sub[cdSub];
+  if (s && ix.cat[s.cat]) return ix.cat[s.cat];
+  const k = String(cdSub).replace(/\d+$/, '');
+  return ix.cat[k] || {cd: k, label: k || '未分類', color: '#9ca3af'};
+}
+const subLabel = (ix, cd) => (ix.sub[cd] && ix.sub[cd].label) || cd;
+
+async function reload(force) {
+  if (needLogin()) { renderLogin(); return; }
+  STATE.loadedOnce = true;
+  const p = STATE.period, fy = fiscalYearOf(p), fps = fiscalPeriods(fy);
+  const prev = addPeriod(p, -1);
+  const start = [periodDates(prev.year, prev.month).startDate, periodDates(fps[0].year, fps[0].month).startDate].sort()[0];
+  const end = periodDates(fps[11].year, fps[11].month).endDate;
+  setLoading(true, '全部署のデータを読み込み中...');
+  if (force) _fetchCache.clear();
+  STATE.errors = {};
+  const results = await Promise.all(SOURCES.map(s => fetchSource(s, start, end, force).catch(e => { STATE.errors[s.id] = e; return null; })));
+  setLoading(false);
+  // 担当ごとに日別データへ
+  const people = [];
+  results.forEach((r, i) => {
+    if (!r) return;
+    const src = SOURCES[i], ix = buildCatIndex(r.cats), by = {};
+    r.docs.forEach(d => {
+      if (EXCLUDE_AUTHORS.includes(d.author)) return;
+      const o = by[d.author] = by[d.author] || {src, ix, author: d.author, days: {}};
+      o.days[d.date] = {leave: d.leaveTime || '', rows: (d.rows || []).filter(x => x && x.cdSub).map(x => ({cdSub: String(x.cdSub), n: Number(x.hoursNormal) || 0, ot: Number(x.hoursOT) || 0}))};
+    });
+    Object.values(by).forEach(o => people.push(o));
+  });
+  // 休日判定（全部署で誰も退勤時刻を入れていない平日の過去日）
+  const anyLeave = new Set();
+  people.forEach(o => Object.entries(o.days).forEach(([d, v]) => { if (v.leave) anyLeave.add(d); }));
+  STATE.data = {people, anyLeave, fy, fps, start, end};
+  render();
+  if (STATE.detail) openDetail(STATE.detail, true);
+}
+
+const isWorkday = (d, today) => { const w = new Date(d + 'T00:00:00').getDay(); if (w === 0 || w === 6) return false; return d >= today || STATE.data.anyLeave.has(d); };
+
+function metricsFor(o, p) {
+  const today = todayStr(), {startDate: s, endDate: e} = periodDates(p.year, p.month);
+  let n = 0, ot = 0, days = 0, miss = 0, leaveSum = 0, leaveN = 0;
+  const first = Object.keys(o.days).filter(d => o.days[d].leave).sort()[0] || null;
+  eachDate(s, e).forEach(d => {
+    const v = o.days[d], c = v && v.leave ? calcFromLeave(v.leave, d) : null;
+    if (c) { n += c.normal; ot += c.ot; days++; leaveSum += _hm(v.leave); leaveN++; }
+    else if (d < today && first && d >= first && isWorkday(d, today)) miss++;
+  });
+  return {n, ot, days, miss, avgLeave: leaveN ? leaveSum / leaveN : null};
+}
+function compFor(o, s, e) {
+  const cats = {}, subs = {}; let tot = 0;
+  Object.entries(o.days).forEach(([d, v]) => {
+    if (d < s || d > e) return;
+    v.rows.forEach(r => {
+      const h = r.n + r.ot; if (!(h > 0)) return;
+      const c = catOf(o.ix, r.cdSub);
+      (cats[c.cd] = cats[c.cd] || {...c, h: 0}).h += h;
+      (subs[r.cdSub] = subs[r.cdSub] || {cd: r.cdSub, label: subLabel(o.ix, r.cdSub), color: c.color, h: 0}).h += h;
+      tot += h;
+    });
+  });
+  return {cats: Object.values(cats).sort((a, b) => b.h - a.h), subs: Object.values(subs).sort((a, b) => b.h - a.h), tot};
+}
+function periodProgress(p) {
+  const today = todayStr(), {startDate: s, endDate: e} = periodDates(p.year, p.month);
+  if (today < s || today > e) return null;
+  const wds = eachDate(s, e).filter(d => isWorkday(d, today));
+  const elapsed = wds.filter(d => d < today).length, total = wds.length;   // 今日は入力途中のため経過に含めない
+  return elapsed > 0 && total > elapsed ? {elapsed, total, ratio: total / elapsed, remain: total - elapsed} : null;
+}
+
+function rowsForView() {
+  const D = STATE.data, p = STATE.period, fpsIdx = D.fps.findIndex(x => x.year === p.year && x.month === p.month);
+  const prev = addPeriod(p, -1), prog = periodProgress(p), {startDate: s, endDate: e} = periodDates(p.year, p.month);
+  return D.people.map(o => {
+    const cur = metricsFor(o, p), pv = metricsFor(o, prev);
+    const fyM = D.fps.slice(0, fpsIdx + 1).map(fp => metricsFor(o, fp));
+    const fyOT = fyM.reduce((t, m) => t + m.ot, 0), over = fyM.filter(m => m.ot > R.otMonthLimit).length;
+    const pj = prog ? cur.ot * prog.ratio : null;
+    const anyFy = fyM.some(m => m.days) || Object.keys(o.days).some(d => d >= s && d <= e);
+    return {o, cur, pv, fyOT, over, pj, prog, comp: compFor(o, s, e), anyFy};
+  }).filter(r => r.anyFy || r.cur.days || r.pv.days);
+}
+
+// ═══════════════════════════════════════════
+//  描画
+// ═══════════════════════════════════════════
+function syncPeriodSelectors() {
+  const y = document.getElementById('sel-year'), m = document.getElementById('sel-month'), p = STATE.period, ty = new Date().getFullYear();
+  let yo = ''; for (let i = ty - 4; i <= ty + 1; i++) yo += `<option value="${i}"${i === p.year ? ' selected' : ''}>${i}年</option>`;
+  y.innerHTML = yo;
+  m.innerHTML = Array.from({length: 12}, (_, i) => `<option value="${i + 1}"${i + 1 === p.month ? ' selected' : ''}>${i + 1}月期</option>`).join('');
+}
+function onSelPeriod() { STATE.period = {year: Number(document.getElementById('sel-year').value), month: Number(document.getElementById('sel-month').value)}; afterPeriodChange(); }
+function shiftPeriod(n) { STATE.period = addPeriod(STATE.period, n); afterPeriodChange(); }
+function goCurrent() { STATE.period = periodOfDate(todayStr()); afterPeriodChange(); }
+function afterPeriodChange() {
+  syncPeriodSelectors();
+  const D = STATE.data;
+  // 年度または前月期が読み込み範囲外なら読み直す
+  if (!D) return reload();
+  const prev = addPeriod(STATE.period, -1);
+  if (fiscalYearOf(STATE.period) !== D.fy || periodDates(prev.year, prev.month).startDate < D.start) reload();
+  else { render(); if (STATE.detail) openDetail(STATE.detail, true); }
+}
+function setDept(d) { STATE.dept = d; render(); }
+function setSort(s) { STATE.sort = s; render(); }
+
+function render() {
+  const D = STATE.data; if (!D) return;
+  const p = STATE.period, pd = periodDates(p.year, p.month), fy = D.fy;
+  document.getElementById('ttl').textContent = `${pd.label} 全員一覧`;
+  document.getElementById('range').textContent = `${pd.range}（${fy + 1}年度・${fiscalKi(fy)}期）`;
+  // バナー
+  const errs = Object.entries(STATE.errors);
+  document.getElementById('banners').innerHTML = errs.map(([id, e]) => {
+    const s = SOURCES.find(x => x.id === id);
+    return `<div class="banner err"><b>${esc(s.name)}</b> のデータを読み込めませんでした（${esc(e.code || e.message || e)}）。閲覧権限（Firebase のセキュリティルール）を確認してください。</div>`;
+  }).join('');
+  let rows = rowsForView();
+  const all = rows;
+  // 部署フィルタ
+  const cnt = id => all.filter(r => r.o.src.id === id).length;
+  document.getElementById('dept-seg').innerHTML = `<button class="${STATE.dept === 'all' ? 'on' : ''}" onclick="setDept('all')">全員 ${all.length}</button>` +
+    SOURCES.map(s => `<button class="${STATE.dept === s.id ? 'on' : ''}" onclick="setDept('${s.id}')"><span class="dot" style="background:${s.color}"></span>${esc(s.short)} ${cnt(s.id)}</button>`).join('');
+  if (STATE.dept !== 'all') rows = rows.filter(r => r.o.src.id === STATE.dept);
+  const basis = r => r.pj != null ? r.pj : r.cur.ot;
+  if (STATE.sort === 'ot') rows.sort((a, b) => basis(b) - basis(a) || b.cur.n - a.cur.n);
+  else rows.sort((a, b) => SOURCES.indexOf(a.o.src) - SOURCES.indexOf(b.o.src) || basis(b) - basis(a));
+  // タイル
+  const act = rows.filter(r => r.cur.days);
+  const totOT = act.reduce((t, r) => t + r.cur.ot, 0), avg = act.length ? totOT / act.length : 0;
+  const nWarn = rows.filter(r => basis(r) >= R.otMonthWarn).length, nMiss = rows.reduce((t, r) => t + r.cur.miss, 0);
+  const prog = periodProgress(p);
+  const tile = (l, v, s, cls) => `<div class="tile ${cls || ''}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s || ''}</div></div>`;
+  document.getElementById('tiles').innerHTML =
+    tile('対象人数', `${rows.length}<small>人</small>`, `入力あり ${act.length}人`) +
+    tile('残業合計', `${h1(totOT)}<small>h</small>`, prog ? `稼働日 ${prog.total}日中 ${prog.elapsed}日経過` : '月期の確定値') +
+    tile('残業平均/人', `${h1(avg)}<small>h</small>`, '入力がある人の平均') +
+    tile(`残業${R.otMonthWarn}h以上${prog ? '（見込含む）' : ''}`, `${nWarn}<small>人</small>`, `上限 ${R.otMonthLimit}h`, nWarn ? 'is-warn' : '') +
+    tile('未入力', `${nMiss}<small>日</small>`, '平日の過去日の合計', nMiss ? 'is-warn' : '');
+  // アラート
+  const al = [];
+  rows.forEach(r => {
+    const A = `<b>${esc(r.o.author)}</b>（${esc(r.o.src.short)}）`;
+    const cl = lvOf(r.cur.ot), pl = r.pj != null ? lvOf(r.pj) : 'ok';
+    if (cl === 'crit') al.push(['crit', `${A} 今期残業 ${h1(r.cur.ot)}h（上限${R.otMonthLimit}h超）`]);
+    else if (pl === 'crit') al.push(['crit', `${A} 月末見込 ${h1(r.pj)}h（上限${R.otMonthLimit}h超の見込み）`]);
+    else if (cl === 'warn' || pl === 'warn') al.push(['warn', `${A} 残業 ${h1(r.cur.ot)}h${r.pj != null ? `（見込 ${h1(r.pj)}h）` : ''}／警告${R.otMonthWarn}h`]);
+    if (r.fyOT >= R.otYearLimit * 0.8) al.push([r.fyOT >= R.otYearLimit ? 'crit' : 'warn', `${A} 年度累計 ${h1(r.fyOT)}h／${R.otYearLimit}h`]);
+    if (r.over >= R.otOverMonthsMax - 2) al.push([r.over >= R.otOverMonthsMax ? 'crit' : 'warn', `${A} 月${R.otMonthLimit}h超が年度${r.over}回（上限${R.otOverMonthsMax}回）`]);
+    if (r.cur.miss >= 3) al.push(['warn', `${A} 日報未入力 ${r.cur.miss}日`]);
+  });
+  const ord = ['crit', 'warn', 'info'];
+  al.sort((a, b) => ord.indexOf(a[0]) - ord.indexOf(b[0]));
+  document.getElementById('alerts').innerHTML = al.length ? al.map(([l, t]) => `<span class="chip is-${l}">${t}</span>`).join('') : '<span class="chip is-ok">対応が必要なアラートはありません</span>';
+  // 表
+  const scaleMax = Math.max(R.otMonthLimit * 1.15, ...rows.map(r => Math.max(r.cur.ot, r.pj || 0))) * 1.02;
+  const pc = v => Math.min(100, v / scaleMax * 100).toFixed(1);
+  const meter = (cur, pj) => {
+    const ext = pj != null && pj > cur ? pj : null;
+    return `<div class="meter"><span class="f lv-${lvOf(cur)}" style="width:${pc(cur)}%"></span>${ext != null ? `<span class="pj lv-${lvOf(ext)}" style="left:${pc(cur)}%;width:${(pc(ext) - pc(cur)).toFixed(1)}%"></span>` : ''}<span class="tk" style="left:${pc(R.otMonthWarn)}%"></span><span class="tk lim" style="left:${pc(R.otMonthLimit)}%"></span></div>`;
+  };
+  const mix = c => c.tot ? `<div class="mix" title="${esc(c.cats.map(x => `${x.label} ${h1(x.h)}h（${Math.round(x.h / c.tot * 100)}%）`).join('\n'))}">${c.cats.map(x => `<span style="width:${(x.h / c.tot * 100).toFixed(2)}%;background:${esc(x.color)}"></span>`).join('')}</div>` : '<span class="t-muted">—</span>';
+  const otc = (v, lv) => `<span class="${lv && lv !== 'ok' ? 't-' + lv : ''}">${h1(v)}h</span>`;
+  const head = `<tr><th>部署</th><th>担当</th><th>業務構成（大分類）</th><th class="num">通常</th><th class="num">残業</th>${prog ? '<th class="num">月末見込</th>' : ''}
+    <th>残業メーター（${R.otMonthWarn}h／${R.otMonthLimit}h）</th><th class="num">前月期</th><th class="num">年度累計 / ${R.otYearLimit}h</th><th class="num">${R.otMonthLimit}h超</th><th class="num">入力日数</th><th class="num">未入力</th></tr>`;
+  let lastDept = null;
+  const body = rows.map(r => {
+    const s = r.o.src, key = s.id + '|' + r.o.author;
+    let grp = '';
+    if (STATE.sort === 'dept' && lastDept !== s.id) { lastDept = s.id; grp = `<tr class="grp"><td colspan="${prog ? 12 : 11}"><span class="dot" style="background:${s.color}"></span> ${esc(s.name)}</td></tr>`; }
+    return grp + `<tr onclick="openDetail('${esc(key)}')">
+      <td><span class="dept"><span class="dot" style="background:${s.color}"></span>${esc(s.short)}</span></td>
+      <td class="name">${esc(r.o.author)}</td>
+      <td>${mix(r.comp)}</td>
+      <td class="num">${h1(r.cur.n)}h</td>
+      <td class="num">${otc(r.cur.ot, lvOf(r.cur.ot))}</td>
+      ${prog ? `<td class="num">${r.pj != null ? otc(r.pj, lvOf(r.pj)) : '—'}</td>` : ''}
+      <td>${meter(r.cur.ot, r.pj)}</td>
+      <td class="num t-muted">${r.pv.days ? h1(r.pv.ot) + 'h' : '—'}</td>
+      <td class="num"><span class="${r.fyOT >= R.otYearLimit ? 't-crit' : r.fyOT >= R.otYearLimit * 0.8 ? 't-warn' : ''}">${h1(r.fyOT)}h</span></td>
+      <td class="num"><span class="${r.over >= R.otOverMonthsMax ? 't-crit' : r.over >= R.otOverMonthsMax - 2 ? 't-warn' : r.over ? '' : 't-muted'}">${r.over}回</span></td>
+      <td class="num">${r.cur.days}日</td>
+      <td class="num ${r.cur.miss ? 't-crit' : 't-muted'}">${r.cur.miss ? r.cur.miss + '日' : '—'}</td></tr>`;
+  }).join('');
+  document.getElementById('tbl').innerHTML = rows.length ? `<table class="mt"><thead>${head}</thead><tbody>${body}</tbody></table>` : '<div class="empty">この月期のデータがありません</div>';
+  document.getElementById('legend').innerHTML = `<span><i style="background:var(--ok)"></i>${R.otMonthWarn}h未満</span><span><i style="background:var(--warn)"></i>警告 ${R.otMonthWarn}h以上</span><span><i style="background:var(--crit)"></i>上限 ${R.otMonthLimit}h超</span>${prog ? '<span><i style="background:repeating-linear-gradient(135deg,var(--g500) 0 2px,transparent 2px 4px)"></i>月末見込までの伸び（今のペースで締め日まで続けた場合）</span>' : ''}<span>業務構成の色は部署ごとの大分類（マウスを乗せると内訳）</span>`;
+}
+
+// ═══════════════════════════════════════════
+//  個人の詳細パネル
+// ═══════════════════════════════════════════
+function closeDrawer() { document.body.classList.remove('dr-open'); STATE.detail = null; document.getElementById('drawer').setAttribute('aria-hidden', 'true'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+function setDetailScope(s) { STATE.detailScope = s; openDetail(STATE.detail, true); }
+function openDetail(key, keepScroll) {
+  const D = STATE.data; if (!D) return;
+  const o = D.people.find(x => x.src.id + '|' + x.author === key);
+  if (!o) { closeDrawer(); return; }
+  STATE.detail = key;
+  const p = STATE.period, pd = periodDates(p.year, p.month), today = todayStr();
+  const idx = D.fps.findIndex(x => x.year === p.year && x.month === p.month);
+  const ms = D.fps.map(fp => ({fp, m: metricsFor(o, fp)}));
+  const cur = ms[idx].m, prog = periodProgress(p), pj = prog ? cur.ot * prog.ratio : null;
+  const fyOT = ms.slice(0, idx + 1).reduce((t, x) => t + x.m.ot, 0), over = ms.slice(0, idx + 1).filter(x => x.m.ot > R.otMonthLimit).length;
+  const fyS = periodDates(D.fps[0].year, D.fps[0].month).startDate, fyE = periodDates(D.fps[11].year, D.fps[11].month).endDate;
+  const comp = STATE.detailScope === 'fy' ? compFor(o, fyS, fyE) : compFor(o, pd.startDate, pd.endDate);
+  const hm = m => m == null ? '—' : `${Math.floor(m / 60)}:${pad(Math.round(m % 60))}`;
+  const tile = (l, v, s, cls) => `<div class="tile ${cls || ''}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s || ''}</div></div>`;
+  const tiles = tile('今期 残業', `${h1(cur.ot)}<small>h</small>`, `上限 ${R.otMonthLimit}h`, lvOf(cur.ot) === 'ok' ? '' : 'is-' + lvOf(cur.ot)) +
+    tile('月末見込', pj != null ? `${h1(pj)}<small>h</small>` : '—', pj != null ? '今のペースで締め日まで' : '確定済みの月期', pj != null && lvOf(pj) !== 'ok' ? 'is-' + lvOf(pj) : '') +
+    tile('年度累計 残業', `${h1(fyOT)}<small>h</small>`, `上限 ${R.otYearLimit}h`, fyOT >= R.otYearLimit ? 'is-crit' : fyOT >= R.otYearLimit * 0.8 ? 'is-warn' : '') +
+    tile(`月${R.otMonthLimit}h超の回数`, `${over}<small>/${R.otOverMonthsMax}回</small>`, '年度内', over >= R.otOverMonthsMax ? 'is-crit' : over >= R.otOverMonthsMax - 2 ? 'is-warn' : '') +
+    tile('平均退勤', hm(cur.avgLeave), `入力 ${cur.days}日`) +
+    tile('未入力', `${cur.miss}<small>日</small>`, '平日の過去日', cur.miss ? 'is-warn' : '');
+  // 月期別推移
+  const mx = Math.max(R.otMonthLimit * 1.1, ...ms.map(x => x.m.ot));
+  const trend = `<table class="mt trend"><thead><tr><th>月期</th><th class="num">通常</th><th class="num">残業</th><th></th><th class="num">入力日数</th><th class="num">平均退勤</th></tr></thead><tbody>${ms.map((x, i) => {
+    const fut = periodDates(x.fp.year, x.fp.month).startDate > today;
+    return `<tr class="${i === idx ? 'cur' : ''}${fut ? ' fut' : ''}" onclick="event.stopPropagation()" style="cursor:default"><td><b>${x.fp.month}月期</b></td>
+      <td class="num">${x.m.days ? h1(x.m.n) + 'h' : ''}</td><td class="num">${x.m.days ? `<span class="${lvOf(x.m.ot) === 'ok' ? '' : 't-' + lvOf(x.m.ot)}">${h1(x.m.ot)}h</span>` : ''}</td>
+      <td><div class="mini">${x.m.days ? `<span class="lv-${lvOf(x.m.ot)}" style="width:${(x.m.ot / mx * 100).toFixed(1)}%"></span>` : ''}<i style="left:${(R.otMonthLimit / mx * 100).toFixed(1)}%"></i></div></td>
+      <td class="num">${x.m.days || ''}</td><td class="num">${x.m.days ? hm(x.m.avgLeave) : ''}</td></tr>`;
+  }).join('')}</tbody></table>`;
+  const bars = (list, tot, n) => list.slice(0, n).map(x => `<div class="hbar"><span class="lb"><span class="dot" style="background:${esc(x.color)}"></span>${esc(x.label)}</span><span class="tr"><span style="width:${(x.h / list[0].h * 100).toFixed(1)}%;background:${esc(x.color)}"></span></span><span class="vl">${h1(x.h)}h<small>${Math.round(x.h / tot * 100)}%</small></span></div>`).join('');
+  // 日別明細
+  const days = eachDate(pd.startDate, pd.endDate).filter(d => o.days[d] || (d < today && isWorkday(d, today)));
+  const daily = `<table class="mt trend"><thead><tr><th>日付</th><th class="num">退勤</th><th class="num">通常</th><th class="num">残業</th><th class="num">日報の入力時間</th></tr></thead><tbody>${days.map(d => {
+    const v = o.days[d], c = v && v.leave ? calcFromLeave(v.leave, d) : null, w = new Date(d + 'T00:00:00').getDay();
+    const rh = v ? v.rows.reduce((t, r) => t + r.n + r.ot, 0) : 0;
+    return `<tr style="cursor:default"><td><b>${Number(d.slice(5, 7))}/${Number(d.slice(8))}</b><span class="t-muted">（${WD[w]}）</span></td>
+      <td class="num">${v && v.leave ? esc(v.leave) : '<span class="t-crit">未入力</span>'}</td><td class="num">${c ? h2(c.normal) : ''}</td>
+      <td class="num">${c && c.ot ? `<span class="t-crit">${h2(c.ot)}</span>` : ''}</td><td class="num t-muted">${rh ? h2(rh) + 'h' : ''}</td></tr>`;
+  }).join('') || '<tr><td colspan="5" class="t-muted">記録がありません</td></tr>'}</tbody></table>`;
+  const s = o.src;
+  document.getElementById('drawer-inner').innerHTML = `
+    <div class="dr-hd"><div><div class="eyebrow"><span class="dot" style="background:${s.color}"></span> ${esc(s.name)}</div><h3>${esc(o.author)}</h3><div class="range">${esc(pd.label)}（${esc(pd.range)}）</div></div>
+      <div style="display:flex;gap:6px;"><a class="btn" href="${esc(s.url)}" target="_blank" rel="noopener" style="text-decoration:none;">部署のアプリを開く</a><button class="btn" onclick="closeDrawer()">閉じる ✕</button></div></div>
+    <div class="dr-body">
+      <div class="dr-tiles">${tiles}</div>
+      <div class="card"><div class="card-hd"><h3>業務構成</h3>
+        <div class="seg"><button class="${STATE.detailScope === 'period' ? 'on' : ''}" onclick="setDetailScope('period')">この月期</button><button class="${STATE.detailScope === 'fy' ? 'on' : ''}" onclick="setDetailScope('fy')">年度累計</button></div></div>
+        <div class="card-body">${comp.tot ? `<div class="two"><div><div class="card-sub" style="margin-bottom:6px;">大分類（${esc(s.short)}の分類） 合計 ${h1(comp.tot)}h</div>${bars(comp.cats, comp.tot, 12)}</div>
+          <div><div class="card-sub" style="margin-bottom:6px;">中分類 上位10</div>${bars(comp.subs, comp.tot, 10)}</div></div>` : '<div class="empty">日報の入力がありません</div>'}</div></div>
+      <div class="card"><div class="card-hd"><h3>月期別 推移（${D.fy + 1}年度）</h3><span class="card-sub">赤線＝月${R.otMonthLimit}h</span></div><div class="card-body scroll">${trend}</div></div>
+      <div class="card"><div class="card-hd"><h3>日別明細</h3><span class="card-sub">通常・残業は退勤時刻から算出／右端は日報に入力した時間の合計</span></div><div class="card-body scroll">${daily}</div></div>
+    </div>`;
+  document.body.classList.add('dr-open');
+  document.getElementById('drawer').setAttribute('aria-hidden', 'false');
+  if (!keepScroll) document.getElementById('drawer').scrollTop = 0;
+}
+
+// ═══════════════════════════════════════════
+//  起動
+// ═══════════════════════════════════════════
+(async function boot() {
+  syncPeriodSelectors();
+  setLoading(true, 'ログイン状態を確認中...');
+  try { await initFb(); } catch (e) { console.error(e); }
+  setLoading(false);
+  renderLogin();
+})();
+</script>
+</body>
+</html>
