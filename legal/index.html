@@ -5538,6 +5538,20 @@ function _megaBubble(x, y, html, cls) {
 // 判定: 直前の打鍵間隔と比べてリズムが揃っていれば「良」、少しずれたら「可」、大きくずれたら「不可」
 const _tk = {last: 0, iv: 0, ryo: 0, ka: 0, fuka: 0, maxCombo: 0, hideT: 0};
 const TAIKO_SOUND_KEY = LS_NS + '__taikoSound__';
+// 部署設定 inputFxForce = {id, on, mode, sound} があれば、その id ごとに各端末で「1回だけ」演出設定を上書きする。
+// 上書き後に本人が設定画面で変えた値はそのまま残る（同じ id では二度と上書きしない）。
+(function applyInputFxForce() {
+  const f = DEPARTMENT_CONFIG.inputFxForce;
+  if (!f || !f.id) return;
+  const key = LS_NS + '__inputFxForce__';
+  try {
+    if (localStorage.getItem(key) === String(f.id)) return;
+    if (f.on != null) localStorage.setItem(INPUT_FX_KEY, f.on ? 'on' : 'off');
+    if (f.mode && INPUT_FX_MODES[f.mode]) localStorage.setItem(INPUT_FX_MODE_KEY, f.mode);
+    if (f.sound != null) localStorage.setItem(TAIKO_SOUND_KEY, f.sound ? 'on' : 'off');
+    localStorage.setItem(key, String(f.id));
+  } catch(e) {}
+})();
 // 既定は部署設定 taikoSoundDefault（未指定なら無音）。端末で切り替えた値（on/off）があればそれを優先
 function taikoSoundOn() {
   const def = DEPARTMENT_CONFIG.taikoSoundDefault === true;
