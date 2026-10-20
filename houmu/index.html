@@ -2222,19 +2222,6 @@ html[data-mv-dir="back"]::view-transition-new(mv-stage),html[data-mv-dir="back"]
       <div id="test-res" class="test-res"></div>
     </div>
     <div class="modal-sec">
-      <h4>バックアップ保存先</h4>
-      <a id="link-backup-sheet" href="https://docs.google.com/spreadsheets/d/1LlQVpi8O7RMmugpVkOlXckiNGrSzE2isS73drWsgxYk/edit" target="_blank"
-         style="display:flex;align-items:center;gap:7px;padding:8px 10px;background:var(--g50);border:1px solid var(--g200);border-radius:8px;text-decoration:none;color:var(--g700);font-size:12px;font-weight:600;transition:.15s;"
-         onmouseover="this.style.background='var(--primary-lt)';this.style.borderColor='var(--accent)'"
-         onmouseout="this.style.background='var(--g50)';this.style.borderColor='var(--g200)'">
-        <div>
-          <div>日報データ</div>
-          <div style="font-size:10px;color:var(--g400);font-weight:400;margin-top:1px;">Google スプレッドシート</div>
-        </div>
-        <span style="margin-left:auto;font-size:11px;color:var(--g400);">開く</span>
-      </a>
-    </div>
-    <div class="modal-sec">
       <h4>マスターデータ保存先</h4>
       <a id="link-fb-console" href="https://console.firebase.google.com/u/0/project/nippou-f191c/firestore/databases/-default-/data" target="_blank"
          style="display:flex;align-items:center;gap:7px;padding:8px 10px;background:var(--g50);border:1px solid var(--g200);border-radius:8px;text-decoration:none;color:var(--g700);font-size:12px;font-weight:600;transition:.15s;"
@@ -5272,9 +5259,13 @@ function addQuarter(cdSub, ev) {
 // ── 入力時の演出: 行の色フラッシュ、クリック位置からの波紋、セルのポップ、「+0.25h」の浮き上がり ──
 // 入力時の演出: 設定で OFF、または OS の「視差効果を減らす」が ON なら全部止める
 const INPUT_FX_KEY = LS_NS + '__inputFx__';
-function inputFxOn() { try { return localStorage.getItem(INPUT_FX_KEY) !== 'off'; } catch(e) { return true; } }
+// 既定は部署設定 inputFxDefault（未指定なら ON）。端末で切り替えた値（on/off）があればそれを優先
+function inputFxOn() {
+  const def = DEPARTMENT_CONFIG.inputFxDefault !== false;
+  try { const v = localStorage.getItem(INPUT_FX_KEY); return v === 'on' ? true : v === 'off' ? false : def; } catch(e) { return def; }
+}
 function setInputFx(on) {
-  try { if (on) localStorage.removeItem(INPUT_FX_KEY); else localStorage.setItem(INPUT_FX_KEY, 'off'); } catch(e) {}
+  try { localStorage.setItem(INPUT_FX_KEY, on ? 'on' : 'off'); } catch(e) {}
   const lbl = document.getElementById('s-input-fx-lbl'); if (lbl) lbl.textContent = on ? 'ON' : 'OFF';
 }
 function _fxReduce() { return !inputFxOn() || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }
