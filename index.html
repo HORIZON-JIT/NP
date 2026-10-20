@@ -2051,6 +2051,7 @@ tr.neon-row td.td-name{animation:neonText .8s ease-out;}
       </div>
       <span class="period-range-label" id="person-range">—</span>
       <button class="btn-refresh no-print" onclick="renderPersonDash(true)">再読込</button>
+      <button class="btn-pdf no-print" onclick="exportPdf('person')">PDF出力</button>
     </div>
     <div class="dash-stats dash-stats-7" id="person-kpi"></div>
     <!-- 上段: 4枚のカードを2列に自動で高さがそろうよう流し込む（データ量で左右の高さが変わっても空きが出ない） -->
@@ -6520,15 +6521,21 @@ function showDashTab(name) {
 // ═══════════════════════════════════════════
 // ─── PDF出力 ─────────────────────────────────
 async function exportPdf(tab) {
-  const titles   = { daily:'日別', monthly:'月次', yearly:'年次', kpi:'KPI' };
+  const titles   = { daily:'日別', monthly:'月次', yearly:'年次', kpi:'KPI', person:'個人' };
   const dateEl   = {
     daily:   document.getElementById('daily-range'),
     monthly: document.getElementById('period-range'),
     yearly:  document.getElementById('yearly-range'),
     kpi:     document.getElementById('kpi-range'),
+    person:  document.getElementById('person-range'),
   };
   let rangeText  = (dateEl[tab] ? dateEl[tab].textContent.trim() : '');
   if (tab === 'daily') rangeText = currentDate.replace(/-/g, '/');
+  if (tab === 'person') {
+    // 担当者名・年度・範囲（年度全体／月期）を見出しに含める
+    const sel = id => { const e = document.getElementById(id); return e && e.selectedIndex >= 0 ? e.options[e.selectedIndex].textContent.trim() : ''; };
+    rangeText = [sel('person-sel-author'), sel('person-sel-fy'), sel('person-sel-scope'), rangeText].filter(Boolean).join('　');
+  }
   const rangeLabel = document.getElementById('pdf-range-label');
   if (rangeLabel) rangeLabel.textContent = `【${titles[tab]}】${rangeText}`;
 
@@ -6542,6 +6549,7 @@ async function exportPdf(tab) {
     if (tab === 'daily') await renderDash(true);
     else if (tab === 'yearly') await renderYearlyDash(true);
     else if (tab === 'kpi') await renderKpiDash();
+    else if (tab === 'person') await renderPersonDash(true);
     else await renderMonthlyDash(true);
     // canvas描画(rAF)と、後から届くデータ(前月期・年度累計・Folio等)の反映を待つ
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
