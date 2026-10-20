@@ -1370,6 +1370,23 @@ html[data-mv-dir="back"]::view-transition-new(mv-stage),html[data-mv-dir="back"]
 .fx-switch input:checked + .fx-track .fx-knob{transform:translateX(20px);}
 .fx-switch input:focus-visible + .fx-track{box-shadow:0 0 0 3px var(--focus);}
 .fx-switch .fx-lbl{font-size:13px;font-weight:800;color:var(--g700);min-width:30px;}
+.fx-modes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+.fx-modes button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 10px;border:1.5px solid var(--g200);border-radius:9px;background:var(--surface);color:var(--g700);cursor:pointer;font-family:inherit;text-align:left;transition:.15s;}
+.fx-modes button b{font-size:12.5px;font-weight:800;}
+.fx-modes button small{font-size:10.5px;color:var(--g500);line-height:1.4;}
+.fx-modes button.on{border-color:var(--primary);background:var(--primary-lt);color:var(--g800);box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 18%,transparent);}
+/* エレガント演出 */
+.hours-wrap input.glow-soft{animation:glowSoft .7s ease-out;}
+@keyframes glowSoft{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--fx-soft,#8A6A37) 55%,transparent);background:color-mix(in srgb,var(--fx-soft,#8A6A37) 16%,var(--surface));}100%{box-shadow:0 0 0 10px transparent;}}
+.td-name.line-soft{position:relative;}
+.td-name.line-soft::after{content:'';position:absolute;left:10px;right:10px;bottom:3px;height:1.5px;border-radius:1px;background:var(--fx-soft,#8A6A37);transform-origin:left;animation:lineSoft .8s cubic-bezier(.2,.7,.2,1) forwards;}
+@keyframes lineSoft{0%{transform:scaleX(0);opacity:.9;}60%{transform:scaleX(1);opacity:.9;}100%{transform:scaleX(1);opacity:0;}}
+.fx-float{position:fixed;z-index:999;pointer-events:none;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;transform:translate(-100%,-50%);animation:fxFloat .9s cubic-bezier(.2,.7,.2,1) forwards;}
+@keyframes fxFloat{0%{opacity:0;transform:translate(-100%,-50%) translateY(4px);}20%{opacity:1;}100%{opacity:0;transform:translate(-100%,-50%) translateY(-22px);}}
+.side-totals.hit-soft{animation:hitSoft .7s ease-out;}
+@keyframes hitSoft{0%{box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--fx-soft,#8A6A37) 60%,transparent);}100%{box-shadow:inset 0 0 0 1.5px transparent;}}
+.input-live-pie.saved-soft::after{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;animation:savedSoft 1.4s ease-out forwards;}
+@keyframes savedSoft{0%{box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--dx-accent,#8A6A37) 70%,transparent);background:color-mix(in srgb,var(--dx-accent,#8A6A37) 8%,transparent);}100%{box-shadow:inset 0 0 0 2px transparent;background:transparent;}}
 /* ══ KPI タブ ══ */
 #view-dash .kpi-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px;}
 .kpi-tile{--k:var(--dx-ink-3);--ki:var(--dx-ink-3);background:var(--surface);border:1px solid var(--dx-line);border-radius:var(--dx-radius);box-shadow:var(--dx-sh);padding:14px 16px 13px;display:flex;flex-direction:column;gap:7px;min-width:0;transition:box-shadow .25s,transform .25s;}
@@ -2211,7 +2228,11 @@ html[data-mv-dir="back"]::view-transition-new(mv-stage),html[data-mv-dir="back"]
         <span class="fx-track"><span class="fx-knob"></span></span>
         <span class="fx-lbl" id="s-input-fx-lbl">ON</span>
       </label>
-      <div style="font-size:11px;color:var(--g500);margin-top:6px;line-height:1.6;">クリックや保存時のアニメーション（火花・コンボ・紙吹雪など）。切り替えるとすぐ反映され、この端末だけの設定です。</div>
+      <div id="s-input-fx-modes" class="fx-modes">
+        <button type="button" data-mode="fever" onclick="setInputFxMode('fever')"><b>フィーバー</b><small>火花・コンボ・紙吹雪で派手に</small></button>
+        <button type="button" data-mode="elegant" onclick="setInputFxMode('elegant')"><b>エレガント</b><small>柔らかな光と小さな動きで上品に</small></button>
+      </div>
+      <div style="font-size:11px;color:var(--g500);margin-top:6px;line-height:1.6;">クリックや保存時のアニメーション。切り替えるとすぐ反映され、この端末だけの設定です。</div>
     </div>
     <div class="modal-sec">
       <h4>Google Apps Script URL</h4>
@@ -3205,8 +3226,7 @@ function openSettings() {
   document.getElementById('preload-status').textContent='';
   document.getElementById('preload-timer').textContent='';
   cancelNewAuthor();
-  const fx = document.getElementById('s-input-fx');
-  if (fx) { fx.checked = inputFxOn(); const l = document.getElementById('s-input-fx-lbl'); if (l) l.textContent = fx.checked ? 'ON' : 'OFF'; }
+  _syncFxSettingsUI();
   document.getElementById('settings-modal').classList.add('open');
 }
 
@@ -5266,12 +5286,47 @@ function inputFxOn() {
 }
 function setInputFx(on) {
   try { localStorage.setItem(INPUT_FX_KEY, on ? 'on' : 'off'); } catch(e) {}
-  const lbl = document.getElementById('s-input-fx-lbl'); if (lbl) lbl.textContent = on ? 'ON' : 'OFF';
+  _syncFxSettingsUI();
 }
+// 演出モード: 'fever'（従来の派手な演出）／'elegant'（控えめ）。既定は部署設定 inputFxMode、無ければ fever
+const INPUT_FX_MODE_KEY = LS_NS + '__inputFxMode__';
+const INPUT_FX_MODES = {fever: 'フィーバー', elegant: 'エレガント'};
+function inputFxMode() {
+  const def = INPUT_FX_MODES[DEPARTMENT_CONFIG.inputFxMode] ? DEPARTMENT_CONFIG.inputFxMode : 'fever';
+  try { const v = localStorage.getItem(INPUT_FX_MODE_KEY); return INPUT_FX_MODES[v] ? v : def; } catch(e) { return def; }
+}
+function setInputFxMode(m) {
+  if (!INPUT_FX_MODES[m]) return;
+  try { localStorage.setItem(INPUT_FX_MODE_KEY, m); } catch(e) {}
+  _syncFxSettingsUI();
+}
+function _syncFxSettingsUI() {
+  const fx = document.getElementById('s-input-fx'), l = document.getElementById('s-input-fx-lbl'), modes = document.getElementById('s-input-fx-modes');
+  if (fx) fx.checked = inputFxOn();
+  if (l) l.textContent = inputFxOn() ? 'ON' : 'OFF';
+  if (modes) { modes.style.display = inputFxOn() ? '' : 'none'; const cur = inputFxMode(); modes.querySelectorAll('button[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === cur)); }
+}
+function _fxElegant() { return inputFxMode() === 'elegant'; }
 function _fxReduce() { return !inputFxOn() || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }
 const _fxCombo = {n: 0, t: 0};
+// エレガント: 火花・コンボ・フラッシュは出さず、セルの柔らかな発光、行名の細い下線、小さな「+0.25h」の浮き上がり、合計の静かな強調だけ
+function _inpFxElegant(cdSub, inp, added, isOT) {
+  const tr = inp.closest('tr');
+  const color = isOT ? '#b45309' : ((tr && tr.style.getPropertyValue('--cat-color')) || '#8A6A37');
+  inp.style.setProperty('--fx-soft', color);
+  inp.classList.remove('glow-soft'); void inp.offsetWidth; inp.classList.add('glow-soft'); setTimeout(() => inp.classList.remove('glow-soft'), 700);
+  const nameTd = tr && tr.querySelector('.td-name');
+  if (nameTd) { nameTd.style.setProperty('--fx-soft', color); nameTd.classList.remove('line-soft'); void nameTd.offsetWidth; nameTd.classList.add('line-soft'); setTimeout(() => nameTd.classList.remove('line-soft'), 800); }
+  const ir = inp.getBoundingClientRect();
+  const f = document.createElement('span'); f.className = 'fx-float'; f.textContent = '+' + stepLabelStr(added); f.style.color = color;
+  f.style.left = (ir.right - 4) + 'px'; f.style.top = (ir.top + ir.height / 2) + 'px';
+  document.body.appendChild(f); setTimeout(() => f.remove(), 900);
+  const tot = document.querySelector('.side-totals');
+  if (tot) { tot.style.setProperty('--fx-soft', color); tot.classList.remove('hit-soft'); void tot.offsetWidth; tot.classList.add('hit-soft'); setTimeout(() => tot.classList.remove('hit-soft'), 700); }
+}
 function _inpFx(cdSub, inp, added, isOT, ev) {
   if (!inp || _fxReduce()) return;
+  if (_fxElegant()) return _inpFxElegant(cdSub, inp, added, isOT);
   const tr = inp.closest('tr');
   const color = (tr && tr.style.getPropertyValue('--cat-color')) || '#6b7280';
   // 行の色フラッシュ ＋ 行を横切る光の帯（オーバーレイなので表のレイアウトは動かさない）
@@ -5487,7 +5542,7 @@ function updateSideBars(calc, normal, ot) {
   if (!wasDone && nPct >= 100 && normal > 0 && updateSideBars._lastDone !== currentDate && !_fxReduce()) {
     updateSideBars._lastDone = currentDate;
     const panel = document.querySelector('.input-live-pie');
-    if (panel && typeof _confetti === 'function') _confetti(panel);
+    if (panel && !_fxElegant() && typeof _confetti === 'function') _confetti(panel);   // エレガントでは紙吹雪なし
   }
 }
 function checkHoursSafety(normal, ot) {
@@ -6247,6 +6302,7 @@ function _saveFx(btn) {
     setTimeout(() => { btn.classList.remove('saved'); btn.innerHTML = orig; }, 1800);
   }
   const panel = document.querySelector('.input-live-pie');
+  if (panel && _fxElegant()) { panel.classList.remove('saved-soft'); void panel.offsetWidth; panel.classList.add('saved-soft'); setTimeout(() => panel.classList.remove('saved-soft'), 1400); return; }
   if (panel) { panel.classList.remove('saved-flash'); void panel.offsetWidth; panel.classList.add('saved-flash'); setTimeout(() => panel.classList.remove('saved-flash'), 1200); }
 }
 
