@@ -5540,16 +5540,71 @@ const _tk = {last: 0, iv: 0, ryo: 0, ka: 0, fuka: 0, maxCombo: 0, hideT: 0};
 const TAIKO_SOUND_KEY = LS_NS + '__taikoSound__';
 function taikoSoundOn() { try { return localStorage.getItem(TAIKO_SOUND_KEY) === 'on'; } catch(e) { return false; } }
 function setTaikoSound(on) { try { localStorage.setItem(TAIKO_SOUND_KEY, on ? 'on' : 'off'); } catch(e) {} if (on) _tkSound(false); }
-let _tkAC = null;
+// 和太鼓の音（外部の音源ファイルは使わず Web Audio で合成）
+//  ドン（面打ち）: 皮の基音が打った瞬間に高く、すぐ下がる胴鳴り＋倍音（円形膜の比 1.59/2.14/2.30）
+//                  ＋バチが当たる「トン」という打撃ノイズ＋胴の中の残響
+//  カッ（縁打ち）: 木の縁を叩く乾いた打撃ノイズ＋木の共鳴（高い短い音）＋わずかな残響
+let _tkAC = null, _tkBus = null, _tkNoise = null;
+function _tkNoiseBuf(ac) {
+  if (_tkNoise && _tkNoise.sampleRate === ac.sampleRate) return _tkNoise;
+  const b = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.6), ac.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return (_tkNoise = b);
+}
+// 出力系: 直接音＋胴鳴り風の短い残響 → コンプレッサー → 出力
+function _tkMakeBus(ac, dest) {
+  const out = ac.createGain(); out.gain.value = 0.75;
+  const comp = ac.createDynamicsCompressor();
+  comp.threshold.value = -14; comp.knee.value = 8; comp.ratio.value = 4; comp.attack.value = 0.002; comp.release.value = 0.12;
+  const dry = ac.createGain(); dry.gain.value = 1;
+  const wet = ac.createGain(); wet.gain.value = 0.22;
+  const conv = ac.createConvolver();
+  const len = Math.floor(ac.sampleRate * 0.9), ir = ac.createBuffer(2, len, ac.sampleRate);
+  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) { const t = i / ac.sampleRate; d[i] = (Math.random() * 2 - 1) * Math.exp(-t * 6.5) * (t < 0.008 ? t / 0.008 : 1); } }
+  conv.buffer = ir;
+  const tone = ac.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 3200;   // 残響は少しこもらせて木の胴の響きに
+  const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 45;   // スピーカーで鳴らない超低音は削る
+  dry.connect(hp); wet.connect(conv); conv.connect(tone); tone.connect(hp); hp.connect(comp); comp.connect(out); out.connect(dest);
+  return {in: dry, wet};
+}
+function _tkVoice(ac, bus, t, ka) {
+  const send = node => { node.connect(bus.in); node.connect(bus.wet); };
+  const env = (g, peak, attack, decay) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay); };
+  const noise = (f, q, type, peak, decay, delay) => {
+    const n = ac.createBufferSource(); n.buffer = _tkNoiseBuf(ac);
+    const bf = ac.createBiquadFilter(); bf.type = type; bf.frequency.value = f; bf.Q.value = q;
+    const g = ac.createGain(); g.gain.setValueAtTime(0.0001, t + (delay || 0)); g.gain.exponentialRampToValueAtTime(peak, t + (delay || 0) + 0.0015); g.gain.exponentialRampToValueAtTime(0.0001, t + (delay || 0) + 0.0015 + decay);
+    n.connect(bf); bf.connect(g); send(g); n.start(t + (delay || 0)); n.stop(t + (delay || 0) + decay + 0.05);
+  };
+  const tone = (type, f0, f1, glide, peak, decay) => {
+    const o = ac.createOscillator(), g = ac.createGain(); o.type = type;
+    o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + glide);
+    env(g, peak, 0.002, decay); o.connect(g); send(g); o.start(t); o.stop(t + decay + 0.05);
+  };
+  const v = 1 + (Math.random() - 0.5) * 0.04;   // 打つたびにわずかに音程が揺れる（機械的に聞こえないように）
+  if (!ka) {
+    const f = 92 * v;
+    tone('sine', f * 1.9, f, 0.035, 0.95, 0.55);          // 基音: 打った瞬間に皮が張って高く、すぐ落ち着く
+    tone('sine', f * 1.59 * 1.5, f * 1.59, 0.03, 0.32, 0.30);   // 膜の倍音
+    tone('sine', f * 2.14 * 1.4, f * 2.14, 0.03, 0.18, 0.18);
+    tone('triangle', f * 2.30 * 1.3, f * 2.30, 0.025, 0.08, 0.12);
+    noise(700, 0.8, 'lowpass', 0.55, 0.05);              // バチが皮に当たる「トン」
+    noise(160, 1.2, 'bandpass', 0.45, 0.16);             // 胴の空気が押される低いうなり
+  } else {
+    noise(2600 * v, 2.2, 'bandpass', 0.9, 0.035);        // 木の縁を叩く乾いた「カッ」
+    noise(5200 * v, 3, 'bandpass', 0.35, 0.02);
+    tone('sine', 1250 * v, 1180 * v, 0.03, 0.22, 0.06);  // 縁（木）の共鳴
+    tone('triangle', 2350 * v, 2250 * v, 0.03, 0.10, 0.04);
+    noise(420, 1.5, 'bandpass', 0.18, 0.05);             // 胴にも少しだけ響く
+  }
+}
 function _tkSound(ka) {
   if (!taikoSoundOn()) return;
   try {
     const ac = _tkAC || (_tkAC = new (window.AudioContext || window.webkitAudioContext)());
     if (ac.state === 'suspended') ac.resume();
-    const t = ac.currentTime, g = ac.createGain(), o = ac.createOscillator();
-    if (ka) { o.type = 'square'; o.frequency.setValueAtTime(1500, t); o.frequency.exponentialRampToValueAtTime(900, t + .05); g.gain.setValueAtTime(.05, t); g.gain.exponentialRampToValueAtTime(.0001, t + .07); }
-    else    { o.type = 'sine';   o.frequency.setValueAtTime(150, t);  o.frequency.exponentialRampToValueAtTime(55, t + .18);  g.gain.setValueAtTime(.35, t); g.gain.exponentialRampToValueAtTime(.0001, t + .22); }
-    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + .25);
+    if (!_tkBus) _tkBus = _tkMakeBus(ac, ac.destination);
+    _tkVoice(ac, _tkBus, ac.currentTime + 0.005, ka);
   } catch(e) {}
 }
 function _tkJudge() {
