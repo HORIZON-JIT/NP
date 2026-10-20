@@ -6265,6 +6265,20 @@ function renderTaskImport() {
   const pv = hasPv ? _taskImportRows.reduce((t, x) => { const r = x.r; if (r.plan != null) { t.plan += r.plan; t.planN++; } if (r.actual != null) { t.actual += r.actual; t.actN++; if (r.plan != null) { t.both += 1; t.planB += r.plan; if (r.actual > r.plan * 1.2) t.over++; } } else t.noAct++; return t; }, {plan: 0, planN: 0, actual: 0, actN: 0, both: 0, planB: 0, over: 0, noAct: 0}) : null;
   const plan = Object.keys(sums).map(cd => ({cdSub:cd, hoursNormal:_roundTaskHours(sums[cd].normal), hoursOT:_roundTaskHours(sums[cd].ot)}))
     .filter(p => p.hoursNormal > 0 || p.hoursOT > 0);
+  // 丸め後にも通常の上限（REGULAR_H）を保証する。中分類ごとの丸めで合計が上限を超えた分は、開始が遅いタスクを含む中分類から残業へ振り替える
+  {
+    let over = Math.round((plan.reduce((t, p) => t + p.hoursNormal, 0) - REGULAR_H) * 100) / 100;
+    if (over > 0) {
+      const lastStart = cd => chk.filter(x => x.cd === cd).reduce((m, x) => Math.max(m, x.placed ? _hmToMin(x.start || '0:00') : 9999), -1);
+      for (const p of plan.slice().sort((a, b) => lastStart(b.cdSub) - lastStart(a.cdSub))) {
+        if (over <= 0) break;
+        const mv = Math.min(p.hoursNormal, over);
+        if (mv <= 0) continue;
+        p.hoursNormal = Math.round((p.hoursNormal - mv) * 100) / 100; p.hoursOT = Math.round((p.hoursOT + mv) * 100) / 100;
+        over = Math.round((over - mv) * 100) / 100; shifted = Math.round((shifted + mv) * 100) / 100;
+      }
+    }
+  }
   const totN = plan.reduce((a, p) => a + p.hoursNormal, 0), totO = plan.reduce((a, p) => a + p.hoursOT, 0);
   // 差の内訳: 時間割どおり（予定工数の合計）と比べて、取込の合計がどこで増減したか
   const fh = h => `${h >= 0 ? '+' : '−'}${Math.abs(h).toFixed(2)}h`;
