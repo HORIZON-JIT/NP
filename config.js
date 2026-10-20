@@ -13,5 +13,7 @@ window.DEPARTMENT_CONFIG_OVERRIDE = {
   // （設定画面から端末ごとに変更でき、変更した端末ではその設定が優先される）
   inputFxDefault: true,
   inputFxMode: 'mega',
-  taikoSoundDefault: true
+  taikoSoundDefault: true,
+  // 全端末で1回だけ演出設定を上書き（id を変えると、もう一度だけ上書きされる）
+  inputFxForce: { id: '2026-10-mega', on: true, mode: 'mega', sound: true }
 };
