@@ -2124,7 +2124,7 @@ html[data-mv-dir="back"]::view-transition-new(mv-stage),html[data-mv-dir="back"]
     </section>
   </div>
 
-  <section class="admin-card" style="margin-top:14px;">
+  <section class="admin-card" id="admin-goal-section" style="margin-top:14px;">
     <h2>チーム目標</h2>
     <div class="admin-note" style="margin-bottom:10px;">ダッシュボード（月次）の「チーム目標」に表示する目標です。変更すると即保存されます。</div>
     <div id="admin-goals" class="dx-goal-admin"></div>
@@ -6968,13 +6968,14 @@ function _confetti(host) {
 
 // 管理タブ: チーム目標の設定
 function renderAdminGoals() {
-  const el = document.getElementById('admin-goals');
+  const el = document.getElementById('admin-goals'), sec = document.getElementById('admin-goal-section');
   if (!el) return;
   const rows = [
     {k: 'otAvg', name: '残業 平均/人', unit: 'h 以下', step: 0.5},
     {k: 'entryRate', name: '日報 入力率', unit: '% 以上', step: 1},
     {k: 'saved', name: '効率化で浮いた時間（前月期比）', unit: 'h 以上', step: 0.5}
-  ];
+  ].filter(r => GOALS[r.k]);   // 部署設定 goals に無い項目は出さない（goals: {} なら節ごと非表示）
+  if (sec) sec.style.display = rows.length ? '' : 'none';
   el.innerHTML = rows.map(r => `<label class="dx-goal-adm">
       <input type="checkbox" ${GOALS[r.k].on ? 'checked' : ''} onchange="setGoal('${r.k}','on',this.checked)">
       <span class="nm">${r.name}</span>

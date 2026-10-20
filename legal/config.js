@@ -43,6 +43,7 @@ window.DEPARTMENT_CONFIG_OVERRIDE = {
   defaultAuthors: ['中西'],
   authorsLast: [],                 // 常に最後に並べる担当者（法務知財部は指定なし）
   kpis: [],                        // KPI（月次工数目標）は生産管理課のみ
+  goals: null,                     // チーム目標（残業平均・入力率・効率化）も生産管理課のみ（{} だと既定とマージされるので null）
 
   // 上部ナビの外部アプリリンク（黒板/手順書/資料検索）は生産管理課専用のため非表示。
   showAppLinks: false,
