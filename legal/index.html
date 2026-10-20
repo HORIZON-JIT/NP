@@ -5538,7 +5538,11 @@ function _megaBubble(x, y, html, cls) {
 // 判定: 直前の打鍵間隔と比べてリズムが揃っていれば「良」、少しずれたら「可」、大きくずれたら「不可」
 const _tk = {last: 0, iv: 0, ryo: 0, ka: 0, fuka: 0, maxCombo: 0, hideT: 0};
 const TAIKO_SOUND_KEY = LS_NS + '__taikoSound__';
-function taikoSoundOn() { try { return localStorage.getItem(TAIKO_SOUND_KEY) === 'on'; } catch(e) { return false; } }
+// 既定は部署設定 taikoSoundDefault（未指定なら無音）。端末で切り替えた値（on/off）があればそれを優先
+function taikoSoundOn() {
+  const def = DEPARTMENT_CONFIG.taikoSoundDefault === true;
+  try { const v = localStorage.getItem(TAIKO_SOUND_KEY); return v === 'on' ? true : v === 'off' ? false : def; } catch(e) { return def; }
+}
 function setTaikoSound(on) { try { localStorage.setItem(TAIKO_SOUND_KEY, on ? 'on' : 'off'); } catch(e) {} if (on) _tkSound(false); }
 // 和太鼓の音（外部の音源ファイルは使わず Web Audio で合成）
 //  ドン（面打ち）: 皮の基音が打った瞬間に高く、すぐ下がる胴鳴り＋倍音（円形膜の比 1.59/2.14/2.30）
