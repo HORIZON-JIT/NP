@@ -2395,9 +2395,11 @@ const DEPARTMENT_CONFIG = (function(){
     // チーム目標（ダッシュボード月次の達成度リング）。管理タブで変更→Firebaseマスタ(goals)に保存
     goals: {
       otAvg:     { on: true, target: 20  },   // 残業 平均/人(h) 以下
-      entryRate: { on: true, target: 80 },    // 日報入力率(%) 以上
-      saved:     { on: true, target: 10  }    // 効率化で浮いた時間(h) 以上
+      entryRate: { on: true, target: 80 }     // 日報入力率(%) 以上
+      // saved（効率化で浮いた時間）は効率化ハイライトと共に停止中（effHighlight を true にすると復活）
     },
+    // 効率化ハイライト（前月期比・日報ベース）。内容の妥当性が確認できるまで全部署 OFF
+    effHighlight: false,
     // KPI（月次の工数目標）。全員の1か月（月期）の工数合計（通常＋残業）を目標以下に収める。
     // subs = 紐づける中分類CD。管理タブで変更→Firebaseマスタ(kpis)に保存。空配列の部署はカードを出さない
     kpis: [
@@ -6896,7 +6898,9 @@ function _effCompute() {
 function _effMin(h) { return Math.round(h * 60); }
 function _effHm(h) { const m = _effMin(h); return m >= 60 ? `${Math.floor(m / 60)}時間${String(m % 60).padStart(2, '0')}分` : `${m}分`; }
 function renderEfficiency() {
-  const el = document.getElementById('eff-body'), ctx = _mgrCtx;
+  const el = document.getElementById('eff-body'), ctx = _mgrCtx, card = document.getElementById('eff-card');
+  if (card) card.style.display = DEPARTMENT_CONFIG.effHighlight ? '' : 'none';
+  if (!DEPARTMENT_CONFIG.effHighlight) { if (ctx) ctx.eff = null; renderGoals(); return; }
   if (!el || !ctx) return;
   if (!ctx.prevRaw) { el.innerHTML = '<p class="dx-empty">前月期のデータを読み込み中…</p>'; return; }
   const e = _effCompute();
@@ -6971,7 +6975,7 @@ function renderGoals() {
     {k: 'otAvg', name: '残業 平均/人', unit: 'h', dir: 'le', fmt: x => x.toFixed(1), note: v && v.projected ? '月末見込で判定' : ''},
     {k: 'entryRate', name: '日報 入力率', unit: '%', dir: 'ge', fmt: x => x.toFixed(0)},
     {k: 'saved', name: '効率化で浮いた時間', unit: 'h', dir: 'ge', fmt: x => x.toFixed(1), note: '1人1日の短縮分 × 今月期の人日'}
-  ].filter(d => G[d.k] && G[d.k].on);
+  ].filter(d => G[d.k] && G[d.k].on && (d.k !== 'saved' || DEPARTMENT_CONFIG.effHighlight));
   if (!defs.length || !v) { card.style.display = 'none'; return; }
   card.style.display = '';
   const C = 2 * Math.PI * 34;
@@ -7030,7 +7034,7 @@ function renderAdminGoals() {
     {k: 'otAvg', name: '残業 平均/人', unit: 'h 以下', step: 0.5},
     {k: 'entryRate', name: '日報 入力率', unit: '% 以上', step: 1},
     {k: 'saved', name: '効率化で浮いた時間（前月期比）', unit: 'h 以上', step: 0.5}
-  ].filter(r => GOALS[r.k]);   // 部署設定 goals に無い項目は出さない（goals: {} なら節ごと非表示）
+  ].filter(r => GOALS[r.k] && (r.k !== 'saved' || DEPARTMENT_CONFIG.effHighlight));   // 部署設定 goals に無い項目は出さない（goals: {} なら節ごと非表示）
   if (sec) sec.style.display = rows.length ? '' : 'none';
   el.innerHTML = rows.map(r => `<label class="dx-goal-adm">
       <input type="checkbox" ${GOALS[r.k].on ? 'checked' : ''} onchange="setGoal('${r.k}','on',this.checked)">
