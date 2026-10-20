@@ -238,10 +238,10 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
 .tk-gauge .clr{position:absolute;top:-2px;bottom:-2px;left:80%;width:2px;background:#ffd400;box-shadow:0 0 4px #ffd400;}
 .tk-gauge.full .fill{background:linear-gradient(90deg,#ff0080,#ffd600,#00ffaa,#00aaff,#aa00ff,#ff0080);background-size:200% 100%;animation:megaHue .6s linear infinite;}
 .tk-soul{position:absolute;right:0;top:50%;margin-top:-14px;z-index:2;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:14px;color:#888;background:#3a3330;border:2px solid #111;font-family:"Zen Kaku Gothic New","Hiragino Mincho ProN",serif;}
-.tk-gwrap{position:relative;padding-right:34px;z-index:2;}
+.tk-gwrap{position:relative;padding-right:34px;z-index:1;}
 .tk-gwrap.full .tk-soul{color:#fff;background:radial-gradient(circle,#ff7a00,#f84828);box-shadow:0 0 10px #ffb000;animation:tkSoul .5s ease-in-out infinite alternate;}
 @keyframes tkSoul{from{transform:scale(1);box-shadow:0 0 6px #ffb000;}to{transform:scale(1.12);box-shadow:0 0 16px #ffd400;}}
-.tk-lane{position:relative;height:40px;border-radius:8px;background:linear-gradient(180deg,#5a524d,#3f3834);border:2px solid #111;overflow:hidden;}
+.tk-lane{position:relative;height:40px;border-radius:8px;background:linear-gradient(180deg,#5a524d,#3f3834);border:2px solid #111;overflow:visible;}
 .tk-lane::after{content:'';position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(255,255,255,.12);}
 .tk-judge{position:absolute;left:30px;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;border:3px solid rgba(255,255,255,.75);box-shadow:inset 0 0 0 4px rgba(0,0,0,.35);}
 .tk-note{position:absolute;top:50%;left:calc(100% - 20px);width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px #111;transition:left .16s linear;z-index:2;}
@@ -249,16 +249,17 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
 .tk-note.ka{background:radial-gradient(circle at 40% 35%,#a8f0f2,#3fb8c4 60%);}
 .tk-note.hit{left:30px;}
 .tk-burst{position:absolute;left:30px;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;border:4px solid #ffd400;z-index:3;animation:tkBurst .35s ease-out forwards;}
+.tk-lane-clip{position:absolute;inset:0;border-radius:6px;overflow:hidden;}
 .tk-burst.ka{border-color:#6ee7f0;}
-@keyframes tkBurst{0%{transform:scale(.6);opacity:1;}100%{transform:scale(2.4);opacity:0;}}
+@keyframes tkBurst{0%{transform:scale(.6);opacity:1;}100%{transform:scale(1.9);opacity:0;}}
 .tk-hit-word{position:absolute;left:70px;top:50%;transform:translateY(-50%);font-weight:900;font-size:17px;color:#fff;-webkit-text-stroke:3px #111;paint-order:stroke fill;z-index:3;animation:tkWord .4s ease-out forwards;font-family:"Zen Kaku Gothic New","Hiragino Sans",sans-serif;}
 .tk-hit-word.ka{color:#a8f0f2;}
 @keyframes tkWord{0%{opacity:0;transform:translateY(-30%) scale(.6);}30%{opacity:1;transform:translateY(-55%) scale(1.15);}100%{opacity:0;transform:translateY(-90%) scale(1);}}
-.tk-jdg{position:absolute;left:30px;top:-2px;transform:translateX(-50%);z-index:4;font-family:"Zen Kaku Gothic New","Hiragino Mincho ProN","Yu Mincho",serif;font-weight:900;font-size:22px;line-height:1;paint-order:stroke fill;animation:tkJdg .45s ease-out forwards;}
+.tk-jdg{position:absolute;left:30px;top:-16px;transform:translateX(-50%);z-index:6;white-space:nowrap;font-family:"Zen Kaku Gothic New","Hiragino Mincho ProN","Yu Mincho",serif;font-weight:900;font-size:22px;line-height:1;paint-order:stroke fill;animation:tkJdg .45s ease-out forwards;}
 .tk-jdg.ryo{color:#ffd21f;-webkit-text-stroke:2.5px #b3200e;}
 .tk-jdg.ka2{color:#fff;-webkit-text-stroke:2.5px #333;}
 .tk-jdg.fuka{color:#7cc4ff;-webkit-text-stroke:2.5px #0b2a55;}
-@keyframes tkJdg{0%{opacity:0;transform:translate(-50%,6px) scale(.6);}30%{opacity:1;transform:translate(-50%,-2px) scale(1.15);}100%{opacity:0;transform:translate(-50%,-10px) scale(1);}}
+@keyframes tkJdg{0%{opacity:0;transform:translate(-50%,8px) scale(.6);}30%{opacity:1;transform:translate(-50%,0) scale(1.2);}75%{opacity:1;transform:translate(-50%,-3px) scale(1);}100%{opacity:0;transform:translate(-50%,-6px) scale(1);}}
 .mega-ryo.ka2{color:#fff;-webkit-text-stroke:2.5px #333;filter:drop-shadow(0 0 4px rgba(255,255,255,.7));}
 .mega-ryo.fuka{color:#7cc4ff;-webkit-text-stroke:2.5px #0b2a55;filter:none;}
 /* 成績（保存時） */
