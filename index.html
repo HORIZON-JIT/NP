@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;800&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@700&text=JIT&display=swap">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Shippori+Mincho:wght@700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700&display=swap">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -1388,29 +1388,6 @@ tr.neon-row td.td-name{animation:neonText .8s ease-out;}
 @keyframes neonHit{0%{box-shadow:0 0 10px var(--fx-neon,#22d3ee),inset 0 0 0 1.5px var(--fx-neon,#22d3ee);}100%{box-shadow:0 0 0 transparent;}}
 .input-live-pie.saved-neon::after{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;animation:savedNeon 1.2s ease-out forwards;}
 @keyframes savedNeon{0%{box-shadow:0 0 14px #22d3ee,inset 0 0 0 2px #22d3ee;}100%{box-shadow:0 0 0 transparent;}}
-/* アーケード */
-.hours-wrap input.pix-cell{animation:pixCell .3s steps(3,end);}
-@keyframes pixCell{0%{transform:translateY(-3px);}100%{transform:none;}}
-.fx-pix{position:fixed;z-index:999;pointer-events:none;font-family:'DotGothic16',monospace;font-size:16px;font-weight:400;letter-spacing:.02em;transform:translate(-100%,-50%);
-  text-shadow:1px 1px 0 var(--surface),-1px -1px 0 var(--surface),2px 2px 0 rgba(0,0,0,.35);animation:fxPix .7s steps(6,end) forwards;}
-@keyframes fxPix{0%{opacity:1;transform:translate(-100%,-50%) translateY(0);}100%{opacity:0;transform:translate(-100%,-50%) translateY(-22px);}}
-.fx-hit{position:fixed;z-index:999;pointer-events:none;font-family:'DotGothic16',monospace;font-size:11px;transform:translateY(-50%);padding:1px 5px;border:2px solid currentColor;background:var(--surface);animation:fxHit .6s steps(4,end) forwards;}
-@keyframes fxHit{0%{transform:translateY(-50%) scale(1.3);}100%{transform:translateY(-50%) scale(1);opacity:0;}}
-.input-live-pie.saved-pix{animation:savedPix .5s steps(2,end) 2;}
-@keyframes savedPix{0%{box-shadow:inset 0 0 0 3px #16a34a;}100%{box-shadow:inset 0 0 0 3px transparent;}}
-.fx-pix-banner{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);z-index:6;font-family:'DotGothic16',monospace;font-size:22px;color:#16a34a;background:var(--surface);border:3px solid #16a34a;padding:4px 14px;animation:fxBanner 1.1s steps(5,end) forwards;pointer-events:none;}
-@keyframes fxBanner{0%{transform:translate(-50%,-50%) scale(.6);opacity:0;}20%{transform:translate(-50%,-50%) scale(1.1);opacity:1;}80%{opacity:1;}100%{opacity:0;}}
-/* 和風 */
-.hours-wrap input.sumi-cell{animation:sumiCell .9s ease-out;background-repeat:no-repeat;}
-@keyframes sumiCell{0%{background-image:radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--fx-sumi,#1f2937) 45%,transparent) 0,transparent 0);background-size:0 0;background-position:center;}
-  40%{background-image:radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--fx-sumi,#1f2937) 35%,transparent) 30%,transparent 70%);background-size:180% 180%;background-position:center;}
-  100%{background-image:radial-gradient(circle at 50% 50%,transparent 0,transparent 100%);background-size:220% 220%;background-position:center;}}
-.fx-hanko{position:absolute;right:8px;top:50%;width:22px;height:22px;margin-top:-11px;border:2px solid #b91c1c;border-radius:50%;color:#b91c1c;font-family:'Shippori Mincho','Noto Serif JP',serif;font-weight:700;font-size:12px;line-height:18px;text-align:center;transform:rotate(-12deg);opacity:.9;pointer-events:none;z-index:3;mix-blend-mode:multiply;animation:hanko .9s cubic-bezier(.2,1.2,.3,1) forwards;}
-.fx-hanko.big{position:absolute;right:18px;top:14px;width:56px;height:56px;margin:0;font-size:22px;line-height:52px;border-width:3px;z-index:6;animation-duration:1.5s;}
-@keyframes hanko{0%{transform:rotate(-12deg) scale(1.8);opacity:0;}25%{transform:rotate(-12deg) scale(1);opacity:.95;}75%{opacity:.95;}100%{opacity:0;}}
-[data-theme="dark"] .fx-hanko{mix-blend-mode:screen;color:#f87171;border-color:#f87171;}
-.side-totals.fude .sv,.side-totals.fude b,.side-totals.fude .ft-num{font-family:'Shippori Mincho','Noto Serif JP',serif;animation:fude .9s ease-out;}
-@keyframes fude{0%{filter:blur(1.5px);letter-spacing:.08em;}100%{filter:none;letter-spacing:0;}}
 .fx-modes button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 10px;border:1.5px solid var(--g200);border-radius:9px;background:var(--surface);color:var(--g700);cursor:pointer;font-family:inherit;text-align:left;transition:.15s;}
 .fx-modes button b{font-size:12.5px;font-weight:800;}
 .fx-modes button small{font-size:10.5px;color:var(--g500);line-height:1.4;}
@@ -2286,12 +2263,7 @@ tr.neon-row td.td-name{animation:neonText .8s ease-out;}
         <button type="button" data-mode="elegant" onclick="setInputFxMode('elegant')"><b>エレガント</b><small>柔らかな光と小さな動きで上品に</small></button>
         <button type="button" data-mode="minimal" onclick="setInputFxMode('minimal')"><b>ミニマル</b><small>入力欄が一度だけ淡く明滅するだけ</small></button>
         <button type="button" data-mode="neon" onclick="setInputFxMode('neon')"><b>ネオン</b><small>セルと行が発光し、合計へ光の軌跡</small></button>
-        <button type="button" data-mode="arcade" onclick="setInputFxMode('arcade')"><b>アーケード</b><small>ドット文字の「+0.25」と HIT カウント</small></button>
-        <button type="button" data-mode="wafu" onclick="setInputFxMode('wafu')"><b>和風</b><small>墨がにじみ、判子の「済」が押される</small></button>
       </div>
-      <label id="s-arcade-sound-row" style="display:none;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--g700);cursor:pointer;">
-        <input type="checkbox" id="s-arcade-sound" onchange="setArcadeSound(this.checked)"> 効果音を鳴らす（ピコピコ音。既定は無音）
-      </label>
       <div style="font-size:11px;color:var(--g500);margin-top:6px;line-height:1.6;">クリックや保存時のアニメーション。切り替えるとすぐ反映され、この端末だけの設定です。</div>
     </div>
     <div class="modal-sec">
@@ -5352,23 +5324,7 @@ function setInputFx(on) {
 }
 // 演出モード: 'fever'（従来の派手な演出）／'elegant'（控えめ）。既定は部署設定 inputFxMode、無ければ fever
 const INPUT_FX_MODE_KEY = LS_NS + '__inputFxMode__';
-const INPUT_FX_MODES = {fever: 'フィーバー', elegant: 'エレガント', minimal: 'ミニマル', neon: 'ネオン', arcade: 'アーケード', wafu: '和風'};
-// アーケードの効果音（既定 OFF・端末ごと）
-const ARCADE_SOUND_KEY = LS_NS + '__arcadeSound__';
-function arcadeSoundOn() { try { return localStorage.getItem(ARCADE_SOUND_KEY) === 'on'; } catch(e) { return false; } }
-function setArcadeSound(on) { try { localStorage.setItem(ARCADE_SOUND_KEY, on ? 'on' : 'off'); } catch(e) {} if (on) _arcadeBeep(880, .08); }
-let _arcadeAC = null;
-function _arcadeBeep(freq, dur, type) {
-  if (!arcadeSoundOn()) return;
-  try {
-    const ac = _arcadeAC || (_arcadeAC = new (window.AudioContext || window.webkitAudioContext)());
-    if (ac.state === 'suspended') ac.resume();
-    const o = ac.createOscillator(), g = ac.createGain();
-    o.type = type || 'square'; o.frequency.value = freq; g.gain.value = 0.035;
-    o.connect(g); g.connect(ac.destination); o.start();
-    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur); o.stop(ac.currentTime + dur);
-  } catch(e) {}
-}
+const INPUT_FX_MODES = {fever: 'フィーバー', elegant: 'エレガント', minimal: 'ミニマル', neon: 'ネオン'};
 function inputFxMode() {
   const def = INPUT_FX_MODES[DEPARTMENT_CONFIG.inputFxMode] ? DEPARTMENT_CONFIG.inputFxMode : 'fever';
   try { const v = localStorage.getItem(INPUT_FX_MODE_KEY); return INPUT_FX_MODES[v] ? v : def; } catch(e) { return def; }
@@ -5383,9 +5339,6 @@ function _syncFxSettingsUI() {
   if (fx) fx.checked = inputFxOn();
   if (l) l.textContent = inputFxOn() ? 'ON' : 'OFF';
   if (modes) { modes.style.display = inputFxOn() ? '' : 'none'; const cur = inputFxMode(); modes.querySelectorAll('button[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === cur)); }
-  const snd = document.getElementById('s-arcade-sound-row'), sc = document.getElementById('s-arcade-sound');
-  if (snd) snd.style.display = (inputFxOn() && inputFxMode() === 'arcade') ? '' : 'none';
-  if (sc) sc.checked = arcadeSoundOn();
 }
 function _fxElegant() { return inputFxMode() === 'elegant'; }
 function _fxReduce() { return !inputFxOn() || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }
@@ -5451,45 +5404,12 @@ function _inpFxNeon(cdSub, inp, added, isOT) {
   const tot = document.querySelector('.side-totals');
   if (tot) { tot.style.setProperty('--fx-neon', color); tot.classList.remove('neon-hit'); void tot.offsetWidth; setTimeout(() => { tot.classList.add('neon-hit'); setTimeout(() => tot.classList.remove('neon-hit'), 700); }, 380); }
 }
-// アーケード: ドット文字の「+0.25」がポンと出る。連打で小さな「2 HIT」。効果音は任意
-function _inpFxArcade(cdSub, inp, added, isOT) {
-  const tr = inp.closest('tr'), color = isOT ? '#ef4444' : ((tr && tr.style.getPropertyValue('--cat-color')) || '#16a34a');
-  const now = performance.now();
-  _fxCombo.n = (now - _fxCombo.t < 1300) ? _fxCombo.n + 1 : 1; _fxCombo.t = now;
-  inp.classList.remove('pix-cell'); void inp.offsetWidth; inp.classList.add('pix-cell'); setTimeout(() => inp.classList.remove('pix-cell'), 300);
-  const ir = inp.getBoundingClientRect();
-  const f = document.createElement('span'); f.className = 'fx-pix'; f.textContent = '+' + stepLabelStr(added); f.style.color = color;
-  f.style.left = (ir.left - 8) + 'px'; f.style.top = (ir.top + ir.height / 2) + 'px';
-  document.body.appendChild(f); setTimeout(() => f.remove(), 700);
-  if (_fxCombo.n >= 2) {
-    const c = document.createElement('span'); c.className = 'fx-hit'; c.textContent = `${_fxCombo.n} HIT`; c.style.color = color;
-    c.style.left = (ir.right + 6) + 'px'; c.style.top = (ir.top + ir.height / 2) + 'px';
-    document.body.appendChild(c); setTimeout(() => c.remove(), 600);
-  }
-  _arcadeBeep(isOT ? 660 : 880 + Math.min(6, _fxCombo.n) * 60, .07);
-}
-// 和風: 墨がにじむようにセルが染まり、行名の横に判子風の「済」。合計は筆文字風
-function _inpFxWafu(cdSub, inp, added, isOT) {
-  const tr = inp.closest('tr'), color = isOT ? '#7f1d1d' : ((tr && tr.style.getPropertyValue('--cat-color')) || '#1f2937');
-  inp.style.setProperty('--fx-sumi', color);
-  inp.classList.remove('sumi-cell'); void inp.offsetWidth; inp.classList.add('sumi-cell'); setTimeout(() => inp.classList.remove('sumi-cell'), 900);
-  const nameTd = tr && tr.querySelector('.td-name');
-  if (nameTd) {
-    nameTd.querySelectorAll('.fx-hanko').forEach(e => e.remove());
-    const h = document.createElement('span'); h.className = 'fx-hanko'; h.textContent = isOT ? '残' : '済';
-    nameTd.appendChild(h); setTimeout(() => h.remove(), 1000);
-  }
-  const tot = document.querySelector('.side-totals');
-  if (tot) { tot.classList.remove('fude'); void tot.offsetWidth; tot.classList.add('fude'); setTimeout(() => tot.classList.remove('fude'), 900); }
-}
 function _inpFx(cdSub, inp, added, isOT, ev) {
   if (!inp || _fxReduce()) return;
   const mode = inputFxMode();
   if (mode === 'elegant') return _inpFxElegant(cdSub, inp, added, isOT);
   if (mode === 'minimal') return _inpFxMinimal(cdSub, inp, added, isOT);
   if (mode === 'neon')    return _inpFxNeon(cdSub, inp, added, isOT);
-  if (mode === 'arcade')  return _inpFxArcade(cdSub, inp, added, isOT);
-  if (mode === 'wafu')    return _inpFxWafu(cdSub, inp, added, isOT);
   const tr = inp.closest('tr');
   const color = (tr && tr.style.getPropertyValue('--cat-color')) || '#6b7280';
   // 行の色フラッシュ ＋ 行を横切る光の帯（オーバーレイなので表のレイアウトは動かさない）
@@ -6469,8 +6389,6 @@ function _saveFx(btn) {
   if (mode === 'elegant') { once('saved-soft', 1600); if (panel) { const r = panel.getBoundingClientRect(); _fxGlitter(r.left + r.width / 2, r.top + 40, 22, r.width * .8); } return; }
   if (mode === 'minimal') return;                          // ボタンのチェックだけ
   if (mode === 'neon')    { once('saved-neon', 1200); return; }
-  if (mode === 'arcade')  { once('saved-pix', 1100); if (panel) { const b = document.createElement('div'); b.className = 'fx-pix-banner'; b.textContent = 'SAVED!'; panel.appendChild(b); setTimeout(() => b.remove(), 1100); } _arcadeBeep(1046, .09); setTimeout(() => _arcadeBeep(1318, .12), 90); return; }
-  if (mode === 'wafu')    { if (panel) { const h = document.createElement('div'); h.className = 'fx-hanko big'; h.textContent = '保存'; panel.appendChild(h); setTimeout(() => h.remove(), 1500); } return; }
   if (panel) { panel.classList.remove('saved-flash'); void panel.offsetWidth; panel.classList.add('saved-flash'); setTimeout(() => panel.classList.remove('saved-flash'), 1200); }
 }
 
