@@ -2200,7 +2200,10 @@ tr.neon-row td.td-name{animation:neonText .8s ease-out;}
 <div class="backdrop" id="task-import-modal">
   <div class="modal" style="max-width:640px;">
     <h3>Folioから取込</h3>
-    <div id="task-import-sub" style="font-size:12px;color:var(--g500);margin-bottom:10px;"></div>
+    <div id="task-import-sub" style="font-size:12px;color:var(--g500);margin-bottom:6px;"></div>
+    <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--g700);margin-bottom:10px;cursor:pointer;">
+      <input type="checkbox" id="ti-round" onchange="setFolioRound(this.checked)"> 中分類ごとの合計を 0.25h 単位に丸める<span style="color:var(--g400);font-size:11px;">（既定 OFF・この端末だけの設定）</span>
+    </label>
     <div id="task-import-body" style="font-size:12px;"></div>
     <div class="modal-btns">
       <button class="btn btn-outline" onclick="closeModal('task-import-modal')">閉じる</button>
@@ -5913,9 +5916,13 @@ function splitTaskNormalOT(start, hours, date) {
   return {normal: Math.max(0, h - ot), ot};
 }
 
-// Folio 取込は実際の工数をそのまま加算する（0.25h 単位の丸めはしない）。表示・保存に合わせて 0.01h 単位に整える
+// Folio 取込の丸め: 既定は実際の工数をそのまま（0.01h 単位）。設定で ON にすると中分類ごとの合計を 0.25h 単位に丸める（端末ごと）
+const FOLIO_ROUND_KEY = LS_NS + '__folioRound__';
+function folioRoundOn() { try { return localStorage.getItem(FOLIO_ROUND_KEY) === 'on'; } catch(e) { return false; } }
+function setFolioRound(on) { try { localStorage.setItem(FOLIO_ROUND_KEY, on ? 'on' : 'off'); } catch(e) {} if (_taskImportPlan) renderTaskImport(); }
 function _roundTaskHours(h) {
   if (!(h > 0)) return 0;
+  if (folioRoundOn()) { const step = DEPARTMENT_CONFIG.rules.roundStepHours || 0.25; return Math.max(step, Math.round(h / step) * step); }
   return Math.round(h * 100) / 100;
 }
 
@@ -6021,6 +6028,7 @@ async function openTaskImport(force) {
   const body = document.getElementById('task-import-body');
   const applyBtn = document.getElementById('btn-task-import-apply');
   document.getElementById('task-import-sub').textContent = `${date} ／ ${author}　（この日に配置された「完了」タスク）`;
+  { const rc = document.getElementById('ti-round'); if (rc) rc.checked = folioRoundOn(); }
   body.classList.remove('ti-reveal');
   applyBtn.style.display = '';
   body.innerHTML = _tiLoaderHtml();
@@ -6275,7 +6283,7 @@ function renderTaskImport() {
     const items = [];
     if (Math.abs(over) > 0.004) items.push(`実績が予定と違うタスク <b class="${over > 0 ? 't-crit' : 't-ok'}">${fh(over)}</b>（${overRows.slice(0, 4).map(x => `${escHtml(x.nm)} ${fh(x.d)}`).join('、')}${overRows.length > 4 ? ` ほか${overRows.length - 4}件` : ''}）`);
     if (Math.abs(unp) > 0.004) items.push(`時間割に未配置のタスク <b class="t-crit">${fh(unp)}</b>（${unpRows.slice(0, 4).map(x => `${escHtml(x.nm)} ${x.d.toFixed(2)}h`).join('、')}${unpRows.length > 4 ? ` ほか${unpRows.length - 4}件` : ''}）`);
-    if (Math.abs(rnd) > 0.004) items.push(`0.01h 単位の丸め ${fh(rnd)}`);
+    if (Math.abs(rnd) > 0.004) items.push(`${folioRoundOn() ? (DEPARTMENT_CONFIG.rules.roundStepHours || 0.25) + 'h' : '0.01h'} 単位の丸め ${fh(rnd)}`);
     return `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--g200);"><b>時間割との差</b>：予定どおりなら <b>${base.toFixed(2)}h</b> → 取込 <b>${(totN + totO).toFixed(2)}h</b>（<b class="${totN + totO - base > 0 ? 't-crit' : 't-ok'}">${fh(totN + totO - base)}</b>）<div style="margin-top:2px;color:var(--g600);">${items.map(x => '・' + x).join('<br>')}</div></div>`;
   })();
   body.innerHTML = `
@@ -6286,7 +6294,7 @@ function renderTaskImport() {
       <tbody>${lines.join('')}</tbody>
     </table>
     <div class="ti-summary" style="--n:${_taskImportRows.length};margin-top:12px;padding:8px 10px;background:var(--g50);border:1px solid var(--g200);border-radius:8px;">
-      <b>反映内容</b>（チェックした行の実際の工数を中分類ごとに合計）：
+      <b>反映内容</b>（チェックした行の実際の工数を中分類ごとに合計${folioRoundOn() ? `・${DEPARTMENT_CONFIG.rules.roundStepHours || 0.25}h 単位に丸め` : ''}）：
       ${plan.map(p => `${escHtml(p.cdSub)} ${escHtml(SUB_MAP[p.cdSub].label)} 通常${p.hoursNormal}${p.hoursOT ? ` / 残業${p.hoursOT}` : ''}`).join('、') || 'なし'}
       <div style="margin-top:4px;">合計 通常 <b>${totN.toFixed(2)}h</b> ／ 残業 <b>${totO.toFixed(2)}h</b>${shifted ? `<span style="margin-left:8px;color:var(--danger);font-size:11px;">※ 通常の上限 ${REGULAR_H}h を超えた ${shifted.toFixed(2)}h は残業に振り替え</span>` : ''}</div>
       ${pv ? `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--g200);"><b>予実</b>（Folio）：${pv.both ? `実績のある${pv.both}件は 予定 <b>${pv.planB.toFixed(2)}h</b> → 実績 <b>${pv.actual.toFixed(2)}h</b>（差 <b class="${pv.actual - pv.planB > 0.05 ? 't-crit' : pv.actual - pv.planB < -0.05 ? 't-ok' : ''}">${pv.actual - pv.planB >= 0 ? '+' : ''}${(pv.actual - pv.planB).toFixed(2)}h</b>）` : '予定と実績がそろった行はありません'}${pv.over ? `・予定の1.2倍超 <b class="t-crit">${pv.over}件</b>` : ''}${pv.noAct ? `・実績未入力 ${pv.noAct}件（予定工数で取込）` : ''}</div>` : ''}
