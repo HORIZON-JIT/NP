@@ -48,8 +48,9 @@ window.DEPARTMENT_CONFIG_OVERRIDE = {
   // 上部ナビの外部アプリリンク（黒板/手順書/資料検索）は生産管理課専用のため非表示。
   showAppLinks: false,
 
-  // 入力時の演出は既定で OFF（設定画面から端末ごとに ON にできる）
-  inputFxDefault: false,
+  // 入力時の演出は既定で ON・エレガント（設定画面から端末ごとに変更できる）
+  inputFxDefault: true,
+  inputFxMode: 'elegant',
 
   // 外部リンクは未設定。生産管理課のバックアップシート継承を防ぐため空に。
   links: { backupSheetUrl: '' },
