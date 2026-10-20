@@ -1,11 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
-//  法務知財部（法務・深谷さん）用 設定（/NP/houmu/ に配置）
+//  法務知財部（法務・深谷さん）用 設定（/NP/law/ に配置）
 // ═══════════════════════════════════════════════════════════════
 //  index.html は生産管理課と共通（単一ソース）。この config.js だけが
 //  この派生アプリ固有の値を上書きする。未記載の項目は生産管理課の既定値を継承。
 //
 //  Firebaseプロジェクト: nippou-legal（法務知財部と共用）。
-//  コレクションを 'dailyReports_houmu' に分けることで、知的財産室（/legal/）の
+//  コレクションを 'dailyReports_law' に分けることで、知的財産室（/legal/）の
 //  日報・マスタとは完全に別のデータとして保存する。
 //
 //  ※ カテゴリ(defaultCats)は「コレクションが空のときの初期の種」。
@@ -14,8 +14,8 @@
 // ═══════════════════════════════════════════════════════════════
 
 window.DEPARTMENT_CONFIG_OVERRIDE = {
-  deptId: 'houmu',                 // localStorageキー / マスタdoc id のプレフィックス
-  collection: 'dailyReports_houmu',// nippou-legal 内で知的財産室(dailyReports)と分ける
+  deptId: 'law',                   // localStorageキー / マスタdoc id のプレフィックス
+  collection: 'dailyReports_law',  // nippou-legal 内で知的財産室(dailyReports)と分ける
 
   branding: {
     appTitle: '日報アプリ',
