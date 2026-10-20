@@ -195,6 +195,19 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
   font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;font-weight:900;font-size:30px;line-height:1.1;letter-spacing:.02em;white-space:nowrap;
   box-shadow:6px 6px 0 #111;transform:translate(-50%,-100%);animation:megaBubble 1.7s cubic-bezier(.2,1.6,.4,1) forwards;}
 .mega-bubble b{font-size:1.35em;color:#f59e0b;-webkit-text-stroke:2px #b45309;margin-right:2px;}
+/* 太鼓風のコンボ吹き出し: 大きな数字（黄→橙、焦げ茶の太縁＋白縁）＋「コンボ!!!」 */
+.mega-bubble.taiko{color:#111;padding:6px 22px 10px 18px;border-radius:26px;display:flex;align-items:baseline;gap:4px;}
+.mega-bubble.taiko .tk-num{font-family:Inter,"Arial Black",sans-serif;font-size:1.9em;font-weight:900;font-style:italic;letter-spacing:-.02em;line-height:1;
+  background:linear-gradient(180deg,#fff7b0 0%,#ffd400 38%,#ff9800 70%,#ff5a00 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
+  -webkit-text-stroke:3px #5a2a00;paint-order:stroke fill;filter:drop-shadow(0 0 0 #fff) drop-shadow(2px 2px 0 #fff) drop-shadow(-2px -2px 0 #fff) drop-shadow(2px -2px 0 #fff) drop-shadow(-2px 2px 0 #fff);}
+.mega-bubble.taiko .tk-txt{font-size:1em;font-weight:900;color:#111;letter-spacing:.04em;}
+.mega-bubble.taiko .tk-txt i{font-style:normal;color:#f84828;}
+.mega-bubble.taiko.big .tk-num{background:linear-gradient(90deg,#ff0080,#ffd600,#00ffaa,#00aaff,#aa00ff,#ff0080);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;animation:megaHue .6s linear infinite;}
+/* 太鼓の判定「良」: 打つたびにセルの上へ */
+.mega-ryo{position:fixed;z-index:1000;pointer-events:none;transform:translate(-50%,-50%);font-family:"Zen Kaku Gothic New","Hiragino Mincho ProN","Yu Mincho",serif;font-weight:900;font-size:30px;line-height:1;
+  background:linear-gradient(180deg,#fff4a0,#ffcc00 45%,#ff8a00);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:2.5px #b3200e;paint-order:stroke fill;
+  filter:drop-shadow(0 0 6px rgba(255,190,0,.8));animation:megaRyo .5s cubic-bezier(.2,1.6,.4,1) forwards;}
+@keyframes megaRyo{0%{opacity:0;transform:translate(-50%,-30%) scale(.4);}30%{opacity:1;transform:translate(-50%,-70%) scale(1.25);}70%{opacity:1;transform:translate(-50%,-95%) scale(1);}100%{opacity:0;transform:translate(-50%,-130%) scale(1);}}
 .mega-bubble::before,.mega-bubble::after{content:'';position:absolute;left:34px;width:0;height:0;border-style:solid;}
 .mega-bubble::before{bottom:-24px;border-width:24px 14px 0 4px;border-color:#111 transparent transparent transparent;}
 .mega-bubble::after{bottom:-15px;left:38px;border-width:16px 9px 0 3px;border-color:#fff transparent transparent transparent;}
@@ -206,8 +219,8 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
 .mega-save .mega-bubble span{display:inline-block;animation:megaBounce .5s ease-in-out infinite alternate;}
 @keyframes megaSaveIn{0%{opacity:0;transform:scale(.2) rotate(-10deg);}15%{opacity:1;transform:scale(1.15) rotate(3deg);}25%{transform:scale(.95) rotate(-1deg);}33%{transform:scale(1.03);}85%{opacity:1;transform:scale(1);}100%{opacity:0;transform:scale(1.1) translateY(-20px);}}
 @keyframes megaBounce{from{transform:translateY(0);}to{transform:translateY(-6px);}}
-@media (prefers-reduced-motion:reduce){.mega-flash,.mega-shake,.table-wrap.mega-rainbow,.fx-combo.mega,.mega-bubble,.mega-save .mega-bubble,.mega-save .mega-bubble span{animation:none!important;}.mega-flash{display:none;}}
-@media print{.mega-flash,.mega-bubble,.mega-save{display:none!important;}}
+@media (prefers-reduced-motion:reduce){.mega-ryo,.mega-flash,.mega-shake,.table-wrap.mega-rainbow,.fx-combo.mega,.mega-bubble,.mega-save .mega-bubble,.mega-save .mega-bubble span{animation:none!important;}.mega-flash{display:none;}}
+@media print{.mega-ryo,.mega-flash,.mega-bubble,.mega-save{display:none!important;}}
 /* ── 右パネル合計ストリップ ── */
 .side-totals{display:flex;gap:0;width:100%;border-radius:8px;overflow:hidden;border:1px solid var(--g200);background:var(--panel);}
 .side-totals .st-cell{flex:1;text-align:center;padding:11px 6px 9px;display:flex;flex-direction:column;gap:2px;}
@@ -2299,7 +2312,7 @@ tr.neon-row td.td-name{animation:neonText .8s ease-out;}
       </label>
       <div id="s-input-fx-modes" class="fx-modes">
         <button type="button" data-mode="fever" onclick="setInputFxMode('fever')"><b>フィーバー</b><small>火花・コンボ・紙吹雪で派手に</small></button>
-        <button type="button" data-mode="mega" onclick="setInputFxMode('mega')"><b>メガフィーバー</b><small>画面ごと光って揺れる。10コンボごとに「ドン！」</small></button>
+        <button type="button" data-mode="mega" onclick="setInputFxMode('mega')"><b>メガフィーバー</b><small>画面ごと光って揺れる。打つたび「良」、10コンボごとに吹き出し</small></button>
         <button type="button" data-mode="elegant" onclick="setInputFxMode('elegant')"><b>エレガント</b><small>柔らかな光と小さな動きで上品に</small></button>
         <button type="button" data-mode="minimal" onclick="setInputFxMode('minimal')"><b>ミニマル</b><small>入力欄が一度だけ淡く明滅するだけ</small></button>
         <button type="button" data-mode="neon" onclick="setInputFxMode('neon')"><b>ネオン</b><small>セルと行が発光し、合計へ光の軌跡</small></button>
@@ -5455,8 +5468,8 @@ function _megaFlash(x, y, color) {
   document.body.appendChild(f); setTimeout(() => f.remove(), 360);
   return true;
 }
-function _megaBubble(x, y, html) {
-  const b = document.createElement('div'); b.className = 'mega-bubble'; b.innerHTML = html;
+function _megaBubble(x, y, html, cls) {
+  const b = document.createElement('div'); b.className = 'mega-bubble' + (cls ? ' ' + cls : ''); b.innerHTML = html;
   const w = Math.min(window.innerWidth - 20, 420);
   b.style.left = Math.max(w / 2 + 10, Math.min(window.innerWidth - w / 2 - 10, x + 140)) + 'px'; b.style.top = Math.max(170, y) + 'px';
   document.body.appendChild(b); setTimeout(() => b.remove(), 1750);
@@ -5513,7 +5526,7 @@ function _inpFx(cdSub, inp, added, isOT, ev) {
       sp.style.animationDelay = (Math.random() * 0.08) + 's';
       document.body.appendChild(sp); setTimeout(() => sp.remove(), 950);
     }
-    if (combo >= 2) {
+    if (combo >= 2 && !(mega && combo % 10 === 0)) {   // メガの10コンボごとは吹き出しが主役
       const cb = document.createElement('div'); cb.className = 'fx-combo' + (mega ? ' mega' : '');
       cb.style.left = (px + 70) + 'px'; cb.style.top = (py - 10) + 'px'; cb.style.fontSize = Math.min(mega ? 96 : 64, (mega ? 34 : 26) + combo * 5) + 'px'; cb.style.setProperty('--cat-color', fxColor);
       cb.innerHTML = mega ? `×${combo}<small>${combo >= 20 ? 'ULTRA!!!' : combo >= 10 ? 'MEGA FEVER!!' : combo >= 5 ? 'FEVER!' : 'COMBO'}</small>`
@@ -5525,7 +5538,10 @@ function _inpFx(cdSub, inp, added, isOT, ev) {
       const card = tr && tr.closest('.submit-card');
       if (card) { card.classList.remove('mega-shake'); void card.offsetWidth; card.classList.add('mega-shake'); setTimeout(() => card.classList.remove('mega-shake'), 340); }
       if (twrap) { twrap.classList.remove('mega-rainbow'); void twrap.offsetWidth; twrap.classList.add('mega-rainbow'); setTimeout(() => twrap.classList.remove('mega-rainbow'), 720); }
-      if (combo % 10 === 0) _megaBubble(px, py - 30, `<b>${combo}</b>コンボだドン！！！`);
+      // 太鼓の判定「良」を入力欄の上に。10コンボごとに「10コンボ!!!」の吹き出し（100以上は虹色の数字）
+      { const ir1 = inp.getBoundingClientRect(), ry = document.createElement('span'); ry.className = 'mega-ryo'; ry.textContent = '良';
+        ry.style.left = (ir1.left + ir1.width / 2) + 'px'; ry.style.top = (ir1.top - 6) + 'px'; document.body.appendChild(ry); setTimeout(() => ry.remove(), 520); }
+      if (combo % 10 === 0) _megaBubble(px, py - 30, `<span class="tk-num">${combo}</span><span class="tk-txt">コンボ<i>!!!</i></span>`, 'taiko' + (combo >= 100 ? ' big' : ''));
     }
   }
   // ドーナツが光る
