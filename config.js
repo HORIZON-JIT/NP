@@ -8,5 +8,10 @@ window.DEPARTMENT_CONFIG_OVERRIDE = {
   taskSheetGasUrl: 'https://script.google.com/a/macros/horizon.co.jp/s/AKfycbwxhtGBpHgb5Iz9FLydd5oxwtYgCQqMEbM_KudCxNTZAo61xL0SLJfokqDE-gW2Ze6w/exec',
   // 月次AI分析用GAS（gas/ai-monthly-analyzer.gs をデプロイしたもの）。生産管理課だけで使う。
   // URL を入れると月次ダッシュボードに「AI分析」カードが出る。空なら非表示。
-  aiAnalysisGasUrl: 'https://script.google.com/a/macros/horizon.co.jp/s/AKfycbx_vALcuIZVtAlN5oX4bFbBmcstz-M2HB45UXpSzUdRHPSBHRjeLCBshGbPZFchQcfj/exec'
+  aiAnalysisGasUrl: 'https://script.google.com/a/macros/horizon.co.jp/s/AKfycbx_vALcuIZVtAlN5oX4bFbBmcstz-M2HB45UXpSzUdRHPSBHRjeLCBshGbPZFchQcfj/exec',
+  // 入力時の演出: 生産管理課の既定は ON・メガフィーバー・効果音（ドン・カッ）あり
+  // （設定画面から端末ごとに変更でき、変更した端末ではその設定が優先される）
+  inputFxDefault: true,
+  inputFxMode: 'mega',
+  taikoSoundDefault: true
 };
