@@ -2357,6 +2357,16 @@ tr.neon-row td.td-name{animation:neonText .8s ease-out;}
         <button class="btn btn-sm btn-outline" onclick="cancelNewAuthor()">×</button>
       </div>
     </div>
+    <div class="modal-sec" id="folio-src-section" style="display:none;">
+      <h4>Folio の読込元</h4>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;margin-bottom:4px;cursor:pointer;"><input type="radio" name="folio-src" value="sheet" onchange="setFolioSource('sheet')"> v1（スプレッドシート・GAS経由）</label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;"><input type="radio" name="folio-src" value="firebase" onchange="setFolioSource('firebase')"> v2（Firebase）</label>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+        <button type="button" class="btn btn-outline btn-sm" style="white-space:nowrap;flex:none;" onclick="testFolioV2()">v2 の接続テスト</button>
+        <span id="folio-src-status" style="font-size:11px;color:var(--g500);line-height:1.5;"></span>
+      </div>
+      <div style="font-size:11px;color:var(--g500);margin-top:6px;line-height:1.6;">Folio の取込・早見表・ダッシュボードの Folio 実績をどちらから読むか。この端末だけの設定です。</div>
+    </div>
     <div class="modal-sec">
       <h4>入力時の演出</h4>
       <label class="fx-switch">
@@ -3370,6 +3380,7 @@ function openSettings() {
   document.getElementById('preload-status').textContent='';
   document.getElementById('preload-timer').textContent='';
   cancelNewAuthor();
+  _syncFolioSettingsUI();
   _syncFxSettingsUI();
   document.getElementById('settings-modal').classList.add('open');
 }
@@ -6020,7 +6031,241 @@ async function loadDay_and_render() {
 // ═══════════════════════════════════════════
 //  タスク実績（タスク管理アプリ）から取込
 // ═══════════════════════════════════════════
-function taskImportUrl() { return DEPARTMENT_CONFIG.taskSheetGasUrl || ''; }
+// ═══════════════════════════════════════════
+//  Folio 連携の窓口（v1: スプレッドシート＋GAS ／ v2: Firebase）
+//  画面側はすべて folioCall({action, ...}) を通す。v2 では Firestore から GAS と同じ形の応答を組み立てる。
+//  部署設定 folio = {source:'sheet'|'firebase', firebase:{...}, mapCollection, mapDoc}
+//  端末ごとの切替（試験用）は設定画面の「Folio の読込元」で行い、localStorage に保存する。
+// ═══════════════════════════════════════════
+const FOLIO_SOURCE_KEY = LS_NS + '__folioSource__';
+function folioV2Config() { const f = DEPARTMENT_CONFIG.folio; return f && f.firebase && f.firebase.projectId ? f : null; }
+function folioSource() {
+  const f = folioV2Config();
+  if (!f) return 'sheet';
+  let v = null; try { v = localStorage.getItem(FOLIO_SOURCE_KEY); } catch(e) {}
+  const src = v === 'firebase' || v === 'sheet' ? v : (f.source === 'firebase' ? 'firebase' : 'sheet');
+  return src === 'sheet' && !DEPARTMENT_CONFIG.taskSheetGasUrl ? 'firebase' : src;
+}
+function setFolioSource(v) {
+  try { localStorage.setItem(FOLIO_SOURCE_KEY, v === 'firebase' ? 'firebase' : 'sheet'); } catch(e) {}
+  _folioCache.clear(); _folioRangeCache.clear(); _taskStatsCache.clear();
+  _trData = null; _fv2.tasks.clear(); _fv2.map = null; _fv2.master = null;
+  _syncFolioSettingsUI();
+  updateTaskImportButton();
+}
+// Folio 連携が使えるか（ボタン・カードの表示判定）。v1 は GAS の URL、v2 は Firebase 設定があれば有効
+function taskImportUrl() { return folioSource() === 'firebase' ? 'firebase' : (DEPARTMENT_CONFIG.taskSheetGasUrl || ''); }
+function folioCall(params) {
+  if (folioSource() === 'firebase') return _fv2Call(params);
+  return _gasJsonpTag(DEPARTMENT_CONFIG.taskSheetGasUrl, params);
+}
+
+// ── v2（Firebase）──
+const _fv2 = {app: null, auth: null, db: null, user: null, ready: null, tasks: new Map(), map: null, master: null, mapErr: null};
+const FV2_TTL = 60 * 1000;
+function _fv2Init() {
+  if (_fv2.app) return _fv2;
+  const f = folioV2Config();
+  if (!f) throw new Error('Folio v2 の設定がありません');
+  _fv2.app = firebase.initializeApp(f.firebase, 'folio-v2');
+  _fv2.auth = _fv2.app.auth(); _fv2.db = _fv2.app.firestore();
+  return _fv2;
+}
+// ログイン状態を確認。未ログインなら、ユーザー操作の直後に限り Google ログインを出す（ポップアップのブロック回避）
+async function _fv2Ready() {
+  _fv2Init();
+  if (_fv2.user) return _fv2;
+  if (!_fv2.ready) _fv2.ready = new Promise(res => { const off = _fv2.auth.onAuthStateChanged(u => { off(); res(u); }); setTimeout(() => res(null), 8000); });
+  const u = await _fv2.ready;
+  if (u && firebaseEmailAllowed(u.email)) { _fv2.user = u; return _fv2; }
+  _fv2.ready = null;
+  const active = navigator.userActivation ? navigator.userActivation.isActive : false;
+  if (!active) { const e = new Error('Folio v2 へのログインが必要です（入力タブの「Folioから取込」を押すとログインできます）'); e.code = 'folio-login'; throw e; }
+  return folioV2Login();
+}
+async function folioV2Login() {
+  _fv2Init();
+  const prov = new firebase.auth.GoogleAuthProvider();
+  prov.setCustomParameters({hd: 'horizon.co.jp', prompt: 'select_account'});
+  const cred = await _fv2.auth.signInWithPopup(prov);
+  if (!cred.user || !firebaseEmailAllowed(cred.user.email)) { await _fv2.auth.signOut(); throw new Error('会社のGoogleアカウント（@horizon.co.jp）でログインしてください'); }
+  _fv2.user = cred.user; _fv2.ready = null;
+  _syncFolioSettingsUI();
+  return _fv2;
+}
+const _fv2H = m => (Number(m) > 0 ? Math.round(Number(m) / 60 * 10000) / 10000 : 0);   // 分 → 時間
+// 完了タスクを作業日（時間割の配置日。未配置なら完了日）ごとに、v1 の GAS と同じ形でまとめる
+async function _fv2Lists(start, end, nocache) {
+  const key = start + '|' + end, hit = _fv2.tasks.get(key);
+  if (!nocache && hit && Date.now() - hit.t < FV2_TTL) return hit.p;
+  const p = (async () => {
+    const {db} = await _fv2Ready();
+    const col = db.collection('tasks');
+    const [a, b] = await Promise.all([
+      col.where('day', '>=', start).where('day', '<=', end).get(),
+      col.where('doneDate', '>=', start).where('doneDate', '<=', end).get()
+    ]);
+    const seen = new Set(), byDate = {};
+    [...a.docs, ...b.docs].forEach(doc => {
+      if (seen.has(doc.id)) return; seen.add(doc.id);
+      const t = doc.data() || {};
+      if (String(t.status || '').trim() !== '完了') return;
+      const st = String(t.start || '').trim();
+      const sd = String(t.day || st.slice(0, 10) || '').trim(), dd = String(t.doneDate || '').trim();
+      const wd = sd || dd;
+      if (!wd || wd < start || wd > end) return;
+      const plan = Number(t.minutes) > 0 ? _fv2H(t.minutes) : null, act = Number(t.actual) > 0;
+      (byDate[wd] = byDate[wd] || []).push({
+        e: String(t.email || '').trim().toLowerCase(), n: String(t.ownerName || '').trim(),
+        id: String(t.taskId || '').trim(), nm: String(t.taskName || '').trim(),
+        h: act ? _fv2H(t.actual) : (plan || 0), p: plan, ac: act,
+        s: /^\d{4}-\d{2}-\d{2} \d{1,2}:\d{2}/.test(st) ? st.slice(11, 16).padStart(5, '0') : null,
+        sd, dd, note: String(t.note || '').trim()
+      });
+    });
+    return byDate;
+  })();
+  _fv2.tasks.set(key, {t: Date.now(), p});
+  p.catch(() => { if (_fv2.tasks.get(key)?.p === p) _fv2.tasks.delete(key); });
+  return p;
+}
+function _fv2Dates(start, end, max) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start || '') || !/^\d{4}-\d{2}-\d{2}$/.test(end || '') || start > end) throw new Error('start/end は YYYY-MM-DD で指定してください');
+  const out = eachDateInRange(start, end);
+  if (out.length > max) throw new Error(`期間は${max}日以内で指定してください`);
+  return out;
+}
+// タスクID → 日報中分類CD（v2 は nippouMap コレクションの1ドキュメントに {タスクID: 中分類CD} で保存）
+function _fv2MapRef() { const f = folioV2Config(); return _fv2.db.collection(f.mapCollection || 'nippouMap').doc(f.mapDoc || 'taskCd'); }
+async function _fv2Map(nocache) {
+  if (!nocache && _fv2.map && Date.now() - _fv2.map.t < FV2_TTL) return _fv2.map.m;
+  await _fv2Ready();
+  let m = {};
+  try { const snap = await _fv2MapRef().get(); m = snap.exists ? (snap.data() || {}) : {}; _fv2.mapErr = null; }
+  catch(e) { _fv2.mapErr = e; }   // ルール未設定などで読めない場合は対応なしとして続ける
+  // 初回: v2 側が空で v1 の GAS があれば、v1 シートの対応を引き継ぐ（1回だけ）
+  if (!_fv2.mapErr && !Object.keys(m).length && DEPARTMENT_CONFIG.taskSheetGasUrl) {
+    try {
+      const d = await _gasJsonpTag(DEPARTMENT_CONFIG.taskSheetGasUrl, {action: 'getTaskMaster'});
+      const mv = {}; ((d && d.tasks) || []).forEach(t => { if (t.taskId && t.cdSub) mv[String(t.taskId)] = String(t.cdSub); });
+      if (Object.keys(mv).length) { await _fv2MapRef().set(mv, {merge: true}); m = mv; }
+    } catch(e) { console.warn('[Folio v2] v1 の中分類対応の引き継ぎに失敗:', e.message); }
+  }
+  _fv2.map = {t: Date.now(), m};
+  return m;
+}
+async function _fv2Master(nocache) {
+  if (!nocache && _fv2.master && Date.now() - _fv2.master.t < FV2_TTL) return _fv2.master.list;
+  const {db} = await _fv2Ready();
+  const snap = await db.collection('masters').doc('taskMaster').get();
+  const list = snap.exists && Array.isArray((snap.data() || {}).list) ? snap.data().list : [];
+  _fv2.master = {t: Date.now(), list};
+  return list;
+}
+async function _fv2Call(p) {
+  const t0 = Date.now(), a = p.action || 'getCompletedTasks', nc = p.nocache === '1';
+  const done = o => Object.assign({ok: true, ms: Date.now() - t0, cached: false, src: 'firebase'}, o);
+  try {
+    if (a === 'test') { await _fv2Ready(); return done({}); }
+    if (a === 'getCompletedTasks') {
+      const name = String(p.name || '').trim(), email = String(p.email || '').trim().toLowerCase();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(p.date || '')) throw new Error('date は YYYY-MM-DD で指定してください');
+      const [byDate, tm] = await Promise.all([_fv2Lists(p.date, p.date, nc), _fv2Map(nc)]);
+      const rows = (byDate[p.date] || []).filter(x => (email && x.e === email) || (name && x.n.indexOf(name) === 0)).map(x => ({
+        taskId: x.id, taskName: x.nm, cdSub: tm[x.id] || null, hours: x.h, start: x.s, startDate: x.sd, doneDate: x.dd, note: x.note,
+        plan: x.p, actual: x.ac ? x.h : null}));
+      return done({rows});
+    }
+    if (a === 'getRangeHours') {
+      const dates = _fv2Dates(p.start, p.end, 62), byDate = await _fv2Lists(p.start, p.end, nc), out = {};
+      dates.forEach(d => { const m = {}; (byDate[d] || []).forEach(r => { if (r.s) m[r.n] = Math.round(((m[r.n] || 0) + r.h) * 10000) / 10000; }); out[d] = m; });
+      return done({byDate: out});
+    }
+    if (a === 'getPersonTasks') {
+      const name = String(p.name || '').trim(); if (!name) throw new Error('name を指定してください');
+      const dates = _fv2Dates(p.start, p.end, 62), byDate = await _fv2Lists(p.start, p.end, nc), agg = {};
+      dates.forEach(d => (byDate[d] || []).forEach(x => {
+        if (x.n.indexOf(name) !== 0) return;
+        const g = agg[x.id] || (agg[x.id] = {taskId: x.id, name: x.nm, n: 0, hours: 0, unplaced: 0, planSum: 0, planN: 0, actualSum: 0, actN: 0, overN: 0});
+        g.n++; g.hours = Math.round((g.hours + x.h) * 10000) / 10000;
+        if (!x.s) g.unplaced++;
+        if (x.p != null) { g.planSum = Math.round((g.planSum + x.p) * 10000) / 10000; g.planN++; }
+        if (x.ac) { g.actualSum = Math.round((g.actualSum + x.h) * 10000) / 10000; g.actN++; if (x.p != null && x.h > x.p) g.overN++; }
+      }));
+      return done({tasks: Object.values(agg).sort((x, y) => y.hours - x.hours)});
+    }
+    if (a === 'getTaskStats') {
+      const days = Math.max(1, Math.min(120, Math.floor(Number(p.days) || 90))), end = todayStr();
+      const t = new Date(end + 'T00:00:00'); t.setDate(t.getDate() - days + 1);
+      const start = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
+      const [byDate, master] = await Promise.all([_fv2Lists(start, end, nc), _fv2Master(nc)]);
+      const std = {}; master.forEach(m => { std[String(m.id)] = {std: Number(m.std) > 0 ? _fv2H(m.std) : null, name: m.name || ''}; });
+      const agg = {};
+      Object.values(byDate).forEach(l => l.forEach(r => {
+        if (!r.ac) return;
+        const g = agg[r.id] || (agg[r.id] = {taskId: r.id, name: r.nm, n: 0, actSum: 0, planSum: 0, planN: 0});
+        g.n++; g.actSum += r.h; if (r.p != null) { g.planSum += r.p; g.planN++; }
+      }));
+      const tasks = Object.values(agg).map(g => { const m = std[g.taskId] || {}; return {taskId: g.taskId, name: m.name || g.name, n: g.n, std: m.std == null ? null : m.std,
+        planAvg: g.planN ? Math.round(g.planSum / g.planN * 1000) / 1000 : null, actAvg: Math.round(g.actSum / g.n * 1000) / 1000, actSum: Math.round(g.actSum * 100) / 100}; });
+      return done({tasks, start, end});
+    }
+    if (a === 'getTaskMaster') {
+      const [master, tm] = await Promise.all([_fv2Master(nc), _fv2Map(nc)]);
+      const seen = new Set(), tasks = [];
+      master.forEach(m => { const id = String(m.id || '').trim(); if (!id || seen.has(id)) return; seen.add(id);
+        tasks.push({taskId: id, name: String(m.name || ''), std: Number(m.std) > 0 ? _fv2H(m.std) : null, cdSub: tm[id] || ''}); });
+      return done({tasks, mapError: _fv2.mapErr ? String(_fv2.mapErr.code || _fv2.mapErr.message) : null});
+    }
+    if (a === 'setTaskCd' || a === 'setTaskCds') {
+      const overwrite = a === 'setTaskCd';
+      const map = overwrite ? {[String(p.taskId || '').trim()]: String(p.cd || '').trim()} : JSON.parse(p.map || '{}');
+      const keys = Object.keys(map);
+      if (!keys.length) throw new Error('taskId と cd を指定してください');
+      keys.forEach(k => { if (!k) throw new Error('taskId が空です'); if (!/^[A-Za-z0-9α-ω]{1,6}$/.test(String(map[k]))) throw new Error('cd の形式が不正です: ' + map[k]); });
+      const [master, cur] = await Promise.all([_fv2Master(true), _fv2Map(true)]);
+      if (_fv2.mapErr) throw new Error('Folio v2 の対応表（nippouMap）に書き込めません。Folio 側のセキュリティルールを確認してください（' + (_fv2.mapErr.code || _fv2.mapErr.message) + '）');
+      const ids = new Set(master.map(m => String(m.id || '').trim()));
+      const notFound = keys.filter(k => !ids.has(k));
+      if (overwrite && notFound.length) throw new Error('タスクマスタに存在しないタスクIDです: ' + notFound.join(', '));
+      const w = {}; let skipped = 0;
+      keys.forEach(k => { if (notFound.includes(k)) return; if (cur[k] && !overwrite) { skipped++; return; } w[k] = String(map[k]).trim(); });
+      if (Object.keys(w).length) await _fv2MapRef().set(w, {merge: true});
+      _fv2.map = null;
+      return done({written: Object.keys(w).length, skippedExisting: skipped, notFound});
+    }
+    return {ok: false, error: 'unknown action: ' + a};
+  } catch(e) {
+    return {ok: false, error: String(e && e.message || e), code: e && e.code};
+  }
+}
+// 設定画面: Folio の読込元
+function _syncFolioSettingsUI() {
+  const sec = document.getElementById('folio-src-section');
+  if (!sec) return;
+  const f = folioV2Config();
+  sec.style.display = f ? '' : 'none';
+  if (!f) return;
+  const src = folioSource();
+  sec.querySelectorAll('input[name="folio-src"]').forEach(r => { r.checked = r.value === src; r.disabled = r.value === 'sheet' && !DEPARTMENT_CONFIG.taskSheetGasUrl; });
+  const st = document.getElementById('folio-src-status');
+  if (st) st.textContent = src === 'firebase'
+    ? (_fv2.user ? `Folio v2（${f.firebase.projectId}）に ${_fv2.user.email} でログイン中` : `Folio v2（${f.firebase.projectId}）から読み込みます。初回は Google ログインが必要です`)
+    : 'Folio v1（スプレッドシート）から GAS 経由で読み込みます';
+}
+async function testFolioV2() {
+  const st = document.getElementById('folio-src-status');
+  if (st) st.textContent = '接続を確認中…';
+  try {
+    await (_fv2.user ? _fv2Ready() : folioV2Login());
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    const start = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const [byDate, master, tm] = await Promise.all([_fv2Lists(start, todayStr(), true), _fv2Master(true), _fv2Map(true)]);
+    const n = Object.values(byDate).reduce((t, l) => t + l.length, 0);
+    if (st) st.textContent = `接続OK：直近30日の完了タスク ${n}件／タスクマスタ ${master.length}件／中分類の対応 ${Object.keys(tm).length}件` +
+      (_fv2.mapErr ? `（対応表は読めません: ${_fv2.mapErr.code || _fv2.mapErr.message}）` : '');
+  } catch(e) { if (st) st.textContent = '接続できませんでした: ' + (e.code || e.message); }
+}
 function updateTaskImportButton() {
   const btn = document.getElementById('btn-task-import');
   if (btn) btn.style.display = taskImportUrl() ? '' : 'none';
@@ -6042,7 +6287,7 @@ async function openTaskRef(force) {
   const t0 = Date.now();
   let d;
   try {
-    d = await _gasJsonpTag(url, force ? {action:'getTaskMaster', nocache:'1'} : {action:'getTaskMaster'});
+    d = await folioCall(force ? {action:'getTaskMaster', nocache:'1'} : {action:'getTaskMaster'});
     if (!d || !d.ok) throw new Error((d && d.error) || '取得に失敗しました');
   } catch(e) {
     const msg = String(e && e.message || e);
@@ -6120,7 +6365,7 @@ async function exportTaskRefXlsx() {
   const btn = document.getElementById('tr-xlsx');
   if (btn) { btn.disabled = true; btn.textContent = '出力中...'; }
   try {
-    const d = await _gasJsonpTag(taskImportUrl(), {action:'getTaskMaster', nocache:'1'});
+    const d = await folioCall({action:'getTaskMaster', nocache:'1'});
     if (!d || !d.ok) throw new Error((d && d.error) || '取得に失敗しました');
     _trData = (d.tasks || []).map(t => ({taskId: String(t.taskId || ''), name: String(t.name || ''), std: (t.std == null ? null : Number(t.std)), cdSub: String(t.cdSub || '').trim()}))
       .sort((x, y) => _trIdCmp(x.taskId, y.taskId));
@@ -6175,7 +6420,7 @@ async function registerTaskRefCd(i) {
   if (cd === t.cdSub) { editTaskRefCd(null); return; }
   if (btn) { btn.disabled = true; btn.textContent = '保存中...'; }
   try {
-    const d = await _gasJsonpTag(taskImportUrl(), {action:'setTaskCd', taskId: t.taskId, cd});
+    const d = await folioCall({action:'setTaskCd', taskId: t.taskId, cd});
     if (!d || !d.ok) throw new Error((d && d.error) || '書き込みに失敗しました');
     const prev = t.cdSub;
     t.cdSub = cd;
@@ -6229,11 +6474,11 @@ function fetchFolioTasks(date, author, force) {
   const t0 = performance.now();
   const params = {action:'getCompletedTasks', date, name:author};
   if (force) params.nocache = '1';   // 「最新に更新」はGAS側キャッシュも使わずシートを読み直す
-  const call = () => _gasJsonpTag(taskImportUrl(), params);
+  const call = () => folioCall(params);
   const promise = call()
     .catch(() => new Promise(r => setTimeout(r, 300)).then(call))   // 1回だけ再試行
     .then(d => {
-      if (!d || !d.ok) throw new Error((d && d.error) || 'GASがエラーを返しました');
+      if (!d || !d.ok) throw new Error((d && d.error) || 'Folioがエラーを返しました');
       d._clientMs = Math.round(performance.now() - t0);
       return d;
     });
@@ -6248,7 +6493,7 @@ function prefetchFolioTasks() {
   if (!taskImportUrl() || !getAuthor()) return;
   if (Date.now() - _folioWarmAt < 5 * 60 * 1000) return;
   _folioWarmAt = Date.now();
-  _gasJsonpTag(taskImportUrl(), {action:'test'}).catch(() => { _folioWarmAt = 0; });
+  folioCall({action:'test'}).catch(() => { _folioWarmAt = 0; });
 }
 
 // ── Folioから取込: 抽出アニメーション ──
@@ -6422,7 +6667,7 @@ async function _saveNewTasks() {
   if (btn) { btn.disabled = true; btn.textContent = '登録中…'; }
   let note;
   try {
-    const d = await _gasJsonpTag(taskImportUrl(), {action:'setTaskCds', map: JSON.stringify(map)});
+    const d = await folioCall({action:'setTaskCds', map: JSON.stringify(map)});
     if (!d || !d.ok) throw new Error((d && d.error) || '書き込みに失敗しました');
     const nf = d.notFound || [];
     note = `${Object.keys(map).length - nf.length}件をタスクマスタに登録しました。` + (nf.length ? `（タスクマスタに無いID: ${nf.join(', ')} は今回の取込にだけ反映）` : '');
@@ -6465,7 +6710,7 @@ async function registerTaskCd(i) {
   if (btn) { btn.disabled = true; btn.textContent = '登録中...'; }
   let msg;
   try {
-    const d = await _gasJsonpTag(taskImportUrl(), {action:'setTaskCd', taskId, cd});
+    const d = await folioCall({action:'setTaskCd', taskId, cd});
     if (!d || !d.ok) throw new Error((d && d.error) || '書き込みに失敗しました');
     msg = `${taskId} → ${cd} をタスクマスタに登録しました。`;
   } catch(e) {
@@ -6486,7 +6731,7 @@ function _showFolioTiming(d) {
   const sub = document.getElementById('task-import-sub');
   if (!sub || !d) return;
   const src = d.cached ? '（キャッシュ）' : (d.t ? `（シート読込 ${((d.t.open + d.t.read)/1000).toFixed(1)}秒）` : '');
-  const gas = (d.ms != null) ? ` / GAS処理 ${(d.ms/1000).toFixed(1)}秒${src}` : '';
+  const gas = (d.ms != null) ? (d.src === 'firebase' ? ` / Folio v2（Firebase） ${(d.ms/1000).toFixed(1)}秒` : ` / GAS処理 ${(d.ms/1000).toFixed(1)}秒${src}`) : '';
   sub.innerHTML = escHtml(sub.textContent.replace(/\s*［取得.*$/, '')) +
     ` <span style="color:var(--g400);font-size:11px;">［取得 ${(d._clientMs/1000).toFixed(1)}秒${gas}］</span>` +
     ` <a href="#" onclick="refreshTaskImport();return false;" style="font-size:11px;color:var(--primary);">最新に更新</a>`;
@@ -7117,7 +7362,7 @@ function loadFolioRange(start, end) {
   const key = `${start}|${end}`;
   const hit = _folioRangeCache.get(key);
   if (hit && Date.now() - hit.t < 5 * 60 * 1000) return hit.promise;
-  const promise = _gasJsonpTag(taskImportUrl(), {action:'getRangeHours', start, end}).then(d => {
+  const promise = folioCall({action:'getRangeHours', start, end}).then(d => {
     if (!d || !d.ok) throw new Error((d && d.error) || 'Folioデータを取得できませんでした');
     return d.byDate || {};
   });
@@ -9068,7 +9313,7 @@ async function renderPersonDetail() {
   loadFolioRange(startDate, end).then(f => { if (_personCtx === ctx) draw(f); }).catch(() => {});
   tasksEl.innerHTML = '<p class="dx-empty">Folioのデータを読み込み中…</p>';
   try {
-    const d = await _gasJsonpTag(taskImportUrl(), {action:'getPersonTasks', name: ctx.a, start: startDate, end});
+    const d = await folioCall({action:'getPersonTasks', name: ctx.a, start: startDate, end});
     if (_personCtx !== ctx) return;
     if (!d || !d.ok) throw new Error((d && d.error) || '取得に失敗しました');
     const ts = d.tasks || [];
@@ -9141,7 +9386,7 @@ async function loadTaskStats(force) {
   const days = Number((document.getElementById('task-stats-days') || {}).value || 90);
   let hit = _taskStatsCache.get(days);
   if (force || !hit || Date.now() - hit.t > 10 * 60 * 1000) {
-    hit = {t: Date.now(), promise: _gasJsonpTag(taskImportUrl(), {action:'getTaskStats', days}).then(d => {
+    hit = {t: Date.now(), promise: folioCall({action:'getTaskStats', days}).then(d => {
       if (!d || !d.ok) throw new Error((d && d.error) || '取得に失敗しました');
       return d;
     })};
