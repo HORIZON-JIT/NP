@@ -6049,7 +6049,7 @@ function folioSource() {
 function setFolioSource(v) {
   try { localStorage.setItem(FOLIO_SOURCE_KEY, v === 'firebase' ? 'firebase' : 'sheet'); } catch(e) {}
   _folioCache.clear(); _folioRangeCache.clear(); _taskStatsCache.clear();
-  _trData = null; _fv2.tasks.clear(); _fv2.map = null; _fv2.master = null;
+  _trData = null; _fv2.days.clear(); _fv2.unplaced.clear(); _fv2.map = null; _fv2.master = null;
   _syncFolioSettingsUI();
   updateTaskImportButton();
 }
@@ -6061,7 +6061,7 @@ function folioCall(params) {
 }
 
 // ── v2（Firebase）──
-const _fv2 = {app: null, auth: null, db: null, user: null, ready: null, tasks: new Map(), map: null, master: null, mapErr: null};
+const _fv2 = {app: null, auth: null, db: null, user: null, ready: null, days: new Map(), inflight: new Map(), unplaced: new Map(), map: null, master: null, mapErr: null};
 const FV2_TTL = 60 * 1000;
 function _fv2Init() {
   if (_fv2.app) return _fv2;
@@ -6094,40 +6094,83 @@ async function folioV2Login() {
   return _fv2;
 }
 const _fv2H = m => (Number(m) > 0 ? Math.round(Number(m) / 60 * 10000) / 10000 : 0);   // 分 → 時間
-// 完了タスクを作業日（時間割の配置日。未配置なら完了日）ごとに、v1 の GAS と同じ形でまとめる
+// ── 読み取り回数の節約 ──
+// Firestore の無料枠（1日5万回の読み取り）を使い切らないよう、完了タスクを「日ごと」に端末へ保存して使い回す。
+//  ・期間の読み込みは配置日（day）の範囲クエリ1回だけ（完了日での二重読みはしない）
+//  ・保存期間は日付の古さで変える: 昨日以降 2分／2〜7日前 6時間／それより前 7日（「最新に更新」で読み直し）
+//  ・時間割に未配置のタスク（day が空）は「Folioから取込」の1日分だけ完了日で読む
+const FV2_LS = () => `fv2:${(folioV2Config() || {firebase: {}}).firebase.projectId}:`;
+function _fv2Age(d) { const t = new Date(todayStr() + 'T00:00:00'), x = new Date(d + 'T00:00:00'); return Math.round((t - x) / 86400000); }
+function _fv2Ttl(d) { const a = _fv2Age(d); return a <= 1 ? 2 * 60 * 1000 : a <= 7 ? 6 * 3600 * 1000 : 7 * 86400 * 1000; }
+function _fv2DayGet(d) {
+  const m = _fv2.days.get(d);
+  if (m) return m;
+  try { const v = JSON.parse(localStorage.getItem(FV2_LS() + 'd:' + d) || 'null'); if (v) { _fv2.days.set(d, v); return v; } } catch(e) {}
+  return null;
+}
+function _fv2DayPut(d, list) {
+  const v = {t: Date.now(), l: list};
+  _fv2.days.set(d, v);
+  try { localStorage.setItem(FV2_LS() + 'd:' + d, JSON.stringify(v)); }
+  catch(e) { _fv2Prune(30); try { localStorage.setItem(FV2_LS() + 'd:' + d, JSON.stringify(v)); } catch(e2) {} }   // 容量不足なら古い日を消して再試行
+}
+function _fv2Prune(keepDays) {
+  try {
+    const pre = FV2_LS() + 'd:', lim = keepDays == null ? 130 : keepDays;
+    Object.keys(localStorage).forEach(k => { if (k.startsWith(pre) && _fv2Age(k.slice(pre.length)) > lim) localStorage.removeItem(k); });
+  } catch(e) {}
+}
+// 読み取り件数（この端末・今日）。設定画面に表示する
+function _fv2Count(n) {
+  try { const k = FV2_LS() + 'reads', v = JSON.parse(localStorage.getItem(k) || '{}'); const d = todayStr();
+    const o = v.d === d ? v : {d, n: 0}; o.n += n; localStorage.setItem(k, JSON.stringify(o)); } catch(e) {}
+}
+function _fv2ReadsToday() { try { const v = JSON.parse(localStorage.getItem(FV2_LS() + 'reads') || '{}'); return v.d === todayStr() ? v.n : 0; } catch(e) { return 0; } }
+function _fv2Item(t) {
+  const st = String(t.start || '').trim(), plan = Number(t.minutes) > 0 ? _fv2H(t.minutes) : null, act = Number(t.actual) > 0;
+  return {e: String(t.email || '').trim().toLowerCase(), n: String(t.ownerName || '').trim(),
+    id: String(t.taskId || '').trim(), nm: String(t.taskName || '').trim(),
+    h: act ? _fv2H(t.actual) : (plan || 0), p: plan, ac: act,
+    s: /^\d{4}-\d{2}-\d{2} \d{1,2}:\d{2}/.test(st) ? st.slice(11, 16).padStart(5, '0') : null,
+    sd: String(t.day || st.slice(0, 10) || '').trim(), dd: String(t.doneDate || '').trim(), note: String(t.note || '').trim()};
+}
+// 時間割に配置済みの完了タスクを日付ごとに返す（端末の保存分を優先し、古くなった日だけ読む）
 async function _fv2Lists(start, end, nocache) {
-  const key = start + '|' + end, hit = _fv2.tasks.get(key);
-  if (!nocache && hit && Date.now() - hit.t < FV2_TTL) return hit.p;
-  const p = (async () => {
-    const {db} = await _fv2Ready();
-    const col = db.collection('tasks');
-    const [a, b] = await Promise.all([
-      col.where('day', '>=', start).where('day', '<=', end).get(),
-      col.where('doneDate', '>=', start).where('doneDate', '<=', end).get()
-    ]);
-    const seen = new Set(), byDate = {};
-    [...a.docs, ...b.docs].forEach(doc => {
-      if (seen.has(doc.id)) return; seen.add(doc.id);
-      const t = doc.data() || {};
-      if (String(t.status || '').trim() !== '完了') return;
-      const st = String(t.start || '').trim();
-      const sd = String(t.day || st.slice(0, 10) || '').trim(), dd = String(t.doneDate || '').trim();
-      const wd = sd || dd;
-      if (!wd || wd < start || wd > end) return;
-      const plan = Number(t.minutes) > 0 ? _fv2H(t.minutes) : null, act = Number(t.actual) > 0;
-      (byDate[wd] = byDate[wd] || []).push({
-        e: String(t.email || '').trim().toLowerCase(), n: String(t.ownerName || '').trim(),
-        id: String(t.taskId || '').trim(), nm: String(t.taskName || '').trim(),
-        h: act ? _fv2H(t.actual) : (plan || 0), p: plan, ac: act,
-        s: /^\d{4}-\d{2}-\d{2} \d{1,2}:\d{2}/.test(st) ? st.slice(11, 16).padStart(5, '0') : null,
-        sd, dd, note: String(t.note || '').trim()
-      });
-    });
-    return byDate;
-  })();
-  _fv2.tasks.set(key, {t: Date.now(), p});
-  p.catch(() => { if (_fv2.tasks.get(key)?.p === p) _fv2.tasks.delete(key); });
-  return p;
+  const dates = eachDateInRange(start, end), out = {}, stale = [];
+  dates.forEach(d => { const v = nocache ? null : _fv2DayGet(d); if (v && Date.now() - v.t < _fv2Ttl(d)) out[d] = v.l; else stale.push(d); });
+  if (!stale.length) return out;
+  const {db} = await _fv2Ready();
+  // 読み直す日を連続した区間にまとめて、区間ごとに1回だけ問い合わせる
+  const runs = [];
+  stale.forEach(d => { const r = runs[runs.length - 1]; if (r && eachDateInRange(r[1], d).length === 2) r[1] = d; else runs.push([d, d]); });
+  await Promise.all(runs.map(async ([s0, e0]) => {
+    const key = s0 + '|' + e0;
+    let p = _fv2.inflight.get(key);
+    if (!p) {
+      p = db.collection('tasks').where('day', '>=', s0).where('day', '<=', e0).get().then(snap => {
+        _fv2Count(snap.size);
+        const by = {};
+        snap.docs.forEach(doc => { const t = doc.data() || {}; if (String(t.status || '').trim() !== '完了') return; const x = _fv2Item(t); if (x.sd) (by[x.sd] = by[x.sd] || []).push(x); });
+        eachDateInRange(s0, e0).forEach(d => _fv2DayPut(d, by[d] || []));
+      }).finally(() => _fv2.inflight.delete(key));
+      _fv2.inflight.set(key, p);
+    }
+    await p;
+  }));
+  stale.forEach(d => { const v = _fv2DayGet(d); out[d] = v ? v.l : []; });
+  _fv2Prune();
+  return out;
+}
+// 時間割に未配置の完了タスク（「Folioから取込」で1日分だけ使う）
+async function _fv2Unplaced(date, nocache) {
+  const hit = _fv2.unplaced.get(date);
+  if (!nocache && hit && Date.now() - hit.t < FV2_TTL) return hit.l;
+  const {db} = await _fv2Ready();
+  const snap = await db.collection('tasks').where('doneDate', '==', date).get();
+  _fv2Count(snap.size);
+  const l = snap.docs.map(d => d.data() || {}).filter(t => String(t.status || '').trim() === '完了' && !String(t.day || '').trim() && !String(t.start || '').trim()).map(_fv2Item);
+  _fv2.unplaced.set(date, {t: Date.now(), l});
+  return l;
 }
 function _fv2Dates(start, end, max) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start || '') || !/^\d{4}-\d{2}-\d{2}$/.test(end || '') || start > end) throw new Error('start/end は YYYY-MM-DD で指定してください');
@@ -6141,7 +6184,7 @@ async function _fv2Map(nocache) {
   if (!nocache && _fv2.map && Date.now() - _fv2.map.t < FV2_TTL) return _fv2.map.m;
   await _fv2Ready();
   let m = {};
-  try { const snap = await _fv2MapRef().get(); m = snap.exists ? (snap.data() || {}) : {}; _fv2.mapErr = null; }
+  try { const snap = await _fv2MapRef().get(); _fv2Count(1); m = snap.exists ? (snap.data() || {}) : {}; _fv2.mapErr = null; }
   catch(e) { _fv2.mapErr = e; }   // ルール未設定などで読めない場合は対応なしとして続ける
   // 初回: v2 側が空で v1 の GAS があれば、v1 シートの対応を引き継ぐ（1回だけ）
   if (!_fv2.mapErr && !Object.keys(m).length && DEPARTMENT_CONFIG.taskSheetGasUrl) {
@@ -6158,6 +6201,7 @@ async function _fv2Master(nocache) {
   if (!nocache && _fv2.master && Date.now() - _fv2.master.t < FV2_TTL) return _fv2.master.list;
   const {db} = await _fv2Ready();
   const snap = await db.collection('masters').doc('taskMaster').get();
+  _fv2Count(1);
   const list = snap.exists && Array.isArray((snap.data() || {}).list) ? snap.data().list : [];
   _fv2.master = {t: Date.now(), list};
   return list;
@@ -6170,8 +6214,8 @@ async function _fv2Call(p) {
     if (a === 'getCompletedTasks') {
       const name = String(p.name || '').trim(), email = String(p.email || '').trim().toLowerCase();
       if (!/^\d{4}-\d{2}-\d{2}$/.test(p.date || '')) throw new Error('date は YYYY-MM-DD で指定してください');
-      const [byDate, tm] = await Promise.all([_fv2Lists(p.date, p.date, nc), _fv2Map(nc)]);
-      const rows = (byDate[p.date] || []).filter(x => (email && x.e === email) || (name && x.n.indexOf(name) === 0)).map(x => ({
+      const [byDate, unp, tm] = await Promise.all([_fv2Lists(p.date, p.date, nc), _fv2Unplaced(p.date, nc), _fv2Map(nc)]);
+      const rows = (byDate[p.date] || []).concat(unp).filter(x => (email && x.e === email) || (name && x.n.indexOf(name) === 0)).map(x => ({
         taskId: x.id, taskName: x.nm, cdSub: tm[x.id] || null, hours: x.h, start: x.s, startDate: x.sd, doneDate: x.dd, note: x.note,
         plan: x.p, actual: x.ac ? x.h : null}));
       return done({rows});
@@ -6250,7 +6294,7 @@ function _syncFolioSettingsUI() {
   sec.querySelectorAll('input[name="folio-src"]').forEach(r => { r.checked = r.value === src; r.disabled = r.value === 'sheet' && !DEPARTMENT_CONFIG.taskSheetGasUrl; });
   const st = document.getElementById('folio-src-status');
   if (st) st.textContent = src === 'firebase'
-    ? (_fv2.user ? `Folio v2（${f.firebase.projectId}）に ${_fv2.user.email} でログイン中` : `Folio v2（${f.firebase.projectId}）から読み込みます。初回は Google ログインが必要です`)
+    ? (_fv2.user ? `Folio v2（${f.firebase.projectId}）に ${_fv2.user.email} でログイン中／今日この端末で読んだ件数 ${_fv2ReadsToday()}` : `Folio v2（${f.firebase.projectId}）から読み込みます。初回は Google ログインが必要です`)
     : 'Folio v1（スプレッドシート）から GAS 経由で読み込みます';
 }
 async function testFolioV2() {
@@ -6258,12 +6302,12 @@ async function testFolioV2() {
   if (st) st.textContent = '接続を確認中…';
   try {
     await (_fv2.user ? _fv2Ready() : folioV2Login());
-    const d = new Date(); d.setDate(d.getDate() - 30);
+    const d = new Date(); d.setDate(d.getDate() - 6);
     const start = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    const [byDate, master, tm] = await Promise.all([_fv2Lists(start, todayStr(), true), _fv2Master(true), _fv2Map(true)]);
+    const [byDate, master, tm] = await Promise.all([_fv2Lists(start, todayStr()), _fv2Master(true), _fv2Map(true)]);
     const n = Object.values(byDate).reduce((t, l) => t + l.length, 0);
-    if (st) st.textContent = `接続OK：直近30日の完了タスク ${n}件／タスクマスタ ${master.length}件／中分類の対応 ${Object.keys(tm).length}件` +
-      (_fv2.mapErr ? `（対応表は読めません: ${_fv2.mapErr.code || _fv2.mapErr.message}）` : '');
+    if (st) st.textContent = `接続OK：直近7日の完了タスク ${n}件／タスクマスタ ${master.length}件／中分類の対応 ${Object.keys(tm).length}件` +
+      (_fv2.mapErr ? `（対応表は読めません: ${_fv2.mapErr.code || _fv2.mapErr.message}）` : '') + `／今日この端末で読んだ件数 ${_fv2ReadsToday()}`;
   } catch(e) { if (st) st.textContent = '接続できませんでした: ' + (e.code || e.message); }
 }
 function updateTaskImportButton() {
