@@ -15,5 +15,21 @@ window.DEPARTMENT_CONFIG_OVERRIDE = {
   inputFxMode: 'mega',
   taikoSoundDefault: true,
   // 全端末で1回だけ演出設定を上書き（id を変えると、もう一度だけ上書きされる）
-  inputFxForce: { id: '2026-10-mega', on: true, mode: 'mega', sound: true }
+  inputFxForce: { id: '2026-10-mega', on: true, mode: 'mega', sound: true },
+
+  // Folio v2（Firebase 保存版）への切替準備。source を 'firebase' にすると全員が v2 から読む。
+  // 切替前は 'sheet'（v1 スプレッドシート＋上の taskSheetGasUrl）。端末ごとの試験切替は設定画面から。
+  // 日報中分類の対応は Folio v2 の nippouMap/taskCd に保存（Folio 側のセキュリティルールに追加が必要）。
+  folio: {
+    source: 'sheet',
+    firebase: {
+      apiKey:            'AIzaSyBLN5pxyLzFULeeCzV4dEUBAOZkMuLJBpA',
+      authDomain:        'folio-73ebf.firebaseapp.com',
+      projectId:         'folio-73ebf',
+      messagingSenderId: '380142786013',
+      appId:             '1:380142786013:web:cfff637333976eae445234'
+    },
+    mapCollection: 'nippouMap',
+    mapDoc: 'taskCd'
+  }
 };
