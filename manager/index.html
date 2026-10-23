@@ -141,6 +141,78 @@ body.dr-open #drawer{transform:none;} body.dr-open #drawer-bg{display:block;}
 .mini span{position:absolute;left:0;top:0;bottom:0;border-radius:999px;}
 .mini i{position:absolute;top:-2px;bottom:-2px;width:1.5px;background:var(--crit);}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.dept-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px;}
+.dcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);padding:14px 16px;cursor:pointer;transition:border-color .15s;border-top:4px solid var(--dc);}
+.dcard:hover{border-color:var(--g300);}
+.dcard.on{box-shadow:0 0 0 2px color-mix(in srgb,var(--dc) 45%,transparent),var(--sh);}
+.dcard .dh{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
+.dcard .dh b{font-size:14px;font-weight:850;}
+.dcard .dh span{font-size:11px;color:var(--g500);}
+.dcard .kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0;}
+.dcard .kv div{background:var(--g50);border:1px solid var(--line);border-radius:8px;padding:6px 8px;}
+.dcard .kv i{display:block;font-style:normal;font-size:10.5px;color:var(--g500);font-weight:700;}
+.dcard .kv em{font-style:normal;font-size:17px;font-weight:850;font-variant-numeric:tabular-nums;}
+.dcard .kv em small{font-size:11px;color:var(--g500);margin-left:1px;}
+.dcard .top{font-size:11.5px;color:var(--g600);margin-top:6px;line-height:1.7;}
+.dcard .top b{color:var(--g800);}
+.stack{display:flex;height:12px;border-radius:999px;overflow:hidden;background:var(--track);}
+.stack span{display:block;height:100%;min-width:1px;}
+.sec-ttl{font-size:12.5px;font-weight:850;margin:18px 0 8px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+.lg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:var(--g600);margin:2px 0 10px;}
+.lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+.pbar{display:grid;grid-template-columns:minmax(0,110px) minmax(0,1fr) 78px;gap:10px;align-items:center;padding:5px 0;font-size:12.5px;cursor:pointer;}
+.pbar:hover .nm{color:var(--primary);}
+.pbar .nm{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pbar .bars{display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--track);}
+.pbar .bars span{display:flex;align-items:center;justify-content:center;height:100%;font-size:10.5px;font-weight:800;color:#fff;overflow:hidden;white-space:nowrap;text-shadow:0 1px 1px rgba(0,0,0,.25);}
+.pbar .tot{text-align:right;font-weight:850;font-variant-numeric:tabular-nums;}
+.pbar .tot small{display:block;font-size:10.5px;color:var(--g500);font-weight:700;}
+table.mx{border-collapse:separate;border-spacing:3px;width:100%;font-variant-numeric:tabular-nums;font-size:12px;}
+table.mx th{font-size:11px;font-weight:800;color:var(--g600);padding:6px 6px;text-align:center;white-space:nowrap;}
+table.mx th.cat{cursor:pointer;border-radius:6px;border-bottom:3px solid var(--cc);}
+table.mx th.cat:hover,table.mx th.cat.on{background:color-mix(in srgb,var(--cc) 16%,transparent);color:var(--g800);}
+table.mx th.nm,table.mx td.nm{text-align:left;font-weight:800;color:var(--g800);white-space:nowrap;}
+table.mx td{text-align:center;padding:7px 6px;border-radius:6px;white-space:nowrap;}
+table.mx td.c{background:color-mix(in srgb,var(--cc) calc(var(--a) * 1%),transparent);}
+table.mx td.c b{font-weight:850;}
+table.mx td.c small{display:block;font-size:10px;color:var(--g500);font-weight:700;}
+table.mx td.z{color:var(--g300);}
+table.mx tr.tot td{border-top:1px solid var(--line);font-weight:850;background:var(--g50);}
+table.mx td.rt{font-weight:850;text-align:right;}
+.drill{margin-top:14px;border:1px solid var(--line);border-left:4px solid var(--cc);border-radius:10px;padding:12px 14px;background:color-mix(in srgb,var(--cc) 4%,var(--surface));}
+.drill h4{font-size:13px;font-weight:850;margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.tag{display:inline-block;font-size:10.5px;font-weight:800;border-radius:999px;padding:1px 8px;}
+.tag.warn{background:var(--warn-bg);color:var(--warn);} .tag.crit{background:var(--crit-bg);color:var(--crit);} .tag.ok{background:var(--ok-bg);color:var(--ok);} .tag.info{background:var(--info-bg);color:var(--info);}
+.chg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;}
+.chg .box{border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
+.chg .box h5{font-size:12px;font-weight:850;margin-bottom:6px;}
+.chg .row{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0;border-bottom:1px dashed var(--line);}
+.chg .row:last-child{border-bottom:none;}
+.chg .row span{color:var(--g500);font-size:11px;}
+table.otm{border-collapse:separate;border-spacing:3px;font-variant-numeric:tabular-nums;font-size:12px;min-width:860px;width:100%;}
+table.otm th{font-size:11px;color:var(--g500);font-weight:800;padding:4px;text-align:center;white-space:nowrap;}
+table.otm td{text-align:center;padding:7px 4px;border-radius:6px;white-space:nowrap;}
+table.otm td.nm{text-align:left;font-weight:800;cursor:pointer;}
+table.otm td.v-ok{background:var(--ok-bg);} table.otm td.v-warn{background:var(--warn-bg);color:var(--warn);font-weight:850;} table.otm td.v-crit{background:var(--crit-bg);color:var(--crit);font-weight:850;}
+table.otm td.v-0{color:var(--g400);background:var(--g50);} table.otm td.fut{background:transparent;}
+table.otm td.cur{box-shadow:inset 0 0 0 2px var(--primary);}
+table.otm td small{display:block;font-size:9.5px;font-weight:700;opacity:.85;}
+table.otm td.sum{font-weight:850;}
+table.cal{border-collapse:separate;border-spacing:2px;font-size:10.5px;font-variant-numeric:tabular-nums;}
+table.cal th{font-weight:700;color:var(--g500);padding:2px;text-align:center;min-width:28px;}
+table.cal th.sun{color:var(--crit);} table.cal th.sat{color:var(--info);}
+table.cal td{text-align:center;padding:4px 2px;border-radius:4px;min-width:28px;}
+table.cal td.nm{text-align:left;font-weight:800;font-size:12px;padding-right:8px;white-space:nowrap;}
+table.cal td.ok{background:var(--ok-bg);color:var(--g700);} table.cal td.miss{background:var(--crit-bg);color:var(--crit);font-weight:850;}
+table.cal td.off{background:repeating-linear-gradient(135deg,transparent 0 3px,var(--line) 3px 4px);} table.cal td.ot{background:var(--warn-bg);color:var(--warn);font-weight:800;}
+table.cal td.cnt{font-weight:850;}
+.cmp{display:grid;grid-template-columns:minmax(0,130px) minmax(0,1fr) 120px;gap:10px;align-items:center;font-size:12px;padding:4px 0;}
+.cmp .tr{position:relative;height:10px;background:var(--track);border-radius:999px;}
+.cmp .tr span{position:absolute;left:0;top:0;bottom:0;border-radius:999px;}
+.cmp .tr i{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--g700);}
+.cmp .vl{text-align:right;font-weight:800;font-variant-numeric:tabular-nums;}
+.cmp .vl small{color:var(--g500);font-weight:700;margin-left:4px;}
+@media (max-width:900px){.dept-grid{grid-template-columns:1fr;}.chg{grid-template-columns:1fr;}.pbar{grid-template-columns:minmax(0,70px) minmax(0,1fr) 64px;}}
 @media (max-width:900px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr));}.two{grid-template-columns:1fr;}.dr-tiles{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media (max-width:520px){.container{padding:12px 16px 30px;}header{padding:10px 16px;}.ttl-row h2{font-size:20px;}}
 @page{size:A4 landscape;margin:8mm;}
@@ -180,15 +252,41 @@ body.dr-open #drawer{transform:none;} body.dr-open #drawer-bg{display:block;}
   <div id="login-area"></div>
   <div id="main" style="display:none;">
     <div class="ttl-row">
-      <div><div class="eyebrow">All departments</div><h2 id="ttl">月次 全員一覧</h2></div>
+      <div><div class="eyebrow">All departments</div><h2 id="ttl">チームの状況</h2></div>
       <div class="range" id="range"></div>
     </div>
     <div id="banners"></div>
-    <div class="tiles" id="tiles"></div>
-    <div class="card">
-      <div class="card-hd"><h3>アラート</h3><span class="card-sub">36協定の基準（月36h警告・月45h上限・年360h・45h超は年6回まで）と未入力</span></div>
+
+    <div class="card" id="alert-card">
+      <div class="card-hd"><h3>要対応</h3><span class="card-sub">36協定（月36h警告・月45h上限・年360h・45h超は年6回まで）と日報の未入力</span></div>
       <div class="card-body"><div class="chips" id="alerts"></div></div>
     </div>
+
+    <div class="dept-grid" id="dept-cards"></div>
+
+    <div class="card" id="alloc-card">
+      <div class="card-hd"><h3>誰が何に時間を使っているか</h3><span class="card-sub" id="alloc-sub"></span></div>
+      <div class="toolbar no-print" style="padding-top:4px;">
+        <div class="seg" id="alloc-dept"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <div class="seg" id="alloc-scope"></div>
+          <div class="seg" id="alloc-mode"></div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="alloc-bars"></div>
+        <div class="sec-ttl">担当 × 大分類 <span class="card-sub">列（大分類）をクリックすると、その中の作業と担当者の内訳を表示</span></div>
+        <div class="scroll"><div id="alloc-matrix"></div></div>
+        <div id="alloc-drill"></div>
+        <div id="alloc-change"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><h3>残業と36協定（年度）</h3><span class="card-sub" id="ot-map-sub">月期（15日締め）ごとの残業。黄＝36h以上・赤＝45h超／右端は年度累計と45h超の回数</span></div>
+      <div class="card-body scroll"><div id="ot-map"></div></div>
+    </div>
+
     <div class="card">
       <div class="toolbar no-print">
         <div class="seg" id="dept-seg"></div>
@@ -197,14 +295,20 @@ body.dr-open #drawer{transform:none;} body.dr-open #drawer-bg{display:block;}
           <button data-sort="dept" onclick="setSort('dept')">部署ごと</button>
         </div>
       </div>
-      <div class="card-hd" style="padding-top:10px;"><h3>全員の残業・36協定・入力状況</h3><span class="card-sub" id="tbl-sub">行をクリックすると個人の詳細（推移・業務構成・日別）を開きます</span></div>
+      <div class="card-hd" style="padding-top:10px;"><h3 id="tbl-ttl">今月期の残業と入力</h3><span class="card-sub">行をクリックすると個人の詳細（業務構成・推移・日別）を開きます</span></div>
       <div class="scroll"><div id="tbl"></div></div>
       <div class="legend" id="legend"></div>
     </div>
+
+    <div class="card">
+      <div class="card-hd"><h3>日報 入力状況</h3><span class="card-sub" id="cal-sub">退勤時刻から計算した勤務時間。赤＝未入力（平日の過去日）・斜線＝土日・休日</span></div>
+      <div class="card-body scroll"><div id="entry-cal"></div></div>
+    </div>
+
     <p class="card-sub" style="line-height:1.7;">
-      ※ 残業・通常時間は各アプリと同じく退勤時刻から算出しています（17:30以降を15分単位）。月期は15日締め、年度は10月期〜9月期です。<br>
-      ※ 未入力は「平日の過去日で、その人が入力を始めた日以降」に退勤時刻がない日です。全員が未入力の平日は休日とみなします。<br>
-      ※ 業務構成は各部署の大分類で表示します（部署ごとに分類が異なるため、色と名称は部署ごとです）。
+      ※ 時間の使い方は、日報に入力した時間（通常＋残業）を大分類・中分類ごとに合計したものです。分類は部署ごとに違うため、部署ごとに表示します。<br>
+      ※ 残業・通常時間（残業と36協定・今月期の残業・入力状況）は、各アプリと同じく退勤時刻から算出しています（17:30以降を15分単位）。月期は15日締め、年度は10月期〜9月期です。<br>
+      ※ 未入力は「平日の過去日で、その人が入力を始めた日以降」に退勤時刻がない日です。全員が未入力の平日は休日とみなします。
     </p>
   </div>
 </div>
@@ -341,6 +445,11 @@ const _fetchCache = new Map();
 async function fetchSource(src, start, end, force) {
   const key = `${src.id}|${start}|${end}`;
   if (!force && _fetchCache.has(key)) return _fetchCache.get(key);
+  // 端末に10分だけ保存（開き直しや月期の切替で毎回全件を読まない）
+  const lsKey = 'mgr:cache:' + key;
+  if (!force && !window.__mgrFetch) {
+    try { const v = JSON.parse(localStorage.getItem(lsKey) || 'null'); if (v && Date.now() - v.t < 10 * 60 * 1000) { _fetchCache.set(key, v.res); return v.res; } } catch (e) {}
+  }
   let res;
   if (window.__mgrFetch) res = await window.__mgrFetch(src, start, end);
   else {
@@ -351,7 +460,11 @@ async function fetchSource(src, start, end, force) {
     ]);
     const docs = snap.docs.map(d => d.data() || {}).filter(d => d.date && d.author);
     const cats = ms && ms.exists && Array.isArray((ms.data() || {}).cats) ? ms.data().cats : [];
-    res = {docs, cats};
+    res = {docs: docs.map(d => ({date: d.date, author: d.author, leaveTime: d.leaveTime || '', rows: d.rows || []})), cats};
+    try {
+      Object.keys(localStorage).forEach(k => { if (k.startsWith('mgr:cache:' + src.id + '|') && k !== lsKey) localStorage.removeItem(k); });
+      localStorage.setItem(lsKey, JSON.stringify({t: Date.now(), res}));
+    } catch (e) {}
   }
   _fetchCache.set(key, res);
   return res;
@@ -360,7 +473,8 @@ async function fetchSource(src, start, end, force) {
 // ═══════════════════════════════════════════
 //  状態と集計
 // ═══════════════════════════════════════════
-const STATE = {period: periodOfDate(todayStr()), dept: 'all', sort: 'ot', data: null, loadedOnce: false, errors: {}, detail: null, detailScope: 'period'};
+const STATE = {period: periodOfDate(todayStr()), dept: 'all', sort: 'ot', data: null, loadedOnce: false, errors: {}, detail: null, detailScope: 'period',
+  allocDept: null, allocScope: 'period', allocMode: 'h', drillCat: null};
 
 function buildCatIndex(cats) {
   const sub = {}, cat = {};
@@ -482,37 +596,24 @@ function setSort(s) { STATE.sort = s; render(); }
 function render() {
   const D = STATE.data; if (!D) return;
   const p = STATE.period, pd = periodDates(p.year, p.month), fy = D.fy;
-  document.getElementById('ttl').textContent = `${pd.label} 全員一覧`;
+  document.getElementById('ttl').textContent = `${pd.label} チームの状況`;
   document.getElementById('range').textContent = `${pd.range}（${fy + 1}年度・${fiscalKi(fy)}期）`;
-  // バナー
   const errs = Object.entries(STATE.errors);
   document.getElementById('banners').innerHTML = errs.map(([id, e]) => {
     const s = SOURCES.find(x => x.id === id);
     return `<div class="banner err"><b>${esc(s.name)}</b> のデータを読み込めませんでした（${esc(e.code || e.message || e)}）。閲覧権限（Firebase のセキュリティルール）を確認してください。</div>`;
   }).join('');
-  let rows = rowsForView();
-  const all = rows;
-  // 部署フィルタ
-  const cnt = id => all.filter(r => r.o.src.id === id).length;
-  document.getElementById('dept-seg').innerHTML = `<button class="${STATE.dept === 'all' ? 'on' : ''}" onclick="setDept('all')">全員 ${all.length}</button>` +
-    SOURCES.map(s => `<button class="${STATE.dept === s.id ? 'on' : ''}" onclick="setDept('${s.id}')"><span class="dot" style="background:${s.color}"></span>${esc(s.short)} ${cnt(s.id)}</button>`).join('');
-  if (STATE.dept !== 'all') rows = rows.filter(r => r.o.src.id === STATE.dept);
-  const basis = r => r.pj != null ? r.pj : r.cur.ot;
-  if (STATE.sort === 'ot') rows.sort((a, b) => basis(b) - basis(a) || b.cur.n - a.cur.n);
-  else rows.sort((a, b) => SOURCES.indexOf(a.o.src) - SOURCES.indexOf(b.o.src) || basis(b) - basis(a));
-  // タイル
-  const act = rows.filter(r => r.cur.days);
-  const totOT = act.reduce((t, r) => t + r.cur.ot, 0), avg = act.length ? totOT / act.length : 0;
-  const nWarn = rows.filter(r => basis(r) >= R.otMonthWarn).length, nMiss = rows.reduce((t, r) => t + r.cur.miss, 0);
-  const prog = periodProgress(p);
-  const tile = (l, v, s, cls) => `<div class="tile ${cls || ''}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s || ''}</div></div>`;
-  document.getElementById('tiles').innerHTML =
-    tile('対象人数', `${rows.length}<small>人</small>`, `入力あり ${act.length}人`) +
-    tile('残業合計', `${h1(totOT)}<small>h</small>`, prog ? `稼働日 ${prog.total}日中 ${prog.elapsed}日経過` : '月期の確定値') +
-    tile('残業平均/人', `${h1(avg)}<small>h</small>`, '入力がある人の平均') +
-    tile(`残業${R.otMonthWarn}h以上${prog ? '（見込含む）' : ''}`, `${nWarn}<small>人</small>`, `上限 ${R.otMonthLimit}h`, nWarn ? 'is-warn' : '') +
-    tile('未入力', `${nMiss}<small>日</small>`, '平日の過去日の合計', nMiss ? 'is-warn' : '');
-  // アラート
+  const rows = rowsForView();
+  renderAlerts(rows);
+  renderDeptCards(rows);
+  renderAlloc(rows);
+  renderOtMap(rows);
+  renderOtTable(rows);
+  renderEntryCal(rows);
+}
+
+// ── 要対応 ──
+function renderAlerts(rows) {
   const al = [];
   rows.forEach(r => {
     const A = `<b>${esc(r.o.author)}</b>（${esc(r.o.src.short)}）`;
@@ -526,39 +627,204 @@ function render() {
   });
   const ord = ['crit', 'warn', 'info'];
   al.sort((a, b) => ord.indexOf(a[0]) - ord.indexOf(b[0]));
-  document.getElementById('alerts').innerHTML = al.length ? al.map(([l, t]) => `<span class="chip is-${l}">${t}</span>`).join('') : '<span class="chip is-ok">対応が必要なアラートはありません</span>';
-  // 表
-  const scaleMax = Math.max(R.otMonthLimit * 1.15, ...rows.map(r => Math.max(r.cur.ot, r.pj || 0))) * 1.02;
-  const pc = v => Math.min(100, v / scaleMax * 100).toFixed(1);
-  const meter = (cur, pj) => {
-    const ext = pj != null && pj > cur ? pj : null;
-    return `<div class="meter"><span class="f lv-${lvOf(cur)}" style="width:${pc(cur)}%"></span>${ext != null ? `<span class="pj lv-${lvOf(ext)}" style="left:${pc(cur)}%;width:${(pc(ext) - pc(cur)).toFixed(1)}%"></span>` : ''}<span class="tk" style="left:${pc(R.otMonthWarn)}%"></span><span class="tk lim" style="left:${pc(R.otMonthLimit)}%"></span></div>`;
+  document.getElementById('alerts').innerHTML = al.length ? al.map(([l, t]) => `<span class="chip is-${l}">${t}</span>`).join('') : '<span class="chip is-ok">対応が必要な人はいません</span>';
+}
+
+// 時間の使い方の対象期間（この月期／年度累計＝期初〜選択中の月期）
+function allocRange() {
+  const D = STATE.data, pd = periodDates(STATE.period.year, STATE.period.month);
+  if (STATE.allocScope === 'fy') { const f = periodDates(D.fps[0].year, D.fps[0].month); return {s: f.startDate, e: pd.endDate, label: `年度累計（${f.range.split(' 〜 ')[0]} 〜 ${pd.range.split(' 〜 ')[1]}）`}; }
+  return {s: pd.startDate, e: pd.endDate, label: `${pd.label}（${pd.range}）`};
+}
+// 部署全体の大分類・中分類の合計
+function deptComp(list, s, e) {
+  const cats = {}, subs = {}; let tot = 0;
+  list.forEach(r => { const c = compFor(r.o, s, e);
+    c.cats.forEach(x => { (cats[x.cd] = cats[x.cd] || {...x, h: 0}).h += x.h; });
+    c.subs.forEach(x => { (subs[x.cd] = subs[x.cd] || {...x, h: 0}).h += x.h; });
+    tot += c.tot; });
+  return {cats: Object.values(cats).sort((a, b) => b.h - a.h), subs: Object.values(subs).sort((a, b) => b.h - a.h), tot};
+}
+// 部署の大分類（マスタの並び順。マスタに無い分類は後ろ）
+function deptCats(src, used) {
+  const D = STATE.data, any = D.people.find(o => o.src.id === src.id);
+  const order = any ? Object.values(any.ix.cat) : [];
+  const out = order.filter(c => used.some(u => u.cd === c.cd));
+  used.forEach(u => { if (!out.some(c => c.cd === u.cd)) out.push(u); });
+  return out;
+}
+
+// ── 部署カード ──
+function renderDeptCards(rows) {
+  const {s, e} = allocRange(), today = todayStr(), p = STATE.period, pd = periodDates(p.year, p.month);
+  const html = SOURCES.map(src => {
+    const list = rows.filter(r => r.o.src.id === src.id);
+    if (!list.length) return `<div class="dcard" style="--dc:${src.color};opacity:.6"><div class="dh"><b>${esc(src.name)}</b><span>データなし</span></div></div>`;
+    const act = list.filter(r => r.cur.days), ot = act.reduce((t, r) => t + r.cur.ot, 0);
+    const comp = deptComp(list, s, e);
+    // 入力率: 平日の過去日（休日除く）× 人数 に対する、退勤時刻を入れた日数
+    let need = 0, got = 0;
+    list.forEach(r => { const first = Object.keys(r.o.days).filter(d => r.o.days[d].leave).sort()[0];
+      eachDate(pd.startDate, pd.endDate).forEach(d => { if (d >= today || !first || d < first || !isWorkday(d, today)) return; need++; if (r.o.days[d] && r.o.days[d].leave) got++; }); });
+    const rate = need ? Math.round(got / need * 100) : null;
+    const top = comp.cats.slice(0, 3);
+    return `<div class="dcard${STATE.allocDept === src.id ? ' on' : ''}" style="--dc:${src.color}" onclick="setAllocDept('${src.id}')" title="クリックで下の「誰が何に時間を使っているか」をこの部署に切り替え">
+      <div class="dh"><b>${esc(src.name)}</b><span>${list.length}人</span></div>
+      <div class="kv"><div><i>日報の入力時間</i><em>${h1(comp.tot)}<small>h</small></em></div>
+        <div><i>今期の残業 計／平均</i><em>${h1(ot)}<small>h</small></em><i>${act.length ? h1(ot / act.length) + 'h/人' : '—'}</i></div>
+        <div><i>入力率</i><em class="${rate != null && rate < 80 ? 't-warn' : ''}">${rate == null ? '—' : rate}<small>${rate == null ? '' : '%'}</small></em></div></div>
+      ${comp.tot ? `<div class="stack">${comp.cats.map(c => `<span style="width:${(c.h / comp.tot * 100).toFixed(2)}%;background:${esc(c.color)}" title="${esc(c.label)} ${h1(c.h)}h（${Math.round(c.h / comp.tot * 100)}%）"></span>`).join('')}</div>
+      <div class="top">主な業務: ${top.map(c => `<b>${esc(c.label)}</b> ${Math.round(c.h / comp.tot * 100)}%`).join('・')}</div>` : '<div class="top">この期間の日報の入力はありません</div>'}
+    </div>`;
+  }).join('');
+  document.getElementById('dept-cards').innerHTML = html;
+}
+
+function setAllocDept(id) { STATE.allocDept = id; STATE.drillCat = null; render(); document.getElementById('alloc-card').scrollIntoView({behavior: 'smooth', block: 'start'}); }
+function setAllocScope(v) { STATE.allocScope = v; render(); }
+function setAllocMode(v) { STATE.allocMode = v; render(); }
+function setDrill(cd) { STATE.drillCat = STATE.drillCat === cd ? null : cd; render(); }
+
+// ── 誰が何に時間を使っているか ──
+function renderAlloc(rows) {
+  const avail = SOURCES.filter(src => rows.some(r => r.o.src.id === src.id));
+  if (!avail.length) { document.getElementById('alloc-bars').innerHTML = '<div class="empty">データがありません</div>'; ['alloc-matrix', 'alloc-drill', 'alloc-change'].forEach(id => document.getElementById(id).innerHTML = ''); return; }
+  if (!STATE.allocDept || !avail.some(x => x.id === STATE.allocDept)) STATE.allocDept = avail[0].id;
+  const src = SOURCES.find(x => x.id === STATE.allocDept), {s, e, label} = allocRange(), pct = STATE.allocMode === 'pct';
+  document.getElementById('alloc-dept').innerHTML = avail.map(x => `<button class="${x.id === src.id ? 'on' : ''}" onclick="setAllocDept('${x.id}')"><span class="dot" style="background:${x.color}"></span>${esc(x.short)}</button>`).join('');
+  document.getElementById('alloc-scope').innerHTML = `<button class="${STATE.allocScope === 'period' ? 'on' : ''}" onclick="setAllocScope('period')">この月期</button><button class="${STATE.allocScope === 'fy' ? 'on' : ''}" onclick="setAllocScope('fy')">年度累計</button>`;
+  document.getElementById('alloc-mode').innerHTML = `<button class="${!pct ? 'on' : ''}" onclick="setAllocMode('h')">時間</button><button class="${pct ? 'on' : ''}" onclick="setAllocMode('pct')">割合</button>`;
+  document.getElementById('alloc-sub').textContent = `${src.name}・${label}・日報に入力した時間（通常＋残業）`;
+  const people = rows.filter(r => r.o.src.id === src.id).map(r => ({r, c: compFor(r.o, s, e)})).filter(x => x.c.tot > 0).sort((a, b) => b.c.tot - a.c.tot);
+  const dc = deptComp(people.map(x => x.r), s, e), cats = deptCats(src, dc.cats);
+  if (!people.length) { document.getElementById('alloc-bars').innerHTML = '<div class="empty">この期間の日報の入力はありません</div>'; ['alloc-matrix', 'alloc-drill', 'alloc-change'].forEach(id => document.getElementById(id).innerHTML = ''); return; }
+  const key = r => esc(r.o.src.id + '|' + r.o.author);
+  // 担当者ごとの積み上げ棒
+  const maxT = Math.max(...people.map(x => x.c.tot));
+  const legend = `<div class="lg">${cats.map(c => `<span><i style="background:${esc(c.color)}"></i>${esc(c.label)}</span>`).join('')}</div>`;
+  const bars = people.map(({r, c}) => {
+    const w = pct ? 100 : c.tot / maxT * 100;
+    const segs = cats.map(cat => { const x = c.cats.find(y => y.cd === cat.cd); if (!x || !x.h) return ''; const share = x.h / c.tot * 100;
+      return `<span style="width:${share.toFixed(2)}%;background:${esc(cat.color)}" title="${esc(cat.label)} ${h1(x.h)}h（${Math.round(share)}%）">${share >= 9 ? (pct ? Math.round(share) + '%' : h1(x.h)) : ''}</span>`; }).join('');
+    return `<div class="pbar" onclick="openDetail('${key(r)}')" title="${esc(r.o.author)} の詳細を開く"><span class="nm">${esc(r.o.author)}</span>
+      <div><div class="bars" style="width:${w.toFixed(1)}%">${segs}</div></div><span class="tot">${h1(c.tot)}h<small>${r.cur.days ? `残業 ${h1(r.cur.ot)}h` : ''}</small></span></div>`;
+  }).join('');
+  document.getElementById('alloc-bars').innerHTML = legend + bars;
+  // 担当 × 大分類
+  const cell = (h, tot, color) => {
+    if (!(h > 0.004)) return `<td class="c z" style="--cc:${esc(color)};--a:0">—</td>`;
+    const share = h / tot, a = Math.round(8 + share * 52);
+    return `<td class="c" style="--cc:${esc(color)};--a:${a}" title="${h1(h)}h（${Math.round(share * 100)}%）"><b>${pct ? Math.round(share * 100) + '%' : h1(h)}</b><small>${pct ? h1(h) + 'h' : Math.round(share * 100) + '%'}</small></td>`;
   };
-  const mix = c => c.tot ? `<div class="mix" title="${esc(c.cats.map(x => `${x.label} ${h1(x.h)}h（${Math.round(x.h / c.tot * 100)}%）`).join('\n'))}">${c.cats.map(x => `<span style="width:${(x.h / c.tot * 100).toFixed(2)}%;background:${esc(x.color)}"></span>`).join('')}</div>` : '<span class="t-muted">—</span>';
+  const head = `<tr><th class="nm">担当</th>${cats.map(c => `<th class="cat${STATE.drillCat === c.cd ? ' on' : ''}" style="--cc:${esc(c.color)}" onclick="setDrill('${esc(c.cd)}')" title="${esc(c.label)} の内訳を表示">${esc(c.label)}</th>`).join('')}<th>合計</th></tr>`;
+  const body = people.map(({r, c}) => `<tr><td class="nm">${esc(r.o.author)}</td>${cats.map(cat => { const x = c.cats.find(y => y.cd === cat.cd); return cell(x ? x.h : 0, c.tot, cat.color); }).join('')}<td class="rt">${h1(c.tot)}h</td></tr>`).join('');
+  const foot = `<tr class="tot"><td class="nm">部署合計</td>${cats.map(cat => { const x = dc.cats.find(y => y.cd === cat.cd); const h = x ? x.h : 0; return `<td>${h1(h)}h<small style="display:block;font-size:10px;color:var(--g500)">${dc.tot ? Math.round(h / dc.tot * 100) : 0}%</small></td>`; }).join('')}<td class="rt">${h1(dc.tot)}h</td></tr>`;
+  document.getElementById('alloc-matrix').innerHTML = `<table class="mx"><thead>${head}</thead><tbody>${body}${foot}</tbody></table>`;
+  // 大分類の内訳（担当 × 中分類）と担い手の偏り
+  const drill = document.getElementById('alloc-drill');
+  const dcat = STATE.drillCat && cats.find(c => c.cd === STATE.drillCat);
+  if (!dcat) drill.innerHTML = '';
+  else {
+    const subs = dc.subs.filter(x => catOf(people[0].r.o.ix, x.cd).cd === dcat.cd);
+    const catTot = (dc.cats.find(x => x.cd === dcat.cd) || {h: 0}).h;
+    const who = people.map(({r, c}) => ({r, c, h: (c.cats.find(x => x.cd === dcat.cd) || {h: 0}).h})).filter(x => x.h > 0.004).sort((a, b) => b.h - a.h);
+    const topShare = catTot ? who[0].h / catTot : 0;
+    const tag = !who.length ? '' : who.length === 1 ? '<span class="tag crit">1人だけが担当</span>' : topShare >= 0.7 ? `<span class="tag warn">${esc(who[0].r.o.author)}さんに集中（${Math.round(topShare * 100)}%）</span>` : `<span class="tag ok">${who.length}人で分担</span>`;
+    const subCell = (h, tot) => h > 0.004 ? `<td class="c" style="--cc:${esc(dcat.color)};--a:${Math.round(8 + h / tot * 52)}"><b>${h1(h)}</b><small>${Math.round(h / tot * 100)}%</small></td>` : `<td class="c z" style="--cc:${esc(dcat.color)};--a:0">—</td>`;
+    const subOf = (o, cd, s0, e0) => { let h = 0; Object.entries(o.days).forEach(([d, v]) => { if (d < s0 || d > e0) return; v.rows.forEach(rw => { if (rw.cdSub === cd) h += rw.n + rw.ot; }); }); return h; };
+    drill.innerHTML = `<div class="drill" style="--cc:${esc(dcat.color)}"><h4><span class="dot" style="background:${esc(dcat.color)}"></span>${esc(dcat.label)} の内訳：誰がどの作業をしているか ${tag}<span class="card-sub">合計 ${h1(catTot)}h・部署の ${dc.tot ? Math.round(catTot / dc.tot * 100) : 0}%</span></h4>
+      ${who.length ? `<div class="scroll"><table class="mx"><thead><tr><th class="nm">担当</th>${subs.map(x => `<th>${esc(x.label)}</th>`).join('')}<th>計</th><th>担い手の割合</th></tr></thead><tbody>
+      ${who.map(w => `<tr><td class="nm">${esc(w.r.o.author)}</td>${subs.map(x => subCell(subOf(w.r.o, x.cd, s, e), w.h)).join('')}<td class="rt">${h1(w.h)}h</td><td class="rt">${Math.round(w.h / catTot * 100)}%</td></tr>`).join('')}
+      <tr class="tot"><td class="nm">合計</td>${subs.map(x => `<td>${h1(x.h)}h</td>`).join('')}<td class="rt">${h1(catTot)}h</td><td></td></tr></tbody></table></div>` : '<div class="empty">この期間の入力はありません</div>'}</div>`;
+  }
+  // 前期からの変化（この月期のときだけ）
+  const chg = document.getElementById('alloc-change');
+  if (STATE.allocScope !== 'period') { chg.innerHTML = ''; return; }
+  const prev = addPeriod(STATE.period, -1), ppd = periodDates(prev.year, prev.month);
+  if (ppd.startDate < STATE.data.start) { chg.innerHTML = ''; return; }
+  const list = rows.filter(r => r.o.src.id === src.id);
+  const pc = deptComp(list, ppd.startDate, ppd.endDate);
+  if (!pc.tot) { chg.innerHTML = ''; return; }
+  // 月期の途中でも比べられるよう、時間ではなく「部署全体に占める割合」で比べる
+  const rs = allocRange(), k = dc.tot / pc.tot;
+  const deltas = cats.concat(pc.cats.filter(x => !cats.some(c => c.cd === x.cd))).map(c => {
+    const now = (dc.cats.find(x => x.cd === c.cd) || {h: 0}).h, before = (pc.cats.find(x => x.cd === c.cd) || {h: 0}).h;
+    // 変化を一番動かした人（前の月期の時間を今期の総量に合わせて比べる）
+    let mover = null;
+    list.forEach(r => { const a = (compFor(r.o, rs.s, rs.e).cats.find(x => x.cd === c.cd) || {h: 0}).h, b = (compFor(r.o, ppd.startDate, ppd.endDate).cats.find(x => x.cd === c.cd) || {h: 0}).h * k;
+      if (!mover || Math.abs(a - b) > Math.abs(mover.d)) mover = {a: r.o.author, d: a - b}; });
+    return {c, d: (now / dc.tot - before / pc.tot) * 100, now: now / dc.tot * 100, before: before / pc.tot * 100, mover};
+  }).filter(x => Math.abs(x.d) >= 3);
+  const up = deltas.filter(x => x.d > 0).sort((a, b) => b.d - a.d).slice(0, 4), down = deltas.filter(x => x.d < 0).sort((a, b) => a.d - b.d).slice(0, 4);
+  const row = x => `<div class="row"><b><span class="dot" style="background:${esc(x.c.color)}"></span> ${esc(x.c.label)}</b><span>${Math.round(x.before)}% → ${Math.round(x.now)}%${x.mover && Math.abs(x.mover.d) >= 0.5 ? `（主に ${esc(x.mover.a)}）` : ''}</span><b class="${x.d > 0 ? 't-warn' : 't-ok'}">${x.d > 0 ? '+' : ''}${Math.round(x.d)}pt</b></div>`;
+  chg.innerHTML = `<div class="sec-ttl">前の月期（${prev.month}月期）からの変化 <span class="card-sub">部署の入力時間全体に占める割合の変化（3pt以上）</span></div>
+    <div class="chg"><div class="box"><h5>増えた業務</h5>${up.length ? up.map(row).join('') : '<span class="card-sub">大きく増えた業務はありません</span>'}</div>
+    <div class="box"><h5>減った業務</h5>${down.length ? down.map(row).join('') : '<span class="card-sub">大きく減った業務はありません</span>'}</div></div>`;
+}
+
+// ── 残業と36協定（人 × 月期）──
+function renderOtMap(rows) {
+  const D = STATE.data, p = STATE.period, idx = D.fps.findIndex(x => x.year === p.year && x.month === p.month), today = todayStr();
+  const list = rows.map(r => ({r, ms: D.fps.map(fp => metricsFor(r.o, fp))})).sort((a, b) => b.r.fyOT - a.r.fyOT);
+  const head = `<tr><th style="text-align:left">担当</th>${D.fps.map((fp, i) => `<th>${fp.month}月期${i === idx ? '<br><span class="t-ok">選択中</span>' : ''}</th>`).join('')}<th>年度累計<br>/ ${R.otYearLimit}h</th><th>${R.otMonthLimit}h超<br>/ ${R.otOverMonthsMax}回</th></tr>`;
+  const body = list.map(({r, ms}) => `<tr><td class="nm" onclick="openDetail('${esc(r.o.src.id + '|' + r.o.author)}')"><span class="dot" style="background:${r.o.src.color}"></span> ${esc(r.o.author)}</td>${ms.map((m, i) => {
+      const fut = periodDates(D.fps[i].year, D.fps[i].month).startDate > today;
+      if (fut || i > idx) return `<td class="fut"></td>`;
+      if (!m.days) return `<td class="v-0${i === idx ? ' cur' : ''}">—</td>`;
+      const lv = lvOf(m.ot), pj = i === idx && r.pj != null && r.pj > m.ot ? r.pj : null;
+      return `<td class="v-${m.ot > 0.004 ? lv : '0'}${i === idx ? ' cur' : ''}" title="${D.fps[i].month}月期 残業 ${h1(m.ot)}h${pj ? `・見込 ${h1(pj)}h` : ''}">${h1(m.ot)}${pj ? `<small class="t-${lvOf(pj)}">見込${h1(pj)}</small>` : ''}</td>`;
+    }).join('')}<td class="sum ${r.fyOT >= R.otYearLimit ? 'v-crit' : r.fyOT >= R.otYearLimit * 0.8 ? 'v-warn' : ''}">${h1(r.fyOT)}h</td><td class="sum ${r.over >= R.otOverMonthsMax ? 'v-crit' : r.over >= R.otOverMonthsMax - 2 ? 'v-warn' : ''}">${r.over}回</td></tr>`).join('');
+  document.getElementById('ot-map').innerHTML = list.length ? `<table class="otm"><thead>${head}</thead><tbody>${body}</tbody></table>` : '<div class="empty">データがありません</div>';
+}
+
+// ── 今月期の残業と入力（表）──
+function renderOtTable(rows) {
+  const p = STATE.period, pd = periodDates(p.year, p.month), all = rows;
+  document.getElementById('tbl-ttl').textContent = `${pd.label}の残業と入力`;
+  const cnt = id => all.filter(r => r.o.src.id === id).length;
+  document.getElementById('dept-seg').innerHTML = `<button class="${STATE.dept === 'all' ? 'on' : ''}" onclick="setDept('all')">全員 ${all.length}</button>` +
+    SOURCES.map(s => `<button class="${STATE.dept === s.id ? 'on' : ''}" onclick="setDept('${s.id}')"><span class="dot" style="background:${s.color}"></span>${esc(s.short)} ${cnt(s.id)}</button>`).join('');
+  document.querySelectorAll('#sort-seg button').forEach(b => b.classList.toggle('on', b.dataset.sort === STATE.sort));
+  let list = STATE.dept === 'all' ? rows.slice() : rows.filter(r => r.o.src.id === STATE.dept);
+  const basis = r => r.pj != null ? r.pj : r.cur.ot;
+  if (STATE.sort === 'ot') list.sort((a, b) => basis(b) - basis(a) || b.cur.n - a.cur.n);
+  else list.sort((a, b) => SOURCES.indexOf(a.o.src) - SOURCES.indexOf(b.o.src) || basis(b) - basis(a));
+  const prog = periodProgress(p);
+  const scaleMax = Math.max(R.otMonthLimit * 1.15, ...list.map(r => Math.max(r.cur.ot, r.pj || 0))) * 1.02;
+  const pc = v => Math.min(100, v / scaleMax * 100).toFixed(1);
+  const meter = (cur, pj) => { const ext = pj != null && pj > cur ? pj : null;
+    return `<div class="meter"><span class="f lv-${lvOf(cur)}" style="width:${pc(cur)}%"></span>${ext != null ? `<span class="pj lv-${lvOf(ext)}" style="left:${pc(cur)}%;width:${(pc(ext) - pc(cur)).toFixed(1)}%"></span>` : ''}<span class="tk" style="left:${pc(R.otMonthWarn)}%"></span><span class="tk lim" style="left:${pc(R.otMonthLimit)}%"></span></div>`; };
   const otc = (v, lv) => `<span class="${lv && lv !== 'ok' ? 't-' + lv : ''}">${h1(v)}h</span>`;
-  const head = `<tr><th>部署</th><th>担当</th><th>業務構成（大分類）</th><th class="num">通常</th><th class="num">残業</th>${prog ? '<th class="num">月末見込</th>' : ''}
-    <th>残業メーター（${R.otMonthWarn}h／${R.otMonthLimit}h）</th><th class="num">前月期</th><th class="num">年度累計 / ${R.otYearLimit}h</th><th class="num">${R.otMonthLimit}h超</th><th class="num">入力日数</th><th class="num">未入力</th></tr>`;
+  const head = `<tr><th>部署</th><th>担当</th><th class="num">通常</th><th class="num">残業</th>${prog ? '<th class="num">月末見込</th>' : ''}<th>残業（${R.otMonthWarn}h／${R.otMonthLimit}h）</th><th class="num">前月期</th><th class="num">入力日数</th><th class="num">未入力</th></tr>`;
   let lastDept = null;
-  const body = rows.map(r => {
+  const body = list.map(r => {
     const s = r.o.src, key = s.id + '|' + r.o.author;
     let grp = '';
-    if (STATE.sort === 'dept' && lastDept !== s.id) { lastDept = s.id; grp = `<tr class="grp"><td colspan="${prog ? 12 : 11}"><span class="dot" style="background:${s.color}"></span> ${esc(s.name)}</td></tr>`; }
-    return grp + `<tr onclick="openDetail('${esc(key)}')">
-      <td><span class="dept"><span class="dot" style="background:${s.color}"></span>${esc(s.short)}</span></td>
-      <td class="name">${esc(r.o.author)}</td>
-      <td>${mix(r.comp)}</td>
-      <td class="num">${h1(r.cur.n)}h</td>
-      <td class="num">${otc(r.cur.ot, lvOf(r.cur.ot))}</td>
-      ${prog ? `<td class="num">${r.pj != null ? otc(r.pj, lvOf(r.pj)) : '—'}</td>` : ''}
-      <td>${meter(r.cur.ot, r.pj)}</td>
-      <td class="num t-muted">${r.pv.days ? h1(r.pv.ot) + 'h' : '—'}</td>
-      <td class="num"><span class="${r.fyOT >= R.otYearLimit ? 't-crit' : r.fyOT >= R.otYearLimit * 0.8 ? 't-warn' : ''}">${h1(r.fyOT)}h</span></td>
-      <td class="num"><span class="${r.over >= R.otOverMonthsMax ? 't-crit' : r.over >= R.otOverMonthsMax - 2 ? 't-warn' : r.over ? '' : 't-muted'}">${r.over}回</span></td>
-      <td class="num">${r.cur.days}日</td>
-      <td class="num ${r.cur.miss ? 't-crit' : 't-muted'}">${r.cur.miss ? r.cur.miss + '日' : '—'}</td></tr>`;
+    if (STATE.sort === 'dept' && lastDept !== s.id) { lastDept = s.id; grp = `<tr class="grp"><td colspan="${prog ? 9 : 8}"><span class="dot" style="background:${s.color}"></span> ${esc(s.name)}</td></tr>`; }
+    return grp + `<tr onclick="openDetail('${esc(key)}')"><td><span class="dept"><span class="dot" style="background:${s.color}"></span>${esc(s.short)}</span></td><td class="name">${esc(r.o.author)}</td>
+      <td class="num">${h1(r.cur.n)}h</td><td class="num">${otc(r.cur.ot, lvOf(r.cur.ot))}</td>${prog ? `<td class="num">${r.pj != null ? otc(r.pj, lvOf(r.pj)) : '—'}</td>` : ''}
+      <td>${meter(r.cur.ot, r.pj)}</td><td class="num t-muted">${r.pv.days ? h1(r.pv.ot) + 'h' : '—'}</td><td class="num">${r.cur.days}日</td><td class="num ${r.cur.miss ? 't-crit' : 't-muted'}">${r.cur.miss ? r.cur.miss + '日' : '—'}</td></tr>`;
   }).join('');
-  document.getElementById('tbl').innerHTML = rows.length ? `<table class="mt"><thead>${head}</thead><tbody>${body}</tbody></table>` : '<div class="empty">この月期のデータがありません</div>';
-  document.getElementById('legend').innerHTML = `<span><i style="background:var(--ok)"></i>${R.otMonthWarn}h未満</span><span><i style="background:var(--warn)"></i>警告 ${R.otMonthWarn}h以上</span><span><i style="background:var(--crit)"></i>上限 ${R.otMonthLimit}h超</span>${prog ? '<span><i style="background:repeating-linear-gradient(135deg,var(--g500) 0 2px,transparent 2px 4px)"></i>月末見込までの伸び（今のペースで締め日まで続けた場合）</span>' : ''}<span>業務構成の色は部署ごとの大分類（マウスを乗せると内訳）</span>`;
+  document.getElementById('tbl').innerHTML = list.length ? `<table class="mt"><thead>${head}</thead><tbody>${body}</tbody></table>` : '<div class="empty">この月期のデータがありません</div>';
+  document.getElementById('legend').innerHTML = `<span><i style="background:var(--ok)"></i>${R.otMonthWarn}h未満</span><span><i style="background:var(--warn)"></i>警告 ${R.otMonthWarn}h以上</span><span><i style="background:var(--crit)"></i>上限 ${R.otMonthLimit}h超</span>${prog ? '<span><i style="background:repeating-linear-gradient(135deg,var(--g500) 0 2px,transparent 2px 4px)"></i>月末見込までの伸び（今のペースで締め日まで続けた場合）</span>' : ''}`;
+}
+
+// ── 日報 入力状況（人 × 日）──
+function renderEntryCal(rows) {
+  const p = STATE.period, pd = periodDates(p.year, p.month), today = todayStr(), dates = eachDate(pd.startDate, pd.endDate);
+  const list = rows.slice().sort((a, b) => SOURCES.indexOf(a.o.src) - SOURCES.indexOf(b.o.src) || b.cur.miss - a.cur.miss);
+  const head = `<tr><th></th>${dates.map(d => { const w = new Date(d + 'T00:00:00').getDay(); return `<th class="${w === 0 ? 'sun' : w === 6 ? 'sat' : ''}">${Number(d.slice(8))}<br>${WD[w]}</th>`; }).join('')}<th>未入力</th></tr>`;
+  const body = list.map(r => { const o = r.o, first = Object.keys(o.days).filter(d => o.days[d].leave).sort()[0];
+    return `<tr><td class="nm"><span class="dot" style="background:${o.src.color}"></span> ${esc(o.author)}</td>${dates.map(d => {
+      const v = o.days[d], c = v && v.leave ? calcFromLeave(v.leave, d) : null, w = new Date(d + 'T00:00:00').getDay();
+      if (c) return `<td class="${c.ot > 0 ? 'ot' : 'ok'}" title="${d} 退勤 ${esc(v.leave)}（通常 ${h2(c.normal)}h・残業 ${h2(c.ot)}h）">${h1(c.normal + c.ot)}</td>`;
+      if (d >= today) return '<td></td>';
+      if (w === 0 || w === 6 || !isWorkday(d, today)) return '<td class="off"></td>';
+      if (!first || d < first) return '<td></td>';
+      return `<td class="miss" title="${d} 未入力">未</td>`;
+    }).join('')}<td class="cnt ${r.cur.miss ? 't-crit' : 't-muted'}">${r.cur.miss ? r.cur.miss + '日' : '—'}</td></tr>`; }).join('');
+  document.getElementById('entry-cal').innerHTML = list.length ? `<table class="cal"><thead>${head}</thead><tbody>${body}</tbody></table>` : '<div class="empty">データがありません</div>';
+  document.getElementById('cal-sub').textContent = `${pd.label}（${pd.range}）・退勤時刻から計算した勤務時間。黄＝残業あり・赤＝未入力（平日の過去日）・斜線＝土日・休日`;
 }
 
 // ═══════════════════════════════════════════
@@ -596,6 +862,21 @@ function openDetail(key, keepScroll) {
       <td><div class="mini">${x.m.days ? `<span class="lv-${lvOf(x.m.ot)}" style="width:${(x.m.ot / mx * 100).toFixed(1)}%"></span>` : ''}<i style="left:${(R.otMonthLimit / mx * 100).toFixed(1)}%"></i></div></td>
       <td class="num">${x.m.days || ''}</td><td class="num">${x.m.days ? hm(x.m.avgLeave) : ''}</td></tr>`;
   }).join('')}</tbody></table>`;
+  // 部署平均（同じ期間・同じ部署の全員の構成比）との比較
+  const scopeS = STATE.detailScope === 'fy' ? fyS : pd.startDate, scopeE = STATE.detailScope === 'fy' ? fyE : pd.endDate;
+  const mates = rowsForView().filter(r => r.o.src.id === o.src.id);
+  const dcp = deptComp(mates, scopeS, scopeE);
+  const cmp = comp.tot && dcp.tot ? deptCats(o.src, dcp.cats.concat(comp.cats.filter(c => !dcp.cats.some(x => x.cd === c.cd)))).map(c => {
+    const me = (comp.cats.find(x => x.cd === c.cd) || {h: 0}).h / comp.tot, team = (dcp.cats.find(x => x.cd === c.cd) || {h: 0}).h / dcp.tot;
+    if (me < 0.005 && team < 0.005) return '';
+    const mx = 100;
+    return `<div class="cmp"><span><span class="dot" style="background:${esc(c.color)}"></span> ${esc(c.label)}</span><div class="tr"><span style="width:${(me * mx).toFixed(1)}%;background:${esc(c.color)}"></span><i style="left:${(team * mx).toFixed(1)}%" title="部署平均 ${Math.round(team * 100)}%"></i></div>
+      <span class="vl">${Math.round(me * 100)}%<small>部署 ${Math.round(team * 100)}%</small> <b class="${me - team > 0.1 ? 't-warn' : me - team < -0.1 ? 't-muted' : ''}">${me - team >= 0 ? '+' : ''}${Math.round((me - team) * 100)}</b></span></div>`; }).join('') : '';
+  // 業務構成の推移（月期ごとの大分類）
+  const allCats = deptCats(o.src, compFor(o, fyS, fyE).cats);
+  const mmax = Math.max(1, ...D.fps.map(fp => { const q = periodDates(fp.year, fp.month); return compFor(o, q.startDate, q.endDate).tot; }));
+  const mixTrend = D.fps.map((fp, i) => { const q = periodDates(fp.year, fp.month); if (q.startDate > today) return ''; const c = compFor(o, q.startDate, q.endDate);
+    return `<div class="pbar" style="cursor:default"><span class="nm" style="font-weight:700">${fp.month}月期${i === idx ? ' ●' : ''}</span><div><div class="bars" style="width:${(c.tot / mmax * 100).toFixed(1)}%;height:16px">${allCats.map(cat => { const x = c.cats.find(y => y.cd === cat.cd); return x && x.h ? `<span style="width:${(x.h / c.tot * 100).toFixed(2)}%;background:${esc(cat.color)}" title="${esc(cat.label)} ${h1(x.h)}h"></span>` : ''; }).join('')}</div></div><span class="tot">${c.tot ? h1(c.tot) + 'h' : '—'}</span></div>`; }).join('');
   const bars = (list, tot, n) => list.slice(0, n).map(x => `<div class="hbar"><span class="lb"><span class="dot" style="background:${esc(x.color)}"></span>${esc(x.label)}</span><span class="tr"><span style="width:${(x.h / list[0].h * 100).toFixed(1)}%;background:${esc(x.color)}"></span></span><span class="vl">${h1(x.h)}h<small>${Math.round(x.h / tot * 100)}%</small></span></div>`).join('');
   // 日別明細
   const days = eachDate(pd.startDate, pd.endDate).filter(d => o.days[d] || (d < today && isWorkday(d, today)));
@@ -615,7 +896,9 @@ function openDetail(key, keepScroll) {
       <div class="card"><div class="card-hd"><h3>業務構成</h3>
         <div class="seg"><button class="${STATE.detailScope === 'period' ? 'on' : ''}" onclick="setDetailScope('period')">この月期</button><button class="${STATE.detailScope === 'fy' ? 'on' : ''}" onclick="setDetailScope('fy')">年度累計</button></div></div>
         <div class="card-body">${comp.tot ? `<div class="two"><div><div class="card-sub" style="margin-bottom:6px;">大分類（${esc(s.short)}の分類） 合計 ${h1(comp.tot)}h</div>${bars(comp.cats, comp.tot, 12)}</div>
-          <div><div class="card-sub" style="margin-bottom:6px;">中分類 上位10</div>${bars(comp.subs, comp.tot, 10)}</div></div>` : '<div class="empty">日報の入力がありません</div>'}</div></div>
+          <div><div class="card-sub" style="margin-bottom:6px;">中分類 上位10</div>${bars(comp.subs, comp.tot, 10)}</div></div>
+          ${cmp ? `<div class="sec-ttl">部署平均との比較 <span class="card-sub">棒＝本人の割合・縦線＝部署平均（${esc(s.short)}の全員）</span></div>${cmp}` : ''}` : '<div class="empty">日報の入力がありません</div>'}</div></div>
+      <div class="card"><div class="card-hd"><h3>業務構成の推移（${D.fy + 1}年度）</h3><span class="card-sub">月期ごとの日報の入力時間を大分類で積み上げ</span></div><div class="card-body"><div class="lg">${allCats.map(c => `<span><i style="background:${esc(c.color)}"></i>${esc(c.label)}</span>`).join('')}</div>${mixTrend}</div></div>
       <div class="card"><div class="card-hd"><h3>月期別 推移（${D.fy + 1}年度）</h3><span class="card-sub">赤線＝月${R.otMonthLimit}h</span></div><div class="card-body scroll">${trend}</div></div>
       <div class="card"><div class="card-hd"><h3>日別明細</h3><span class="card-sub">通常・残業は退勤時刻から算出／右端は日報に入力した時間の合計</span></div><div class="card-body scroll">${daily}</div></div>
     </div>`;
