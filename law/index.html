@@ -1526,6 +1526,8 @@ tr.neon-row td.td-name{animation:neonText .8s ease-out;}
 .kpi-tile.is-ok{--k:var(--st-ok);--ki:var(--st-ok-ink);} .kpi-tile.is-warn{--k:var(--st-warn);--ki:var(--st-warn-ink);} .kpi-tile.is-crit{--k:var(--st-crit);--ki:var(--st-crit-ink);}
 .kpi-tile .kt-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:600;color:var(--dx-ink-2);min-width:0;}
 .kpi-tile .kt-nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.kpi-tile .kt-rule{flex:none;font-size:10px;font-weight:700;color:var(--dx-ink-3,var(--g500));border:1px solid var(--g200);border-radius:999px;padding:0 6px;line-height:16px;white-space:nowrap;}
+.kpi-bd .kb-rng{font-size:11px;color:var(--dx-ink-3,var(--g500));margin:-4px 0 8px;}
 .kpi-tile .kt-dot{width:8px;height:8px;border-radius:50%;background:var(--k);flex:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--k) 18%,transparent);}
 .kpi-tile.is-na .kt-dot{background:var(--dx-track);box-shadow:none;}
 .kpi-tile .kt-v{display:flex;align-items:baseline;gap:2px;line-height:1;color:var(--dx-ink-1);font-variant-numeric:tabular-nums;white-space:nowrap;}
@@ -7821,11 +7823,17 @@ async function renderKpiDash(force) {
   const sel = document.getElementById('kpi-sel-fy');
   const fy = Number(sel && sel.value) || getCurrentFiscalYear();
   const periods = getFiscalPeriods(fy), ranges = periods.map(x => kpiPeriodDates(x.year, x.month));
+  // 残業時間 KPI だけは日報全体と同じ 15日締め（前月16日〜当月15日）で集計する
+  const otRanges = periods.map(x => getPeriodDates(x.year, x.month));
   const today = todayStr();
   const curIdx = ranges.findIndex(r => r.startDate <= today && today <= r.endDate);
   let lastIdx = -1; ranges.forEach((r, i) => { if (r.startDate <= today) lastIdx = i; });
+  const otCurIdx = otRanges.findIndex(r => r.startDate <= today && today <= r.endDate);
+  let otLastIdx = -1; otRanges.forEach((r, i) => { if (r.startDate <= today) otLastIdx = i; });
   const reuse = !force && _kpiCtx && _kpiCtx.fy === fy && _kpiCtx.data;
-  const ctx = {fy, periods, ranges, curIdx, lastIdx, data: reuse ? _kpiCtx.data : null, sel: reuse ? _kpiCtx.sel : (curIdx >= 0 ? curIdx : lastIdx)};
+  const ctx = {fy, periods, ranges, curIdx, lastIdx, otRanges, otCurIdx, otLastIdx,
+    data: reuse ? _kpiCtx.data : null, otData: reuse ? _kpiCtx.otData : null, otPrev0: reuse ? _kpiCtx.otPrev0 : null,
+    sel: reuse ? _kpiCtx.sel : (curIdx >= 0 ? curIdx : lastIdx)};
   _kpiCtx = ctx;
   const rl = document.getElementById('kpi-range');
   if (rl) rl.textContent = `${ranges[0].range.split(' 〜 ')[0]} 〜 ${ranges[11].range.split(' 〜 ')[1]}`;
@@ -7839,6 +7847,14 @@ async function renderKpiDash(force) {
       // 年度初めの月期の前期（前年度9月期）: 担当者別の前期比に使う
       const p0 = periods[0], pp = p0.month === 1 ? {year: p0.year - 1, month: 12} : {year: p0.year, month: p0.month - 1}, pr = kpiPeriodDates(pp.year, pp.month);
       ctx.prev0 = lastIdx >= 0 ? await withTimeout(loadRangeData(pr.startDate, pr.endDate, pp.year, pp.month), 15000, 'timeout').catch(() => null) : null;
+      // 残業時間（15日締め）の月期データと、年度初めの前期（前年度9月期）
+      if (_kpiOtItem()) {
+        const og = await mapPool(periods.map((x, i) => ({x, i})).filter(o => o.i <= otLastIdx), 4, ({x, i}) =>
+          withTimeout(loadRangeData(otRanges[i].startDate, otRanges[i].endDate, x.year, x.month), 15000, 'timeout').catch(() => null));
+        ctx.otData = periods.map((x, i) => i <= otLastIdx ? og[i] : null);
+        const opr = getPeriodDates(pp.year, pp.month);
+        ctx.otPrev0 = otLastIdx >= 0 ? await withTimeout(loadRangeData(opr.startDate, opr.endDate, pp.year, pp.month), 15000, 'timeout').catch(() => null) : null;
+      } else ctx.otData = periods.map(() => null);
     } finally { setLoading(false); }
   }
   if (_kpiCtx !== ctx) return;
@@ -7846,38 +7862,46 @@ async function renderKpiDash(force) {
   // 各KPI × 月期 の工数
   const HK = _kpiHoursItems(), OTK = _kpiOtItem();
   const vals = HK.map(k => periods.map((x, i) => (i > lastIdx || !data[i] || !k.subs.length) ? null : _kpiHoursOf(data[i], k.subs)));
-  const otVals = periods.map((x, i) => (i > lastIdx || !data[i]) ? null : _kpiOtOf(data[i]));
+  const otData = ctx.otData || periods.map(() => null);
+  const otVals = periods.map((x, i) => (i > otLastIdx || !otData[i]) ? null : _kpiOtOf(otData[i]));
   // 担当者別の残業（積み上げ棒用）。年度内に残業のある人を多い順に
-  const otBy = periods.map((x, i) => (i > lastIdx || !data[i]) ? null : _kpiOtByAuthor(data[i]));
+  const otBy = periods.map((x, i) => (i > otLastIdx || !otData[i]) ? null : _kpiOtByAuthor(otData[i]));
   const otAuthors = (() => { const t = {}; otBy.forEach(m => m && Object.keys(m).forEach(a => { t[a] = (t[a] || 0) + m[a].ot; })); return Object.keys(t).filter(a => t[a] > 0).sort((a, b) => t[b] - t[a]); })();   // KPI は公平に多い順（谷を最後にしない）
   const AUTH_COLORS = ['#2a78d6', '#e0a526', '#8b5cf6', '#10b981', '#f43f5e', '#0ea5e9', '#f97316', '#84cc16', '#ec4899', '#6b7280'];
   // 担当者の色は年度を通して固定（残業の多い順に割当。残業の無い人も内訳のバーで同じ色になるよう全員に振る）
   const palAuthors = otAuthors.slice();
-  data.forEach(d => d && Object.keys(d).forEach(a => { if (a !== '_leaveMap' && !palAuthors.includes(a)) palAuthors.push(a); }));
+  data.concat(otData).forEach(d => d && Object.keys(d).forEach(a => { if (a !== '_leaveMap' && !palAuthors.includes(a)) palAuthors.push(a); }));
   const authColor = a => { const i = palAuthors.indexOf(a); return i < 0 ? '#8C8377' : AUTH_COLORS[i % AUTH_COLORS.length]; };
   const wd = curIdx >= 0 && data[curIdx] ? _kpiWorkdays(data[curIdx], ranges[curIdx].startDate, ranges[curIdx].endDate) : null;
   const proj = wd && wd.elapsed > 0 && wd.total > wd.elapsed ? wd.total / wd.elapsed : 1;
   ctx.proj = proj;
+  const owd = otCurIdx >= 0 && otData[otCurIdx] ? _kpiWorkdays(otData[otCurIdx], otRanges[otCurIdx].startDate, otRanges[otCurIdx].endDate) : null;
+  const otProj = owd && owd.elapsed > 0 && owd.total > owd.elapsed ? owd.total / owd.elapsed : 1;
+  ctx.otProj = otProj;
   const calFirst = ranges.findIndex(r => !r.calendar), calMixed = ranges.some(r => r.calendar) && calFirst >= 0;
-  const calNote = ranges.some(r => r.calendar) ? (calFirst >= 0 ? `${periods[calFirst].month}月期から15日締め、それ以前は月末締め` : '全月期とも月末締め') : '15日締め';
+  const calNote = (ranges.some(r => r.calendar) ? (calFirst >= 0 ? `工数は${periods[calFirst].month}月期から15日締め、それ以前は月末締め` : '工数は月末締め') : '工数は15日締め') + (OTK ? '・残業時間は15日締め' : '');
 
   // ── タイル: 今期（当年度でなければ選択中の月期）──
   const tIdx = curIdx >= 0 ? curIdx : (ctx.sel >= 0 ? ctx.sel : lastIdx);
   const tiles = document.getElementById('kpi-tiles');
   if (tiles) {
-    const tile = (k, v, note, isOt) => {
+    const tile = (k, v, note, isOt, isCur, pjx, range) => {
       const base = 'kpi-tile' + (isOt ? ' is-ot' : '');
-      if (v == null) return `<div class="${base} is-na"><div class="kt-hd"><span class="kt-nm">${escHtml(k.name)}</span><span class="kt-dot"></span></div><div class="kt-v"><b>—</b><span class="kt-tg">/ ${k.target}h</span></div><div class="kt-m"></div><div class="kt-ft"><span class="kt-tag">${note || 'データなし'}</span></div></div>`;
-      const isCur = tIdx === curIdx, J = _kpiJudge(v, k.target, isCur, proj), hasPj = J.hasPj, pj = J.pj, lv = J.lv, judge = J.label, r = J.rAct;
+      const nm = `<span class="kt-nm">${escHtml(k.name)}</span>${isOt ? '<span class="kt-rule" title="残業時間は15日締め（前月16日〜当月15日）で集計">15日締め</span>' : ''}`;
+      if (v == null) return `<div class="${base} is-na"><div class="kt-hd">${nm}<span class="kt-dot"></span></div><div class="kt-v"><b>—</b><span class="kt-tg">/ ${k.target}h</span></div><div class="kt-m"></div><div class="kt-ft"><span class="kt-tag">${note || 'データなし'}</span></div></div>`;
+      const J = _kpiJudge(v, k.target, isCur, pjx), hasPj = J.hasPj, pj = J.pj, lv = J.lv, judge = J.label, r = J.rAct;
       const scale = Math.max(k.target * 1.35, pj, v, 0.01);
       const sub = hasPj ? `見込 ${pj.toFixed(2)}h・${Math.round(r * 100)}%` : (v > k.target ? `目標超過 +${(v - k.target).toFixed(2)}h` : `${Math.round(r * 100)}%`);
-      return `<div class="${base} is-${lv}" title="${escHtml(k.name)}: ${v.toFixed(2)}h／目標 ${k.target}h（${Math.round(r * 100)}%）${hasPj ? `・見込 ${pj.toFixed(2)}h` : ''}">
-        <div class="kt-hd"><span class="kt-nm">${escHtml(k.name)}</span><span class="kt-dot"></span></div>
+      return `<div class="${base} is-${lv}" title="${escHtml(k.name)}${range ? `（${range}）` : ''}: ${v.toFixed(2)}h／目標 ${k.target}h（${Math.round(r * 100)}%）${hasPj ? `・見込 ${pj.toFixed(2)}h` : ''}">
+        <div class="kt-hd">${nm}<span class="kt-dot"></span></div>
         <div class="kt-v"><b>${v.toFixed(2)}</b><small>h</small><span class="kt-tg">/ ${k.target}h</span></div>
         <div class="kt-m">${hasPj && pj > v ? `<i class="pj" data-w="${(pj / scale * 100).toFixed(1)}"></i>` : ''}${v > k.target ? `<i class="ov" data-w="${(v / scale * 100).toFixed(1)}"></i>` : ''}<i class="f" data-w="${(Math.min(v, k.target) / scale * 100).toFixed(1)}"></i><i class="tk" style="left:${(k.target / scale * 100).toFixed(1)}%"></i></div>
         <div class="kt-ft"><span class="kt-tag">${judge}</span><span class="kt-sub">${sub}</span></div></div>`;
     };
-    tiles.innerHTML = (OTK ? tile(OTK, tIdx >= 0 ? otVals[tIdx] : null, '', true) : '') + HK.map((k, ki) => tile(k, tIdx >= 0 ? vals[ki][tIdx] : null, k.subs.length ? '' : '中分類が未設定', false)).join('');
+    // 残業時間は 15日締めの今期（当年度でなければ同じ月の月期）
+    const oIdx = tIdx === curIdx && otCurIdx >= 0 ? otCurIdx : tIdx;
+    tiles.innerHTML = (OTK ? tile(OTK, oIdx >= 0 ? otVals[oIdx] : null, '', true, oIdx === otCurIdx, otProj, oIdx >= 0 ? otRanges[oIdx].range : '') : '') +
+      HK.map((k, ki) => tile(k, tIdx >= 0 ? vals[ki][tIdx] : null, k.subs.length ? '' : '中分類が未設定', false, tIdx === curIdx, proj, tIdx >= 0 ? ranges[tIdx].range : '')).join('');
   }
   const tl = document.querySelector('#dash-kpi .kpi-tiles');
   if (tl) tl.title = tIdx >= 0 ? `${periods[tIdx].month}月期（${ranges[tIdx].range}）` : '';
@@ -7923,22 +7947,23 @@ async function renderKpiDash(force) {
   if (bt) bt.textContent = si >= 0 ? `内訳（${periods[si].month}月期）` : '内訳';
   if (bs) bs.textContent = si >= 0 ? `${ranges[si].range}${calMixed && ranges[si].calendar ? '（月末締め）' : ''}・KPI ごとの中分類別と担当者別の工数` : 'ヒートマップの月期をクリックで切替';
   if (bd) {
-    const d = si >= 0 ? data[si] : null;
-    if (!d) bd.innerHTML = '<p class="dx-empty">この月期のデータがありません</p>';
-    else bd.innerHTML = `<div class="kpi-bd-grid">${(OTK ? [(() => {
-      const all = _kpiOtByAuthor(d), auth = Object.keys(all).filter(a => all[a].ot > 0).sort((x, y) => all[y].ot - all[x].ot);   // 多い順（要因が上に来るように）
+    const d = si >= 0 ? data[si] : null, od = si >= 0 ? otData[si] : null;
+    if (!d && !od) bd.innerHTML = '<p class="dx-empty">この月期のデータがありません</p>';
+    else bd.innerHTML = `<div class="kpi-bd-grid">${(OTK && od ? [(() => {
+      const all = _kpiOtByAuthor(od), auth = Object.keys(all).filter(a => all[a].ot > 0).sort((x, y) => all[y].ot - all[x].ot);   // 多い順（要因が上に来るように）
       const total = auth.reduce((t, a) => t + all[a].ot, 0), maxA = Math.max(0.01, ...auth.map(a => all[a].ot));
-      const J = _kpiJudge(total, OTK.target, si === curIdx, proj), lv = J.lv;
-      const prevD = si > 0 ? data[si - 1] : ctx.prev0, prevAll = prevD ? _kpiOtByAuthor(prevD) : null;
+      const J = _kpiJudge(total, OTK.target, si === otCurIdx, otProj), lv = J.lv;
+      const prevD = si > 0 ? otData[si - 1] : ctx.otPrev0, prevAll = prevD ? _kpiOtByAuthor(prevD) : null;
       const over = Math.max(0, J.pj - OTK.target), avg = auth.length ? total / auth.length : 0;
       const inc = prevAll ? auth.filter(a => (all[a].ot - ((prevAll[a] || {}).ot || 0)) > 0.05) : [];
       return `<div class="kpi-bd kpi-bd-ot is-${lv}">
         <div class="kpi-bd-hd"><span class="kb-dot"></span><b>${escHtml(OTK.name)}</b><span class="kb-v"><em>${total.toFixed(2)}h</em>/ ${OTK.target}h${J.hasPj ? `<span class="kb-pj">見込 ${J.pj.toFixed(2)}h</span>` : ''}${over > 0 ? `<span class="kb-over">+${over.toFixed(2)}h</span>` : ''}</span><span class="dx-tag is-${lv}">${J.label}</span></div>
+        <div class="kb-rng">集計期間 ${escHtml(otRanges[si].range)}（15日締め）</div>
         ${auth.length ? `<div class="kpi-bd-sec">担当者（多い順）・平均 ${avg.toFixed(2)}h${prevAll ? '・前期比' : ''}</div>
         <div class="dx-hbars">${auth.map(a => { const v = all[a].ot, pv = prevAll ? ((prevAll[a] || {}).ot || 0) : null, dv = pv == null ? null : v - pv, hi = v > avg + 0.05;
           return `<div class="dx-hbar"><span class="lb"><i class="dx-sw" style="background:${authColor(a)}"></i>${escHtml(a)}${hi ? '<span class="dx-tag is-crit" title="チーム平均より多い">平均超</span>' : ''}</span><div class="tr"><i style="background:${authColor(a)}" data-w="${(v / maxA * 100).toFixed(1)}"></i></div><span class="vv">${v.toFixed(2)}h<small>${total ? Math.round(v / total * 100) : 0}%</small>${dv == null ? '' : `<small class="${dv > 0.05 ? 't-crit' : dv < -0.05 ? 't-ok' : 't-muted'}" title="前期 ${pv.toFixed(2)}h">${dv > 0 ? '+' : ''}${dv.toFixed(2)}</small>`}</span></div>`; }).join('')}</div>
         ${inc.length ? `<p class="dx-note">前期より増えた人: ${inc.map(a => `${escHtml(a)} +${(all[a].ot - ((prevAll[a] || {}).ot || 0)).toFixed(2)}h`).join('、')}</p>` : ''}` : '<p class="dx-empty">この月期の残業はありません</p>'}
-      </div>`; })()] : []).join('')}${HK.map((k, ki) => {
+      </div>`; })()] : []).join('')}${d ? HK.map((k, ki) => {
       const b = _kpiBreakdown(d, k.subs);
       const J = _kpiJudge(b.total, k.target, si === curIdx, proj), lv = !k.subs.length ? '' : J.lv;
       const subs = Object.keys(b.bySub).filter(cd => b.bySub[cd] > 0.005).sort((x, y) => b.bySub[y] - b.bySub[x]);
@@ -7952,7 +7977,7 @@ async function renderKpiDash(force) {
         `<div class="kpi-bd-sec">中分類</div><div class="dx-hbars">${subs.map(cd => { const sb = SUB_MAP[cd] || {}; return bar(escHtml(sb.label || cd), b.bySub[cd], maxS, 'var(--k)'); }).join('')}</div>
         <div class="kpi-bd-sec">担当者</div><div class="dx-hbars">${auth.map(a => bar(`<i class="dx-sw" style="background:${authColor(a)}"></i>${escHtml(a)}`, b.byAuthor[a], maxA, authColor(a))).join('')}</div>`}
       </div>`;
-    }).join('')}</div>`;
+    }).join('') : ''}</div>`;
   }
   // ── 残業時間の棒グラフ ──
   const otCard = document.getElementById('kpi-ot-card');
@@ -7960,8 +7985,8 @@ async function renderKpiDash(force) {
     otCard.style.display = OTK ? '' : 'none';
     if (OTK) {
       const os = document.getElementById('kpi-ot-sub');
-      if (os) os.textContent = `月期ごとの全員の残業時間の合計（日報の残業欄・担当者ごとの積み上げ）・破線＝目標 ${OTK.target}h・斜線＝今期の見込`;
-      requestAnimationFrame(() => renderKpiOtBar(document.getElementById('kpi-ot-canvas'), periods, ranges, otVals, OTK.target, curIdx, proj, {by: otBy, authors: otAuthors, color: authColor, sel: ctx.sel}));
+      if (os) os.textContent = `月期（15日締め）ごとの全員の残業時間の合計（日報の残業欄・担当者ごとの積み上げ）・破線＝目標 ${OTK.target}h・斜線＝今期の見込`;
+      requestAnimationFrame(() => renderKpiOtBar(document.getElementById('kpi-ot-canvas'), periods, otRanges, otVals, OTK.target, otCurIdx, otProj, {by: otBy, authors: otAuthors, color: authColor, sel: ctx.sel}));
       const lg = document.getElementById('kpi-ot-legend');
       if (lg) lg.innerHTML = otAuthors.map(a => `<span><i class="dx-sw" style="background:${authColor(a)}"></i>${escHtml(a)}</span>`).join('');
     }
@@ -8921,8 +8946,10 @@ function _aiKpiPayload() {
   const at = (i, f) => (i > c.lastIdx || !c.data[i]) ? null : f(c.data[i]);
   if (OTK) {
     const byAuthor = {};
-    c.data.forEach((d, i) => { if (i > c.lastIdx || !d) return; const ob = _kpiOtByAuthor(d); Object.keys(ob).forEach(a => { byAuthor[a] = _aiR((byAuthor[a] || 0) + ob[a].ot); }); });
-    kpis.push({key: OTK.key, name: OTK.name, kind: 'ot', target: OTK.target, owner: OTK.owner || '', plan: OTK.plan || '', vals: c.periods.map((_, i) => at(i, d => _aiR(_kpiOtOf(d)))), byAuthor});
+    const od = c.otData || [], oat = (i, f) => (i > c.otLastIdx || !od[i]) ? null : f(od[i]);
+    od.forEach((d, i) => { if (i > c.otLastIdx || !d) return; const ob = _kpiOtByAuthor(d); Object.keys(ob).forEach(a => { byAuthor[a] = _aiR((byAuthor[a] || 0) + ob[a].ot); }); });
+    kpis.push({key: OTK.key, name: OTK.name, kind: 'ot', target: OTK.target, owner: OTK.owner || '', plan: OTK.plan || '', vals: c.periods.map((_, i) => oat(i, d => _aiR(_kpiOtOf(d)))), byAuthor,
+      period: '15日締め（前月16日〜当月15日）', curIdx: c.otCurIdx, proj: _aiR(c.otProj || 1), ranges: (c.otRanges || []).map(r => r.range)});
   }
   HK.forEach(k => {
     const byAuthor = {}, bySub = {};
@@ -8932,11 +8959,11 @@ function _aiKpiPayload() {
     kpis.push({key: k.key, name: k.name, target: k.target, owner: k.owner || '', plan: k.plan || '', subs: k.subs.map(subName),
       vals: c.periods.map((_, i) => k.subs.length ? at(i, d => _aiR(_kpiHoursOf(d, k.subs))) : null), byAuthor, bySub});
   });
-  const proj = c.proj || 1;
   kpis.forEach(k => {
-    const past = k.vals.map((v, i) => ({v, i})).filter(x => x.v != null && x.i !== c.curIdx);
-    const judge = k.vals.map((v, i) => v == null ? null : _kpiJudge(v, k.target, i === c.curIdx, proj).label);
-    const cv = c.curIdx >= 0 ? k.vals[c.curIdx] : null;
+    const kc = k.kind === 'ot' ? c.otCurIdx : c.curIdx, proj = (k.kind === 'ot' ? c.otProj : c.proj) || 1;
+    const past = k.vals.map((v, i) => ({v, i})).filter(x => x.v != null && x.i !== kc);
+    const judge = k.vals.map((v, i) => v == null ? null : _kpiJudge(v, k.target, i === kc, proj).label);
+    const cv = kc >= 0 ? k.vals[kc] : null;
     k.summary = {doneMonths: past.length, achievedMonths: past.filter(x => x.v <= k.target).length,
       avgDone: past.length ? _aiR(past.reduce((t, x) => t + x.v, 0) / past.length) : null, judge,
       curValue: cv, curProjection: cv == null ? null : _aiR(cv * proj), totalByAuthor: k.byAuthor};
@@ -8954,7 +8981,8 @@ function _aiKpiPayload() {
 // ── KPI: 図表（KPIごとのカード＋AIコメント） ──
 function _aiKpiVisuals(p, rep) {
   const cur = p.curIdx, proj = p.proj || 1;
-  const J = (v, k, i) => _kpiJudge(v, k.target, i === cur, proj);
+  // 残業時間 KPI は 15日締めなので、今期の位置と見込の倍率を KPI ごとに持つ
+  const J = (v, k, i) => _kpiJudge(v, k.target, i === (k.curIdx != null ? k.curIdx : cur), k.proj != null ? k.proj : proj);
   let cOk = 0, cAll = 0, cCrit = 0;
   p.kpis.forEach(k => k.vals.forEach((v, i) => { if (v == null || i === cur) return; cAll++; const lv = J(v, k, i).lv; if (lv === 'ok') cOk++; if (lv === 'crit') cCrit++; }));
   const ti = cur >= 0 ? cur : p.kpis.reduce((m, k) => Math.max(m, k.vals.map((v, i) => v != null ? i : -1).reduce((a, b) => Math.max(a, b), -1)), -1);
