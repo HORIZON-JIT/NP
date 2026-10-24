@@ -128,6 +128,21 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
 @keyframes tdRipple{to{transform:scale(28);opacity:0;}}
 .hours-wrap{position:relative;}
 .hours-wrap input.bump{animation:cellBump .42s cubic-bezier(.2,1.4,.4,1);}
+/* Folioから取込: 入力欄に反映するときのチャージ演出 */
+.hours-wrap .chg{position:absolute;inset:0;border-radius:8px;overflow:hidden;pointer-events:none;z-index:3;border:1.5px solid var(--cc);background:var(--panel);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--cc);font-variant-numeric:tabular-nums;box-shadow:0 0 10px color-mix(in srgb,var(--cc) 45%,transparent);animation:chgIn .18s ease-out;}
+.hours-wrap .chg i{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,color-mix(in srgb,var(--cc) 10%,transparent),color-mix(in srgb,var(--cc) 42%,transparent));animation:chgFill var(--d) cubic-bezier(.35,.6,.3,1) forwards;}
+.hours-wrap .chg i::after{content:'';position:absolute;right:-3px;top:-2px;bottom:-2px;width:7px;background:#fff;opacity:.85;filter:blur(2px);box-shadow:0 0 8px 2px var(--cc);}
+.hours-wrap .chg b{position:relative;}
+.hours-wrap .chg.done{animation:chgDone .5s ease-out forwards;}
+.hours-wrap .chg.done{background:transparent;border-color:transparent;color:transparent;}
+.hours-wrap .chg.done i{opacity:0;}
+/* 順番待ちのセルは、チャージされるまで空に見せる */
+.hours-wrap .chg-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--g800);pointer-events:none;z-index:2;}
+.hours-wrap input.chg-wait{color:transparent!important;background:var(--panel)!important;border-color:var(--g200)!important;font-weight:400!important;}
+#entry-tbody tr.chg-row td{transition:background-color .3s;background-color:color-mix(in srgb,var(--cat-color,var(--primary)) 9%,transparent);}
+@keyframes chgIn{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}
+@keyframes chgFill{to{width:100%}}
+@keyframes chgDone{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--cc) 70%,transparent);opacity:1}60%{box-shadow:0 0 0 9px transparent;opacity:1}100%{box-shadow:0 0 0 12px transparent;opacity:0}}
 .hours-wrap input.bump-ot{animation:cellBumpOT .42s cubic-bezier(.2,1.4,.4,1);}
 @keyframes cellBump{0%{transform:scale(1);box-shadow:0 0 0 0 color-mix(in srgb,var(--primary) 65%,transparent);}40%{transform:scale(1.35);}100%{transform:scale(1);box-shadow:0 0 0 20px transparent;}}
 @keyframes cellBumpOT{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(244,63,94,.7);}40%{transform:scale(1.35);}100%{transform:scale(1);box-shadow:0 0 0 20px transparent;}}
@@ -172,7 +187,7 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
 [data-theme="dark"] .input-live-pie.saved-flash::after{background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.14) 50%,transparent 70%);background-size:250% 100%;}
 @keyframes savedSweep{from{background-position:120% 0;}to{background-position:-30% 0;}}
 .input-live-pie.saved-flash .live-pie-canvas{animation:numPop .6s cubic-bezier(.2,1.4,.4,1);}
-@media (prefers-reduced-motion:reduce){#entry-tbody tr.hit td,.td-ripple,.add-chip,.num-pop,.hours-wrap input.bump,.hours-wrap input.bump-ot,.input-live-pie.saved-flash::after,.input-live-pie.saved-flash .live-pie-canvas,.row-sweep::before,.fx-spark,.fx-ring,.table-flash,.fx-combo,.live-pie-canvas.glow,.side-totals.hit,.side-totals.hit::after{animation:none!important;}.fx-fly{transition:none!important;}}
+@media (prefers-reduced-motion:reduce){#entry-tbody tr.hit td,.td-ripple,.add-chip,.num-pop,.hours-wrap input.bump,.hours-wrap input.bump-ot,.input-live-pie.saved-flash::after,.input-live-pie.saved-flash .live-pie-canvas,.row-sweep::before,.fx-spark,.fx-ring,.table-flash,.fx-combo,.live-pie-canvas.glow,.side-totals.hit,.side-totals.hit::after,.hours-wrap .chg,.hours-wrap .chg i{animation:none!important;}.fx-fly{transition:none!important;}}
 /* ══ メガフィーバー ══════════════════════════════════════════
    全画面の発光・虹色・揺れ・特大の火花。10コンボごとに吹き出し、保存で「もう一回遊べるドン！！！」。
    画面全体の点滅は光過敏への配慮で 1秒に3回まで（_megaFlash で間引く）。 */
@@ -6988,17 +7003,73 @@ function applyTaskImport() {
   const hasInput = Object.values(_INP_CACHE).some(c => getH(c.h) || getH(c.ot));
   if (hasInput && !confirm('入力済みの内容をタスク実績の内容で置き換えます。よろしいですか？')) return;
   clearInputs(true);
+  const fills = [];   // チャージ演出の対象（値は先に確定させ、演出は見た目だけ）
   p.plan.forEach(r => {
     const c = _INP_CACHE[r.cdSub] || {};
     const h = c.h || document.getElementById(`h_${r.cdSub}`), ot = c.ot || document.getElementById(`ot_${r.cdSub}`);
-    if (h && r.hoursNormal > 0) { setHV(h, r.hoursNormal); refreshCellStyle(h); }
-    if (ot && r.hoursOT > 0)    { setHV(ot, r.hoursOT);    refreshCellStyle(ot); }
+    if (h && r.hoursNormal > 0) { setHV(h, r.hoursNormal); refreshCellStyle(h); fills.push({inp: h, h: r.hoursNormal, ot: false}); }
+    if (ot && r.hoursOT > 0)    { setHV(ot, r.hoursOT);    refreshCellStyle(ot); fills.push({inp: ot, h: r.hoursOT, ot: true}); }
   });
-  updateTotals();
-  updateLivePie();
   closeModal('task-import-modal');
+  _chargeFill(fills, () => { updateTotals(); updateLivePie(); });
   const st = document.getElementById('data-status');
   if (st) { st.textContent = 'Folioから取込済み（未保存）'; st.className = 'data-status'; }
+}
+
+// 取込の反映: 上の行から順に、各セルへ時間が「チャージ」されていく演出。
+// 入力欄の値は呼び出し前に確定済み（途中で保存しても正しい値が保存される）。数字の増加とゲージは上に重ねた表示だけ
+function _chargeFill(items, onDone) {
+  const tok = _chargeFill.tok = (_chargeFill.tok || 0) + 1;
+  document.querySelectorAll('.hours-wrap .chg, .hours-wrap .chg-ph').forEach(e => e.remove());
+  document.querySelectorAll('#entry-tbody tr.chg-row').forEach(e => e.classList.remove('chg-row'));
+  document.querySelectorAll('.hours-wrap input.chg-wait').forEach(e => e.classList.remove('chg-wait'));
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce || !items.length) { onDone(); return; }
+  const pos = el => { const all = [...document.querySelectorAll('#entry-tbody input')]; return all.indexOf(el); };
+  items.sort((a, b) => pos(a.inp) - pos(b.inp));
+  items.forEach(it => { it.inp.classList.add('chg-wait'); const ph = document.createElement('span'); ph.className = 'chg-ph'; ph.textContent = '0'; it.inp.parentElement && it.inp.parentElement.appendChild(ph); it.inp.addEventListener('focus', () => { it.inp.classList.remove('chg-wait'); it.inp.parentElement && it.inp.parentElement.querySelectorAll('.chg-ph').forEach(e => e.remove()); }, {once: true}); });   // 途中で触ったら値を見せる
+  const fmt = v => _unit === 'min' ? String(Math.round(v * 60)) : v.toFixed(2);
+  const GAP = Math.max(90, Math.min(170, 1400 / items.length));
+  let end = 0;
+  items.forEach((it, k) => {
+    const d = Math.round(420 + Math.min(520, it.h * 110));   // 大きい時間ほど少し長くチャージ
+    end = Math.max(end, k * GAP + d + 120);
+    setTimeout(() => {
+      if (tok !== _chargeFill.tok) return;
+      const wrap = it.inp.parentElement, tr = it.inp.closest('tr');
+      if (!wrap) return;
+      // 画面外なら見える位置へ（上部の固定ヘッダーに隠れないよう中央寄せ）
+      { const r = it.inp.getBoundingClientRect(); if (r.top < 100 || r.bottom > window.innerHeight - 20) window.scrollBy({top: r.top - window.innerHeight / 2, behavior: 'smooth'}); }
+      if (tr) tr.classList.add('chg-row');
+      const el = document.createElement('span');
+      el.className = 'chg';
+      el.style.setProperty('--cc', it.ot ? 'var(--danger)' : (tr ? getComputedStyle(tr).getPropertyValue('--cat-color').trim() || 'var(--primary)' : 'var(--primary)'));
+      el.style.setProperty('--d', d + 'ms');
+      el.innerHTML = `<i></i><b>${fmt(0)}</b>`;
+      wrap.querySelectorAll('.chg-ph').forEach(e => e.remove());
+      wrap.appendChild(el);
+      const b = el.querySelector('b'), t0 = performance.now();
+      const tick = now => {
+        if (tok !== _chargeFill.tok) { el.remove(); if (tr) tr.classList.remove('chg-row'); it.inp.classList.remove('chg-wait'); return; }
+        const q = Math.min(1, (now - t0) / d), e = 1 - Math.pow(1 - q, 3);
+        b.textContent = fmt(it.h * e);
+        if (q < 1) { requestAnimationFrame(tick); return; }
+        b.textContent = fmt(it.h);
+        el.classList.add('done');
+        it.inp.classList.remove('chg-wait', 'bump', 'bump-ot'); void it.inp.offsetWidth; it.inp.classList.add(it.ot ? 'bump-ot' : 'bump');
+        setTimeout(() => { el.remove(); it.inp.classList.remove('bump', 'bump-ot'); if (tr && !tr.querySelector('.chg')) tr.classList.remove('chg-row'); }, 520);
+      };
+      requestAnimationFrame(tick);
+    }, k * GAP);
+  });
+  // 全部たまったら合計とグラフを更新（合計欄がはじける）
+  setTimeout(() => {
+    onDone();
+    if (tok !== _chargeFill.tok) return;
+    items.forEach(it => { it.inp.classList.remove('chg-wait'); it.inp.parentElement && it.inp.parentElement.querySelectorAll('.chg-ph').forEach(e => e.remove()); });
+    const st = document.querySelector('.side-totals');
+    if (st) { st.classList.remove('hit'); void st.offsetWidth; st.classList.add('hit'); setTimeout(() => st.classList.remove('hit'), 600); }
+  }, end);
 }
 
 let _submitRunning = false;
