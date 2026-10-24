@@ -1,52 +1,42 @@
-# Folio v2（Firebase 保存版）への切替手順
+# Folio 連携（Firebase）
 
-日報アプリは Folio のデータを `folioCall()` 経由で読む。読込元は部署設定 `folio.source` で切り替える。
+日報アプリは Folio のデータを `folioCall()` 経由で、Folio の保存先 Firebase（プロジェクト folio-73ebf）からブラウザで直接読む。
+2026/10/23 の Folio 移行で、スプレッドシート＋GAS（v1・`gas/task-sheet-reader.gs`）からの読み込みは廃止した。
 
-| 読込元 | 設定 | 読む場所 |
-| --- | --- | --- |
-| v1（現行） | `folio.source: 'sheet'` | スプレッドシート「タスク管理アプリ v2」を `taskSheetGasUrl` の GAS（gas/task-sheet-reader.gs）経由 |
-| v2 | `folio.source: 'firebase'` | Folio v2 の Firestore（プロジェクト folio-73ebf）をブラウザから直接 |
+Folio 連携は生産管理課だけ。`config.js` に `folio`（Firebase の接続情報）がある部署だけに、「Folioから取込」・タスク早見表・ダッシュボードの Folio 実績が出る。
 
-各端末は、設定画面「Folio の読込元」で部署設定と関係なく v1／v2 を切り替えられる（試験用。localStorage に保存）。
+## 読むデータ
 
-## v2 で読むデータ
-
-| 日報アプリの機能 | v2 の読み書き先 |
+| 日報アプリの機能 | 読み書き先 |
 | --- | --- |
-| Folioから取込 | `tasks`（`day` または `doneDate` が期間内、`status == '完了'`） |
+| Folioから取込 | `tasks`（`day == 日付`、時間割に未配置のものは `doneDate == 日付`。`status == '完了'`） |
 | タスク早見表 | `masters/taskMaster` の `list`（id・name・std） |
 | 日報中分類の対応（読み書き） | `nippouMap/taskCd`（`{タスクID: 中分類CD}`） |
-| 月次の Folio 実績・個人の Folio 完了タスク | `tasks`（同上） |
+| 予実対比・個人の Folio 完了タスク・タスク別 標準工数と実績 | `tasks`（`day` の範囲＋未配置の完了タスク） |
 
 項目の対応: `email`・`ownerName`・`taskId`・`taskName`・`minutes`（予定、分）・`actual`（実績、分。0 は未入力扱い）・`status`・`note`・`start`（"YYYY-MM-DD HH:MM"）・`day`・`doneDate`。
-作業日は `day`（時間割の配置日）、空なら `doneDate`。工数は実績が入っていれば実績、なければ予定。
+作業日は `day`（時間割の配置日）。`day` が空なら `start` の日付、それも空なら `doneDate`。工数は実績が入っていれば実績、なければ予定。
 
 ## 読み取り回数の節約（Firestore 無料枠 1日5万回）
 
 - 完了タスクは日ごとに端末（localStorage `fv2:folio-73ebf:d:YYYY-MM-DD`）へ保存して使い回す。保存期間は日付の古さで変える: 昨日以降 2分／2〜7日前 6時間／それより前 7日。130日より古い日は自動で消す
-- 期間の読み込みは配置日 `day` の範囲クエリ1回だけ（完了日での二重読みはしない）。古くなった日だけを連続区間にまとめて読む
-- 時間割に未配置のタスク（`day` が空）は「Folioから取込」の1日分だけ `doneDate == 日付` で読む。ダッシュボード（月次の Folio 実績・個人の完了タスク・タスク統計）は配置済みのタスクだけを集計する
-- 「Folioから取込」を開いたとき・「最新に更新」はその日の分を読み直す（全員分で数十件）
-- 設定画面「Folio の読込元」に、その日にこの端末で読んだ件数を表示する
+- 期間の読み込みは配置日 `day` の範囲クエリ1回だけ。古くなった日だけを連続区間にまとめて読む
+- 時間割に未配置のタスク（`day` が空）
+  - 「Folioから取込」: その1日分だけ `doneDate == 日付` で読む
+  - ダッシュボードの集計: `day == '' かつ status == '完了'` をまとめて1回読み、端末に6時間保存（localStorage `fv2:folio-73ebf:unp`）
+- 「Folioから取込」を開いたとき・「最新に更新」はその日の分を読み直す
+- 設定画面「Folio 連携」に、その日にこの端末で読んだ件数を表示する
 
-`nippouMap/taskCd` が空のとき、v1 の GAS が使えれば v1 シートの「日報中分類CD」列を1回だけ引き継ぐ。
+## ログイン
 
-## Folio 側で必要な設定（切替前に1回）
+各ユーザーは最初に Folio を使うときに一度だけ Google ログインが出る（「Folioから取込」を押したとき、またはダッシュボードの Folio カードの「Folio にログイン」）。以後はブラウザがログイン状態を覚えている。
 
-1. Firebase コンソール > Authentication > ログイン方法で **Google** を有効にする
-2. Authentication > 設定 > 承認済みドメインに **horizon-jit.github.io** を追加
-3. Folio の `コード.gs` の `FB_RULES` に次の1行を追加し、`fbRulesDeploy` を実行
-   ```
-   match /nippouMap/{id} { allow read, write: if inside(); }
-   ```
-   （`tasks` と `masters` の読み取りは既存ルールの `inside()` で許可済み）
+## Folio 側の設定（設定済み）
 
-## 切替の流れ
+1. Authentication > ログイン方法で **Google** を有効
+2. Authentication > 設定 > 承認済みドメインに **horizon-jit.github.io**
+3. セキュリティルールで `tasks`・`masters` の読み取りと `nippouMap` の読み書きを社内アドレスに許可
 
-1. 上の Folio 側設定を済ませる
-2. 谷さんの端末で設定画面「Folio の読込元」を v2 にし、「v2 の接続テスト」で件数を確認。取込・早見表・ダッシュボードを v1 と見比べる
-3. Folio 側で `fbCutover_` を実行（v1 シートから Firestore への最終同期）
-4. `config.js` の `folio.source` を `'firebase'` に変えて公開 → 全員が v2 から読む
-5. 問題があれば `'sheet'` に戻す（切替後は v1 シートが更新されないので一時しのぎ）
+## 旧 v1（廃止）
 
-各ユーザーは v2 に切り替わった後、最初に「Folioから取込」を押したときに一度だけ Google ログインが出る。
+`gas/task-sheet-reader.gs` と `.github/workflows/deploy-gas.yml` は v1 の名残で、日報アプリからは呼ばない。
