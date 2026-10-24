@@ -3231,6 +3231,8 @@ function todayStr() {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
 function pad(n){ return String(n).padStart(2,'0'); }
+// Date → 'YYYY-MM-DD'（端末の時刻で。toISOString は UTC になり、日本時間の0時が前日になるので使わない）
+function ymdLocal(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 
 // ─── 15日締め期間計算 ────────────────────
 // 「YYYY年M月期」= 前月16日〜当月15日
@@ -3521,7 +3523,7 @@ async function preloadAllCache() {
   const dailyFetchNeeded = [];
   for (let i = 1; i <= 30; i++) {
     const d = new Date(today); d.setDate(today.getDate() - i);
-    const ds = d.toISOString().slice(0, 10);
+    const ds = ymdLocal(d);
     if (lsCacheGet(`daily_${ds}`)) { dSkipped++; continue; }
     dailyFetchNeeded.push(ds);
   }
@@ -3844,7 +3846,7 @@ const JP_HOLIDAYS = (function(){
       // 振替休日（日曜日の翌月曜日）
       if (dt.getDay() === 0) {
         const next = new Date(dt); next.setDate(dt.getDate()+1);
-        h.add(next.toISOString().slice(0,10));
+        h.add(ymdLocal(next));
       }
     }
     // 春分の日（概算）
@@ -3872,7 +3874,7 @@ const JP_HOLIDAYS = (function(){
       if (d.getDay() === dow) { count++; if (count === n) break; }
       d.setDate(d.getDate()+1);
     }
-    return d.toISOString().slice(0,10);
+    return ymdLocal(d);
   }
 })();
 
@@ -3886,8 +3888,8 @@ function isHoliday(dateStr) {
 function prevBusinessDay() {
   const d = new Date(todayStr() + 'T00:00:00');
   do { d.setDate(d.getDate() - 1); }
-  while (isHoliday(d.toISOString().slice(0,10)));
-  return d.toISOString().slice(0,10);
+  while (isHoliday(ymdLocal(d)));
+  return ymdLocal(d);
 }
 
 // 指定の year/month が現在進行中の期かどうか判定
@@ -4465,7 +4467,7 @@ function eachDateInRange(startDate, endDate) {
   const d = new Date(startDate + 'T00:00:00');
   const end = new Date(endDate + 'T00:00:00');
   while (d <= end) {
-    dates.push(d.toISOString().slice(0,10));
+    dates.push(ymdLocal(d));
     d.setDate(d.getDate() + 1);
   }
   return dates;
@@ -10967,7 +10969,7 @@ async function refreshRecentCache() {
   for (let i = 1; i <= RECENT_REFRESH_DAYS; i++) {
     const d = new Date(today + 'T00:00:00');
     d.setDate(d.getDate() - i);
-    allDates.push(d.toISOString().slice(0, 10));
+    allDates.push(ymdLocal(d));
   }
 
   // 過去7日が属する月次期を特定（重複除去）
