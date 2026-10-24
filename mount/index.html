@@ -6555,6 +6555,17 @@ function _roundTaskHours(h) {
   return Math.round(h * 100) / 100;
 }
 
+// 中分類ごとに 0.01h へ丸めると、合計が実際の工数の合計から ±0.01〜0.03h ずれる（20分×3 → 0.33×3 = 0.99h）。
+// 合計を先に 0.01h 単位で決め、端数の大きい中分類から 0.01h ずつ配って合計を一致させる（最大剰余法）
+function _apportionHours(vals) {
+  const tot = Math.round(vals.reduce((t, v) => t + v, 0) * 100);
+  const base = vals.map(v => Math.floor(v * 100 + 1e-6));
+  let rest = tot - base.reduce((t, v) => t + v, 0);
+  const ord = vals.map((v, i) => [v * 100 - base[i], i]).sort((a, b) => b[0] - a[0]);
+  for (let k = 0; rest > 0 && k < ord.length; k++, rest--) base[ord[k][1]]++;
+  return base.map(v => v / 100);
+}
+
 let _taskImportPlan = null;
 let _taskImportRows = [];
 
@@ -6897,8 +6908,14 @@ function renderTaskImport() {
   });
   // 予実の集計（GAS が plan/actual を返すときだけ）
   const pv = hasPv ? _taskImportRows.reduce((t, x) => { const r = x.r; if (r.plan != null) { t.plan += r.plan; t.planN++; } if (r.actual != null) { t.actual += r.actual; t.actN++; if (r.plan != null) { t.both += 1; t.planB += r.plan; if (r.actual > r.plan * 1.2) t.over++; } } else t.noAct++; return t; }, {plan: 0, planN: 0, actual: 0, actN: 0, both: 0, planB: 0, over: 0, noAct: 0}) : null;
-  const plan = Object.keys(sums).map(cd => ({cdSub:cd, hoursNormal:_roundTaskHours(sums[cd].normal), hoursOT:_roundTaskHours(sums[cd].ot)}))
-    .filter(p => p.hoursNormal > 0 || p.hoursOT > 0);
+  const cds = Object.keys(sums);
+  let plan;
+  if (folioRoundOn()) plan = cds.map(cd => ({cdSub:cd, hoursNormal:_roundTaskHours(sums[cd].normal), hoursOT:_roundTaskHours(sums[cd].ot)}));
+  else {
+    const an = _apportionHours(cds.map(cd => sums[cd].normal)), ao = _apportionHours(cds.map(cd => sums[cd].ot));
+    plan = cds.map((cd, i) => ({cdSub:cd, hoursNormal:an[i], hoursOT:ao[i]}));
+  }
+  plan = plan.filter(p => p.hoursNormal > 0 || p.hoursOT > 0);
   // 丸め後にも通常の上限（REGULAR_H）を保証する。中分類ごとの丸めで合計が上限を超えた分は、開始が遅いタスクを含む中分類から残業へ振り替える
   {
     let over = Math.round((plan.reduce((t, p) => t + p.hoursNormal, 0) - REGULAR_H) * 100) / 100;
