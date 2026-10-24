@@ -6041,15 +6041,19 @@ async function loadDay_and_render() {
 // ═══════════════════════════════════════════
 const FOLIO_SOURCE_KEY = LS_NS + '__folioSource__';
 function folioV2Config() { const f = DEPARTMENT_CONFIG.folio; return f && f.firebase && f.firebase.projectId ? f : null; }
+// 端末の試験切替は「保存したときの部署設定（base）」と今の部署設定が同じ間だけ有効。
+// 部署設定を v2 に切り替えたら、切替前に端末へ保存された 'sheet' は無視して全員 v2 になる。
 function folioSource() {
   const f = folioV2Config();
   if (!f) return 'sheet';
-  let v = null; try { v = localStorage.getItem(FOLIO_SOURCE_KEY); } catch(e) {}
-  const src = v === 'firebase' || v === 'sheet' ? v : (f.source === 'firebase' ? 'firebase' : 'sheet');
+  const base = f.source === 'firebase' ? 'firebase' : 'sheet';
+  let o = null; try { const raw = localStorage.getItem(FOLIO_SOURCE_KEY); o = raw && raw[0] === '{' ? JSON.parse(raw) : (raw ? {v: raw, base: 'sheet'} : null); } catch(e) {}
+  const src = o && o.base === base && (o.v === 'firebase' || o.v === 'sheet') ? o.v : base;
   return src === 'sheet' && !DEPARTMENT_CONFIG.taskSheetGasUrl ? 'firebase' : src;
 }
 function setFolioSource(v) {
-  try { localStorage.setItem(FOLIO_SOURCE_KEY, v === 'firebase' ? 'firebase' : 'sheet'); } catch(e) {}
+  const f = folioV2Config();
+  try { localStorage.setItem(FOLIO_SOURCE_KEY, JSON.stringify({v: v === 'firebase' ? 'firebase' : 'sheet', base: f && f.source === 'firebase' ? 'firebase' : 'sheet'})); } catch(e) {}
   _folioCache.clear(); _folioRangeCache.clear(); _taskStatsCache.clear();
   _trData = null; _fv2.days.clear(); _fv2.unplaced.clear(); _fv2.map = null; _fv2.master = null;
   _syncFolioSettingsUI();
@@ -6063,7 +6067,7 @@ function folioCall(params) {
 }
 
 // ── v2（Firebase）──
-const _fv2 = {app: null, auth: null, db: null, user: null, ready: null, days: new Map(), inflight: new Map(), unplaced: new Map(), map: null, master: null, mapErr: null};
+const _fv2 = {app: null, auth: null, db: null, user: null, ready: null, login: null, days: new Map(), inflight: new Map(), unplaced: new Map(), map: null, master: null, mapErr: null};
 const FV2_TTL = 60 * 1000;
 function _fv2Init() {
   if (_fv2.app) return _fv2;
@@ -6085,15 +6089,37 @@ async function _fv2Ready() {
   if (!active) { const e = new Error('Folio v2 へのログインが必要です（入力タブの「Folioから取込」を押すとログインできます）'); e.code = 'folio-login'; throw e; }
   return folioV2Login();
 }
-async function folioV2Login() {
+function folioV2Login() {
   _fv2Init();
+  if (_fv2.login) return _fv2.login;   // 同時に呼ばれても、ログイン画面は1つだけ
   const prov = new firebase.auth.GoogleAuthProvider();
   prov.setCustomParameters({hd: 'horizon.co.jp', prompt: 'select_account'});
-  const cred = await _fv2.auth.signInWithPopup(prov);
-  if (!cred.user || !firebaseEmailAllowed(cred.user.email)) { await _fv2.auth.signOut(); throw new Error('会社のGoogleアカウント（@horizon.co.jp）でログインしてください'); }
-  _fv2.user = cred.user; _fv2.ready = null;
-  _syncFolioSettingsUI();
-  return _fv2;
+  _fv2.login = _fv2.auth.signInWithPopup(prov).then(async cred => {
+    if (!cred.user || !firebaseEmailAllowed(cred.user.email)) { await _fv2.auth.signOut(); throw new Error('会社のGoogleアカウント（@horizon.co.jp）でログインしてください'); }
+    _fv2.user = cred.user; _fv2.ready = null;
+    _syncFolioSettingsUI();
+    return _fv2;
+  }, e => {
+    const c = e && e.code;
+    const msg = c === 'auth/popup-blocked' ? 'ログイン画面がブロックされました。ブラウザのポップアップを許可してから、もう一度押してください'
+      : c === 'auth/popup-closed-by-user' || c === 'auth/cancelled-popup-request' ? 'Folio へのログインがキャンセルされました'
+      : 'Folio にログインできませんでした（' + (c || (e && e.message) || e) + '）';
+    const err = new Error(msg); err.code = c; throw err;
+  }).finally(() => { _fv2.login = null; });
+  return _fv2.login;
+}
+// ダッシュボードの Folio カード: ログインが必要なときはボタンを出す
+function folioErrHtml(msg) {
+  const login = /ログインが必要/.test(msg || '');
+  return `<p class="dx-empty">Folioデータなし（${escHtml(login ? 'Folio v2 へのログインが必要です' : msg)}）${login ? ` <button class="btn" style="margin-left:6px;padding:3px 10px;font-size:12px;" onclick="folioLoginAndReload(this)">Folio にログイン</button>` : ''}</p>`;
+}
+async function folioLoginAndReload(btn) {
+  if (btn) btn.disabled = true;
+  try { await folioV2Login(); }
+  catch(e) { alert(e.message); if (btn) btn.disabled = false; return; }
+  _folioCache.clear(); _folioRangeCache.clear(); _taskStatsCache.clear();
+  _renderCache.daily = _renderCache.monthly = _renderCache.yearly = null;
+  showTab(_currentTab);
 }
 const _fv2H = m => (Number(m) > 0 ? Math.round(Number(m) / 60 * 10000) / 10000 : 0);   // 分 → 時間
 // ── 読み取り回数の節約 ──
@@ -7518,7 +7544,7 @@ function renderFolioCompare() {
   const ctx = _entryCtx;
   if (!el || !ctx) return;
   if (card) card.style.display = taskImportUrl() ? '' : 'none';
-  if (ctx.folioErr) { el.innerHTML = `<p class="dx-empty">Folioデータなし（${escHtml(ctx.folioErr)}）</p>`; return; }
+  if (ctx.folioErr) { el.innerHTML = folioErrHtml(ctx.folioErr); return; }
   if (!ctx.folio) { el.innerHTML = '<p class="dx-empty">Folioのデータを読み込み中…</p>'; return; }
   const today = todayStr();
   const dates = eachDateInRange(ctx.startDate, ctx.endDate).filter(d => d <= today);
@@ -9407,7 +9433,7 @@ async function renderPersonDetail() {
     <p class="dx-note">合計 ${tot.toFixed(1)}h・${ts.reduce((t, r) => t + r.n, 0)}件（色＝日報の大分類）${ts.some(r => r.planN != null) ? (() => { const P = ts.reduce((t, r) => t + (r.planSum || 0), 0), A = ts.reduce((t, r) => t + (r.actualSum || 0), 0), aN = ts.reduce((t, r) => t + (r.actN || 0), 0), oN = ts.reduce((t, r) => t + (r.overN || 0), 0), nN = ts.reduce((t, r) => t + r.n - (r.actN || 0), 0); return `<br>予実（Folio）：予定 ${P.toFixed(1)}h → 実績 ${A.toFixed(1)}h（実績入力 ${aN}件${oN ? `・予定超過 <b class="t-crit">${oN}件</b>` : ''}${nN ? `・実績未入力 ${nN}件` : ''}）`; })() : ''}</p>`;
     dxGrow(tasksEl);
   } catch(e) {
-    tasksEl.innerHTML = `<p class="dx-empty">Folioデータなし（${escHtml(e.message)}）</p>`;
+    tasksEl.innerHTML = folioErrHtml(e.message);
   }
 }
 
@@ -9471,7 +9497,7 @@ async function loadTaskStats(force) {
   }
   el.innerHTML = '<p class="no-data-msg">Folioのデータを読み込み中...</p>';
   try { renderTaskStats(await hit.promise); }
-  catch(e) { _taskStatsCache.delete(days); el.innerHTML = `<p class="no-data-msg">Folioデータなし（${escHtml(e.message)}）</p>`; }
+  catch(e) { _taskStatsCache.delete(days); el.innerHTML = folioErrHtml(e.message); }
 }
 
 function renderTaskStats(d) {
