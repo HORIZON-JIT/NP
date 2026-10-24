@@ -6201,6 +6201,38 @@ async function _fv2ListsAll(start, end, nocache) {
   unp.forEach(x => { const d = x.sd || x.dd; if (d >= start && d <= end) (out[d] = out[d] || []).push(x); });
   return out;
 }
+// 取込で1件も見つからないときに、理由を調べる（読み取りは最大で数十件）
+async function _fv2Diag(date, name) {
+  try {
+    const {db, user} = await _fv2Ready();
+    const me = String(user && user.email || '').toLowerCase();
+    const [byDay, byDone, mine] = await Promise.all([
+      db.collection('tasks').where('day', '==', date).get(),
+      db.collection('tasks').where('doneDate', '==', date).get(),
+      me ? db.collection('tasks').where('email', '==', me).limit(5).get() : Promise.resolve({docs: [], size: 0})]);
+    _fv2Count(byDay.size + byDone.size + mine.size);
+    const seen = new Set(), all = [];
+    byDay.docs.concat(byDone.docs).forEach(d => { if (!seen.has(d.id)) { seen.add(d.id); all.push(d.data() || {}); } });
+    const isMine = t => String(t.email || '').trim().toLowerCase() === me || String(t.ownerName || '').trim().indexOf(name) === 0;
+    const mineDay = all.filter(isMine);
+    const cnt = l => { const m = {}; l.forEach(v => { m[v] = (m[v] || 0) + 1; }); return Object.entries(m).map(([k, n]) => `${k || '（空）'} ${n}件`).join('、'); };
+    const samples = mine.docs.map(d => d.data() || {}).map(t => ({day: t.day, start: t.start, doneDate: t.doneDate, status: t.status, ownerName: t.ownerName}));
+    const reasons = [];
+    if (mineDay.length) {
+      const notDone = mineDay.filter(t => String(t.status || '').trim() !== '完了');
+      if (notDone.length) reasons.push(`この日の自分のタスクのうち ${notDone.length}件が「完了」になっていません（${cnt(notDone.map(t => String(t.status || '').trim()))}）。取込は「完了」のタスクだけです`);
+      const nm = mineDay.filter(t => String(t.ownerName || '').trim().indexOf(name) !== 0);
+      if (nm.length) reasons.push(`Folio の担当者名が「${[...new Set(nm.map(t => String(t.ownerName || '').trim() || '（空）'))].join('、')}」で、日報の担当者「${name}」で始まっていません`);
+    } else if (all.length) {
+      reasons.push(`この日の Folio のタスク ${all.length}件に、ログイン中のアカウント（${me}）・担当者「${name}」のものがありません。担当者名が別の書き方（ローマ字など）で保存されていないか、下の担当者一覧を確認してください`);
+    } else if (samples.length) {
+      const fmt = samples.find(t => (t.day && !/^\d{4}-\d{2}-\d{2}$/.test(String(t.day))) || (t.doneDate && !/^\d{4}-\d{2}-\d{2}$/.test(String(t.doneDate))));
+      if (fmt) reasons.push(`Folio の日付の形式が想定（YYYY-MM-DD）と違います（例: day=${JSON.stringify(fmt.day)} doneDate=${JSON.stringify(fmt.doneDate)}）`);
+      else reasons.push(`この日（${date}）に配置・完了した自分のタスクが Folio に見つかりません。Folio で作業日（時間割の日付）と完了日を確認してください`);
+    } else reasons.push(`ログイン中のアカウント（${me || '不明'}）のタスクが Folio に見つかりません。Folio で使っているアカウントと同じか確認してください`);
+    return {reasons, dayN: all.length, mineN: mineDay.length, owners: cnt(all.map(t => String(t.ownerName || '').trim())), samples};
+  } catch(e) { return {reasons: ['原因を調べられませんでした: ' + (e.code || e.message)]}; }
+}
 function _fv2Dates(start, end, max) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start || '') || !/^\d{4}-\d{2}-\d{2}$/.test(end || '') || start > end) throw new Error('start/end は YYYY-MM-DD で指定してください');
   const out = eachDateInRange(start, end);
@@ -6239,7 +6271,7 @@ async function _fv2Call(p) {
       const rows = (byDate[p.date] || []).concat(unp).filter(x => (email && x.e === email) || (name && x.n.indexOf(name) === 0)).map(x => ({
         taskId: x.id, taskName: x.nm, cdSub: tm[x.id] || null, hours: x.h, start: x.s, startDate: x.sd, doneDate: x.dd, note: x.note,
         plan: x.p, actual: x.ac ? x.h : null}));
-      return done({rows});
+      return done({rows, diag: rows.length ? null : await _fv2Diag(p.date, name)});
     }
     if (a === 'getRangeHours') {
       const dates = _fv2Dates(p.start, p.end, 62), byDate = await _fv2ListsAll(p.start, p.end, nc), out = {};
@@ -6636,7 +6668,12 @@ async function openTaskImport(force) {
   }
   const rows = Array.isArray(d.rows) ? d.rows : [];
   if (!rows.length) {
-    body.innerHTML = '<div style="padding:16px 0;color:var(--g500);">この日の完了タスクはありません。</div>';
+    const dg = d.diag;
+    body.innerHTML = '<div style="padding:16px 0;color:var(--g500);">この日の完了タスクはありません。</div>' + (dg ? `<div style="font-size:12px;line-height:1.7;background:var(--g50);border:1px solid var(--g200);border-radius:8px;padding:10px 12px;">
+      <b>見つからない理由</b><ul style="margin:4px 0 6px 18px;">${dg.reasons.map(r => `<li>${escHtml(r)}</li>`).join('')}</ul>
+      ${dg.dayN != null ? `<span style="color:var(--g500);font-size:11px;">この日の Folio のタスク（全員）${dg.dayN}件・うち自分 ${dg.mineN}件${dg.owners ? `／担当者: ${escHtml(dg.owners)}` : ''}</span>` : ''}
+      ${dg.samples && dg.samples.length ? `<details style="margin-top:4px;font-size:11px;color:var(--g500);"><summary>自分のタスクの保存形式（見本）</summary><pre style="white-space:pre-wrap;font-size:10.5px;">${escHtml(dg.samples.map(t => JSON.stringify(t)).join('\n'))}</pre></details>` : ''}
+    </div>` : '');
     _taskImportPlan = {date, author, plan:[]};
     _showFolioTiming(d);
     return;
