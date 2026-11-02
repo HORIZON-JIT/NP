@@ -14,6 +14,8 @@ window.DEPARTMENT_CONFIG_OVERRIDE = {
   inputFxMode: 'mega',
   taikoSoundDefault: true,
   // 全端末で1回だけ演出設定を上書き（id を変えると、もう一度だけ上書きされる）
+  // Folio 取込の「中分類ごとの合計を 0.25h 単位に丸める」を全端末で1回だけ OFF にする（id を変えると、もう一度だけ上書き）
+  folioRoundForce: { id: '2026-11-round-off', on: false },
   inputFxForce: { id: '2026-10-mega', on: true, mode: 'mega', sound: true },
 
   // Folio 連携（生産管理課だけ）。Folio の保存先 Firebase（folio-73ebf）から直接読む。

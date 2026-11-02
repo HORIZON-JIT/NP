@@ -6568,6 +6568,18 @@ function splitTaskNormalOT(start, hours, date) {
 const FOLIO_ROUND_KEY = LS_NS + '__folioRound__';
 function folioRoundOn() { try { return localStorage.getItem(FOLIO_ROUND_KEY) === 'on'; } catch(e) { return false; } }
 function setFolioRound(on) { try { localStorage.setItem(FOLIO_ROUND_KEY, on ? 'on' : 'off'); } catch(e) {} if (_taskImportPlan) renderTaskImport(); }
+// 部署設定 folioRoundForce = {id, on} があれば、その id ごとに各端末で「1回だけ」丸めの設定を上書きする（inputFxForce と同じ考え方）。
+// 上書き後に本人が取込画面で変えた値はそのまま残る
+(function applyFolioRoundForce() {
+  const f = DEPARTMENT_CONFIG.folioRoundForce;
+  if (!f || !f.id) return;
+  const key = LS_NS + '__folioRoundForce__';
+  try {
+    if (localStorage.getItem(key) === String(f.id)) return;
+    localStorage.setItem(FOLIO_ROUND_KEY, f.on ? 'on' : 'off');
+    localStorage.setItem(key, String(f.id));
+  } catch(e) {}
+})();
 function _roundTaskHours(h) {
   if (!(h > 0)) return 0;
   if (folioRoundOn()) { const step = DEPARTMENT_CONFIG.rules.roundStepHours || 0.25; return Math.max(step, Math.round(h / step) * step); }
