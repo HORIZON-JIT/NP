@@ -6885,15 +6885,16 @@ function renderTaskImport() {
   const chk = _taskImportRows.filter(x => x.ok && x.checked);
   let shifted = 0;
   {
-    let excess = Math.round((chk.reduce((t, x) => t + x.sp.normal, 0) - REGULAR_H) * 100) / 100;
-    if (excess > 0) {
+    // 端数のまま振り替える（0.1667h を 0.17h に丸めて動かすと、通常が 7.99h になっていた）。丸めは最後の中分類ごとの配分で1回だけ
+    let excess = chk.reduce((t, x) => t + x.sp.normal, 0) - REGULAR_H;
+    if (excess > 1e-6) {
       const order = chk.slice().sort((a, b) => (a.placed === b.placed ? _hmToMin(b.start || '0:00') - _hmToMin(a.start || '0:00') : (a.placed ? 1 : -1)));
       for (const x of order) {
-        if (excess <= 0) break;
+        if (excess <= 1e-6) break;
         const mv = Math.min(x.spAdj.normal, excess);
         if (mv <= 0) continue;
-        x.spAdj.normal = Math.round((x.spAdj.normal - mv) * 100) / 100; x.spAdj.ot = Math.round((x.spAdj.ot + mv) * 100) / 100;
-        excess = Math.round((excess - mv) * 100) / 100; shifted = Math.round((shifted + mv) * 100) / 100;
+        x.spAdj.normal -= mv; x.spAdj.ot += mv;
+        excess -= mv; shifted += mv;
       }
     }
   }
@@ -6917,8 +6918,8 @@ function renderTaskImport() {
            <select id="ti-sel-${i}" style="font-size:11px;max-width:150px;"><option value="">中分類を選択</option>${_activeSubOptions()}</select>
            <button id="ti-btn-${i}" class="btn btn-primary btn-sm" style="font-size:11px;padding:2px 8px;" onclick="registerTaskCd(${i})">登録</button>`}</td>
       ${hasPv ? `<td style="padding:4px 6px;white-space:nowrap;font-size:11px;">${_tiPvCell(r)}</td>` : ''}
-      <td style="padding:4px 6px;text-align:right;white-space:nowrap;">${sp.normal ? sp.normal.toFixed(2) : ''}</td>
-      <td style="padding:4px 6px;text-align:right;white-space:nowrap;color:var(--danger);">${sp.ot ? sp.ot.toFixed(2) : ''}</td>
+      <td style="padding:4px 6px;text-align:right;white-space:nowrap;">${sp.normal > 0.004 ? sp.normal.toFixed(2) : ''}</td>
+      <td style="padding:4px 6px;text-align:right;white-space:nowrap;color:var(--danger);">${sp.ot > 0.004 ? sp.ot.toFixed(2) : ''}</td>
     </tr>`;
   });
   // 予実の集計（GAS が plan/actual を返すときだけ）
