@@ -332,7 +332,7 @@ const FB_PROJECTS = {
   }
 };
 const SOURCES = [
-  {id: 'np',    name: '生産管理課',       short: '生産管理', project: 'np',    collection: 'dailyReports',     master: 'np_master_categories',    url: '../',      color: 'var(--dept-np)'},
+  {id: 'np',    name: '生産管理課',       short: '生産管理', project: 'np',    collection: 'dailyReports',     master: 'np_master_categories',    url: '../',      color: 'var(--dept-np)', otExactFrom: '2026-10-16'},   // 残業は 2026年11月期から1分単位（config.js の rules.otExactFrom と同じ）,
   {id: 'legal', name: '法務知財部 知財',  short: '法務知財', project: 'legal', collection: 'dailyReports',     master: 'legal_master_categories', url: '../legal/', color: 'var(--dept-legal)'},
   {id: 'law',   name: '法務知財部 法務',  short: '法務',     project: 'legal', collection: 'dailyReports_law', master: 'law_master_categories',   url: '../law/',   color: 'var(--dept-law)'}
 ];
@@ -369,13 +369,15 @@ const fiscalKi = fy => fy - 1951;
 function eachDate(s, e) { const out = []; for (let t = new Date(s + 'T00:00:00'); fmtD(t) <= e; t.setDate(t.getDate() + 1)) out.push(fmtD(t)); return out; }
 // 退勤時刻 → 通常・残業（各アプリの calcFromLeave と同じ）
 const _clCache = new Map();
-function calcFromLeave(leave, date) {
+// src.otExactFrom 以降の日は、残業を丸めずに1分単位で数える（各アプリの rules.otExactFrom と同じ）
+function calcFromLeave(leave, date, src) {
   if (!leave) return null;
-  const k = leave + '|' + date; if (_clCache.has(k)) return _clCache.get(k);
+  const ex = !!(src && src.otExactFrom && date >= src.otExactFrom);
+  const k = leave + '|' + date + '|' + ex; if (_clCache.has(k)) return _clCache.get(k);
   const [hh, mm] = leave.split(':').map(Number); if (isNaN(hh) || isNaN(mm)) return null;
   const L = hh * 60 + mm, st = _hm(R.workStart), ne = _hm(R.normalEnd), os = _hm(R.otStart), sm = R.roundStepMin, sh = R.roundStepHours;
   if (L <= st) { const r = {normal: 0, ot: 0}; _clCache.set(k, r); return r; }
-  let ot = 0; if (L > os) { const m = L - os; ot = m < sm ? 0 : Math.ceil(m / sm) * sh; }
+  let ot = 0; if (L > os) { const m = L - os; ot = ex ? Math.round(m / 60 * 10000) / 10000 : (m < sm ? 0 : Math.ceil(m / sm) * sh); }
   const we = Math.min(L, ne), mo = Number(date.slice(5, 7)), lw = mo % 2 === 1 ? R.lunch.odd : R.lunch.even;
   const ls = _hm(lw.start), le = _hm(lw.end);
   let ld = 0; if (we > ls) ld = Math.max(0, Math.min(we, le) - ls);
@@ -528,7 +530,7 @@ function metricsFor(o, p) {
   let n = 0, ot = 0, days = 0, miss = 0, leaveSum = 0, leaveN = 0;
   const first = Object.keys(o.days).filter(d => o.days[d].leave).sort()[0] || null;
   eachDate(s, e).forEach(d => {
-    const v = o.days[d], c = v && v.leave ? calcFromLeave(v.leave, d) : null;
+    const v = o.days[d], c = v && v.leave ? calcFromLeave(v.leave, d, o.src) : null;
     if (c) { n += c.normal; ot += c.ot; days++; leaveSum += _hm(v.leave); leaveN++; }
     else if (d < today && first && d >= first && isWorkday(d, today)) miss++;
   });
@@ -816,7 +818,7 @@ function renderEntryCal(rows) {
   const head = `<tr><th></th>${dates.map(d => { const w = new Date(d + 'T00:00:00').getDay(); return `<th class="${w === 0 ? 'sun' : w === 6 ? 'sat' : ''}">${Number(d.slice(8))}<br>${WD[w]}</th>`; }).join('')}<th>未入力</th></tr>`;
   const body = list.map(r => { const o = r.o, first = Object.keys(o.days).filter(d => o.days[d].leave).sort()[0];
     return `<tr><td class="nm"><span class="dot" style="background:${o.src.color}"></span> ${esc(o.author)}</td>${dates.map(d => {
-      const v = o.days[d], c = v && v.leave ? calcFromLeave(v.leave, d) : null, w = new Date(d + 'T00:00:00').getDay();
+      const v = o.days[d], c = v && v.leave ? calcFromLeave(v.leave, d, o.src) : null, w = new Date(d + 'T00:00:00').getDay();
       if (c) return `<td class="${c.ot > 0 ? 'ot' : 'ok'}" title="${d} 退勤 ${esc(v.leave)}（通常 ${h2(c.normal)}h・残業 ${h2(c.ot)}h）">${h1(c.normal + c.ot)}</td>`;
       if (d >= today) return '<td></td>';
       if (w === 0 || w === 6 || !isWorkday(d, today)) return '<td class="off"></td>';
@@ -881,7 +883,7 @@ function openDetail(key, keepScroll) {
   // 日別明細
   const days = eachDate(pd.startDate, pd.endDate).filter(d => o.days[d] || (d < today && isWorkday(d, today)));
   const daily = `<table class="mt trend"><thead><tr><th>日付</th><th class="num">退勤</th><th class="num">通常</th><th class="num">残業</th><th class="num">日報の入力時間</th></tr></thead><tbody>${days.map(d => {
-    const v = o.days[d], c = v && v.leave ? calcFromLeave(v.leave, d) : null, w = new Date(d + 'T00:00:00').getDay();
+    const v = o.days[d], c = v && v.leave ? calcFromLeave(v.leave, d, o.src) : null, w = new Date(d + 'T00:00:00').getDay();
     const rh = v ? v.rows.reduce((t, r) => t + r.n + r.ot, 0) : 0;
     return `<tr style="cursor:default"><td><b>${Number(d.slice(5, 7))}/${Number(d.slice(8))}</b><span class="t-muted">（${WD[w]}）</span></td>
       <td class="num">${v && v.leave ? esc(v.leave) : '<span class="t-crit">未入力</span>'}</td><td class="num">${c ? h2(c.normal) : ''}</td>

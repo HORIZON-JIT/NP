@@ -4743,6 +4743,7 @@ async function saveLeaveTime(date, author, leaveTime) {
 // 夕方休憩: 17:20〜17:30(10分) ※normalEnd=17:20で自動除外
 // 残業: 17:30以降
 // 丸め: 通常・残業ともに15分未満切り捨て、15分以上は0.25h単位切り上げ
+//       ただし rules.otExactFrom（'YYYY-MM-DD'）以降の日は、残業を丸めずに1分単位で数える（通常は従来どおり）
 
 // 月から昼休憩時刻を返す（dateStr='YYYY-MM-DD'、省略時は今日）
 function getLunchBreak(dateStr) {
@@ -4774,7 +4775,10 @@ function calcFromLeave(leaveHHMM, dateStr) {
   let ot = 0;
   if (leaveMins > otStart) {
     const otMins = leaveMins - otStart;
-    ot = otMins < stepMin ? 0 : Math.ceil(otMins / stepMin) * stepH;
+    const d = dateStr || (typeof currentDate !== 'undefined' ? currentDate : '');
+    ot = R.otExactFrom && d >= R.otExactFrom
+      ? Math.round(otMins / 60 * 10000) / 10000                     // 1分単位（丸めない）
+      : (otMins < stepMin ? 0 : Math.ceil(otMins / stepMin) * stepH);
   }
 
   // ── 通常時間計算 ──
@@ -5405,7 +5409,7 @@ function getLeaveWorkLimit() {
   const leaveTime = document.getElementById('input-leave')?.value || '';
   const calc = calcFromLeave(leaveTime);
   if (!calc) return null;
-  return Math.floor((calc.normal + calc.ot) * 4) / 4;
+  return Math.round((calc.normal + calc.ot) * 100) / 100;   // 残業を1分単位で数える日もあるので 0.01h で比べる
 }
 function addQuarter(cdSub, ev) {
   let step = _clickStep;                      // 加算量は常に時間(h)
@@ -5955,9 +5959,9 @@ function checkHoursSafety(normal, ot) {
   const calc = calcFromLeave(leaveTime);
   if (!calc) { if (warnEl.style.display !== 'none') warnEl.style.display = 'none'; setSaveGlow(false); updateSideBars(null, 0, 0); checkHoursSafety._lastKey = ''; return; }
 
-  // 実勤務時間上限 = 通常 + 残業（0.25刻みに切り捨て）
+  // 実勤務時間上限 = 通常 + 残業（0.01h 単位。丸めありの日は元から 0.25h の倍数）
   const limitRaw = (calc.normal + calc.ot);
-  const limit = Math.floor(limitRaw * 4) / 4;  // 0.25刻み切り捨て
+  const limit = Math.round(limitRaw * 100) / 100;
   const total = Math.round((normal + ot) * 100) / 100;
 
   const state = total > limit ? 'over' : total < limit ? 'under' : 'match';
@@ -7181,8 +7185,10 @@ function onLeaveChange() {
     el.className   = 'leave-ot-preview ok';
   }
   // 退勤時刻変更時もセーフティ再チェック
-  const normal = parseFloat(document.getElementById('total-normal')?.textContent) || 0;
-  const otVal  = parseFloat(document.getElementById('total-ot')?.textContent)     || 0;
+  // 合計欄の数字は増えていく演出の途中のことがあるので、入力欄の値から直接合計する
+  let normal = 0, otVal = 0;
+  Object.values(_INP_CACHE).forEach(c => { normal += getH(c.h); otVal += getH(c.ot); });
+  normal = Math.round(normal * 100) / 100; otVal = Math.round(otVal * 100) / 100;
   checkHoursSafety(normal, otVal);
 }
 
@@ -9741,8 +9747,8 @@ async function renderMonthlyDash(silent) {
         // ヘルプは作業ログの値をそのまま使用
         (byAuthor[a]||[]).forEach(r=>{ aN+=r.hoursNormal||0; aOT+=r.hoursOT||0; });
       } else {
-        Object.values(leaveDates).forEach(t=>{
-          const calc = calcFromLeave(t);
+        Object.entries(leaveDates).forEach(([dt,t])=>{
+          const calc = calcFromLeave(t, dt);
           if (calc) { aN += calc.normal; aOT += calc.ot; }
         });
       }
@@ -9962,8 +9968,8 @@ async function renderYearlyDash(silent) {
           // ヘルプは作業ログの値をそのまま使用
           (d[a]||[]).forEach(r=>{ aN+=r.hoursNormal||0; aOT+=r.hoursOT||0; });
         } else {
-          Object.values(leaveDates).forEach(t=>{
-            const calc = calcFromLeave(t);
+          Object.entries(leaveDates).forEach(([dt,t])=>{
+            const calc = calcFromLeave(t, dt);
             if (calc) { aN += calc.normal; aOT += calc.ot; }
           });
         }
@@ -10027,8 +10033,8 @@ async function renderYearlyDash(silent) {
           if (a === 'ヘルプ') {
             (d[a]||[]).forEach(r=>{ mOT += r.hoursOT||0; });
           } else {
-            Object.values(leaveMap[a]||{}).forEach(t=>{
-              const calc = calcFromLeave(t); if (calc) mOT += calc.ot;
+            Object.entries(leaveMap[a]||{}).forEach(([dt,t])=>{
+              const calc = calcFromLeave(t, dt); if (calc) mOT += calc.ot;
             });
           }
         });
@@ -10090,8 +10096,8 @@ async function renderYearlyDash(silent) {
         if(a==='ヘルプ') return;
         const leaveDates=leaveMap[a]||{};
         let aN=0,aOT=0;
-        Object.values(leaveDates).forEach(t=>{
-          const calc=calcFromLeave(t);
+        Object.entries(leaveDates).forEach(([dt,t])=>{
+          const calc=calcFromLeave(t, dt);
           if(calc){aN+=calc.normal;aOT+=calc.ot;}
         });
         leaveNormalY[a]=(leaveNormalY[a]||0)+aN;
