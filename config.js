@@ -6,6 +6,8 @@ window.DEPARTMENT_CONFIG_OVERRIDE = {
   // 月次AI分析用GAS（gas/ai-monthly-analyzer.gs をデプロイしたもの）。生産管理課だけで使う。
   // URL を入れると月次ダッシュボードに「AI分析」カードが出る。空なら非表示。
   aiAnalysisGasUrl: 'https://script.google.com/a/macros/horizon.co.jp/s/AKfycbx_vALcuIZVtAlN5oX4bFbBmcstz-M2HB45UXpSzUdRHPSBHRjeLCBshGbPZFchQcfj/exec',
+  // 勤務ルール: 残業は 2026年11月期（2026/10/16〜）から15分単位に丸めず1分単位で数える（それより前の日は従来どおり15分単位で切り上げ）
+  rules: { otExactFrom: '2026-10-16' },
   // 入力時の演出: 生産管理課の既定は ON・メガフィーバー・効果音（ドン・カッ）あり
   // （設定画面から端末ごとに変更でき、変更した端末ではその設定が優先される）
   inputFxDefault: true,
