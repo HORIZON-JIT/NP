@@ -2789,12 +2789,12 @@ function _normKpis(list) {
 function _kpiHoursItems() { return KPIS.filter(k => k.kind !== 'ot'); }
 function _kpiOtItem() { return KPIS.find(k => k.kind === 'ot') || null; }
 // KPI は日報に入力した時間をそのまま合計する（退勤時刻による補正はしない）
-// 部署設定 kpiExcludeAuthors に入れた担当者は、KPI のすべての項目（工数・残業）の集計から外す
-function _kpiAuthors(d) { const ex = DEPARTMENT_CONFIG.kpiExcludeAuthors || []; return Object.keys(d || {}).filter(a => a !== '_leaveMap' && a !== 'ヘルプ' && !ex.includes(a) && Array.isArray(d[a])); }
+// 部署設定 kpiOtExcludeAuthors に入れた担当者は、残業時間 KPI の集計からだけ外す（工数 KPI には含める）
+function _kpiAuthors(d, forOt) { const ex = forOt ? (DEPARTMENT_CONFIG.kpiOtExcludeAuthors || []) : []; return Object.keys(d || {}).filter(a => a !== '_leaveMap' && a !== 'ヘルプ' && !ex.includes(a) && Array.isArray(d[a])); }
 // 担当者別の残業（日報の残業欄の合計）。形は _otByAuthor と同じ {担当者: {n, ot}}
 function _kpiOtByAuthor(d) {
   const out = {};
-  _kpiAuthors(d).forEach(a => {
+  _kpiAuthors(d, true).forEach(a => {
     let n = 0, ot = 0;
     d[a].forEach(r => { n += r.hoursNormal || 0; ot += r.hoursOT || 0; });
     out[a] = {n, ot};
