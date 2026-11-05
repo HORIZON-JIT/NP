@@ -8235,7 +8235,9 @@ function renderKpiOtBar(canvas, periods, ranges, vals, target, curIdx, proj, sta
       const by = stack.by[i];
       if (by && stack.authors.length) {
         let y0 = PT + cH;
-        stack.authors.forEach(a => {
+        // 月期ごとに、その月期の残業が多い人から下に積む（同じ時間なら年度の多い順。色は年度を通して固定）
+        const otOf = a => (by[a] || {}).ot || 0;
+        stack.authors.slice().sort((p, q) => otOf(q) - otOf(p)).forEach(a => {
           const av = (by[a] || {}).ot || 0, ah = av / maxV * cH * frac; if (ah <= 0) return;
           ctx.fillStyle = stack.color(a); ctx.fillRect(x - barW / 2, y0 - ah, barW, ah);
           // 区切り線＋セグメント内に名前と時間（高さがあるときだけ）
