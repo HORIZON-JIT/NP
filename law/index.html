@@ -1865,7 +1865,7 @@ tr.neon-row td.td-name{animation:neonText .8s ease-out;}
         <label class="leave-label" for="input-leave">退勤時刻</label>
         <input type="time" id="input-leave" class="leave-input" placeholder="--:--" step="60"
                oninput="onLeaveChangeDebounced()" />
-        <script>(function(){var d=new Date(),el=document.getElementById('input-leave');if(!el)return;el.value=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');window.addEventListener('load',function(){try{stampNow();}catch(e){}});})()</script>
+        <script>(function(){var d=new Date(),el=document.getElementById('input-leave');if(!el)return;el.value=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');window.addEventListener('load',function(){try{if(!window._leaveFromSaved)stampNow();}catch(e){}});})()</script>
         <button class="btn-stamp no-print" onclick="stampNow()" title="現在時刻を入力">現在時刻を反映</button>
         <span id="leave-ot-preview" class="leave-ot-preview"></span>
       </div>
@@ -6032,6 +6032,8 @@ async function loadDay_and_render() {
       document.getElementById('data-status').className='data-status';
     }
     const leaveEl = document.getElementById('input-leave');
+    // 保存済みの退勤時刻があるときは、ページ読込完了時の「現在時刻の自動入力」で上書きしない
+    window._leaveFromSaved = !!dayData.leaveTime;
     if (leaveEl) {
       if (dayData.leaveTime) {
         leaveEl.value = dayData.leaveTime;
