@@ -245,8 +245,8 @@ table.cal td.cnt{font-weight:850;}
       <button onclick="shiftPeriod(1)" title="次月期">▶</button>
     </div>
     <button class="btn" onclick="goCurrent()">今月期</button>
-    <div class="ot-rule-seg no-print" id="ot-rule-seg" style="display:none;" title="生産管理課の残業を集計する月期の区切り（日報アプリと共通・この端末だけの設定）">
-      <span>生産管理の残業</span><button type="button" data-v="month" onclick="setOtRule('month')">月末</button><button type="button" data-v="mid" onclick="setOtRule('mid')">15日</button>
+    <div class="ot-rule-seg no-print" id="ot-rule-seg" style="display:none;" title="生産管理課の月期の区切り（日報アプリと共通・この端末だけの設定）">
+      <span>生産管理の締め</span><button type="button" data-v="month" onclick="setOtRule('month')">月末</button><button type="button" data-v="mid" onclick="setOtRule('mid')">15日</button>
     </div>
     <button class="btn" onclick="reload(true)">再読込</button>
     <button class="btn" onclick="window.print()">PDF出力</button>
@@ -368,10 +368,11 @@ function _hm(hm) { const [h, m] = String(hm).split(':').map(Number); return h * 
 // 残業だけは src.otToggle の部署で、画面の「残業の締め」ボタン（各アプリと共通の端末設定）に従う
 const OT_RULE_KEY = '__otPeriodRule__';   // 生産管理課の日報アプリと同じキー（同じ公開先なので設定を共有）
 function otRuleSetting() { try { return localStorage.getItem(OT_RULE_KEY); } catch(e) { return null; } }
+// otToggle の部署は、画面の「締め」ボタン（日報アプリと共通の端末設定）で月期全体の締めが切り替わる
 function monthEndFor(src, ot) {
-  if (!src || !src.monthEnd) return false;
-  if (!ot || !src.otToggle) return true;
-  return otRuleSetting() !== 'mid';
+  if (!src) return false;
+  if (src.otToggle) { const v = otRuleSetting(); if (v === 'mid') return false; if (v === 'month') return true; }
+  return !!src.monthEnd;
 }
 function periodOfDate(s, src, ot) { const [y, m, d] = s.split('-').map(Number); if (monthEndFor(src || SOURCES[0], ot) || d <= 15) return {year: y, month: m}; return m === 12 ? {year: y + 1, month: 1} : {year: y, month: m + 1}; }
 function periodDates(year, month, src, ot) {
@@ -387,7 +388,7 @@ function periodSpan(year, month) {
   const a = periodDates(year, month, {}, false), b = periodDates(year, month, {monthEnd: true}, false);
   return {startDate: a.startDate < b.startDate ? a.startDate : b.startDate, endDate: a.endDate > b.endDate ? a.endDate : b.endDate};
 }
-function setOtRule(v) { try { localStorage.setItem(OT_RULE_KEY, v === 'mid' ? 'mid' : 'month'); } catch(e) {} _clCache.clear(); syncOtRuleSeg(); render(); if (STATE.detail) openDetail(STATE.detail, true); }
+function setOtRule(v) { try { localStorage.setItem(OT_RULE_KEY, v === 'mid' ? 'mid' : 'month'); } catch(e) {} _clCache.clear(); syncOtRuleSeg(); STATE.period = periodOfDate(todayStr(), SOURCES[0]); afterPeriodChange(); }
 function syncOtRuleSeg() {
   const el = document.getElementById('ot-rule-seg'); if (!el) return;
   const t = SOURCES.find(x => x.otToggle);
