@@ -224,6 +224,10 @@ table.cal td.cnt{font-weight:850;}
   .meter{min-width:120px;}
   body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 }
+.ot-rule-seg{display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--g500);font-weight:700;}
+.ot-rule-seg span{margin-right:2px;white-space:nowrap;}
+.ot-rule-seg button{border:1px solid var(--line);background:var(--surface);color:var(--g600);border-radius:999px;padding:4px 9px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;}
+.ot-rule-seg button.on{background:var(--g800);color:var(--surface);border-color:var(--g800);}
 </style>
 </head>
 <body>
@@ -241,6 +245,9 @@ table.cal td.cnt{font-weight:850;}
       <button onclick="shiftPeriod(1)" title="次月期">▶</button>
     </div>
     <button class="btn" onclick="goCurrent()">今月期</button>
+    <div class="ot-rule-seg no-print" id="ot-rule-seg" style="display:none;" title="生産管理課の残業を集計する月期の区切り（日報アプリと共通・この端末だけの設定）">
+      <span>生産管理の残業</span><button type="button" data-v="month" onclick="setOtRule('month')">月末</button><button type="button" data-v="mid" onclick="setOtRule('mid')">15日</button>
+    </div>
     <button class="btn" onclick="reload(true)">再読込</button>
     <button class="btn" onclick="window.print()">PDF出力</button>
     <button class="btn icon" id="theme-btn" onclick="toggleTheme()" title="ダーク／ライト切替" aria-label="ダーク／ライト切替"><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.4 14.6A8.3 8.3 0 0 1 9.4 3.6a8.5 8.5 0 1 0 11 11Z"></path></svg><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg></button>
@@ -332,7 +339,7 @@ const FB_PROJECTS = {
   }
 };
 const SOURCES = [
-  {id: 'np',    name: '生産管理課',       short: '生産管理', project: 'np',    collection: 'dailyReports',     master: 'np_master_categories',    url: '../',      color: 'var(--dept-np)', otExactFrom: '2026-10-16'},   // 残業は 2026年11月期から1分単位（config.js の rules.otExactFrom と同じ）,
+  {id: 'np',    name: '生産管理課',       short: '生産管理', project: 'np',    collection: 'dailyReports',     master: 'np_master_categories',    url: '../',      color: 'var(--dept-np)', otExactFrom: '2026-10-16', monthEnd: true, otToggle: true},   // 残業は 2026年11月期から1分単位（config.js の rules.otExactFrom と同じ）,
   {id: 'legal', name: '法務知財部 知財',  short: '法務知財', project: 'legal', collection: 'dailyReports',     master: 'legal_master_categories', url: '../legal/', color: 'var(--dept-legal)'},
   {id: 'law',   name: '法務知財部 法務',  short: '法務',     project: 'legal', collection: 'dailyReports_law', master: 'law_master_categories',   url: '../law/',   color: 'var(--dept-law)'}
 ];
@@ -357,10 +364,37 @@ const h1 = v => (Math.round(v * 10) / 10).toFixed(1);
 const h2 = v => (Math.round(v * 100) / 100).toFixed(2);
 const WD = ['日', '月', '火', '水', '木', '金', '土'];
 function _hm(hm) { const [h, m] = String(hm).split(':').map(Number); return h * 60 + m; }
-function periodOfDate(s) { const [y, m, d] = s.split('-').map(Number); if (d > 15) return m === 12 ? {year: y + 1, month: 1} : {year: y, month: m + 1}; return {year: y, month: m}; }
-function periodDates(year, month) {
+// 月期の締めは部署ごと（各アプリの config.js の periodRule と同じ）。src.monthEnd=true は月末締め、それ以外は15日締め。
+// 残業だけは src.otToggle の部署で、画面の「残業の締め」ボタン（各アプリと共通の端末設定）に従う
+const OT_RULE_KEY = '__otPeriodRule__';   // 生産管理課の日報アプリと同じキー（同じ公開先なので設定を共有）
+function otRuleSetting() { try { return localStorage.getItem(OT_RULE_KEY); } catch(e) { return null; } }
+function monthEndFor(src, ot) {
+  if (!src || !src.monthEnd) return false;
+  if (!ot || !src.otToggle) return true;
+  return otRuleSetting() !== 'mid';
+}
+function periodOfDate(s, src, ot) { const [y, m, d] = s.split('-').map(Number); if (monthEndFor(src || SOURCES[0], ot) || d <= 15) return {year: y, month: m}; return m === 12 ? {year: y + 1, month: 1} : {year: y, month: m + 1}; }
+function periodDates(year, month, src, ot) {
+  if (monthEndFor(src || SOURCES[0], ot)) {
+    const last = new Date(year, month, 0).getDate();
+    return {startDate: `${year}-${pad(month)}-01`, endDate: `${year}-${pad(month)}-${pad(last)}`, label: `${year}年${month}月期`, range: `${year}/${pad(month)}/01 〜 ${year}/${pad(month)}/${pad(last)}`};
+  }
   const pm = month === 1 ? 12 : month - 1, py = month === 1 ? year - 1 : year;
   return {startDate: `${py}-${pad(pm)}-16`, endDate: `${year}-${pad(month)}-15`, label: `${year}年${month}月期`, range: `${py}/${pad(pm)}/16 〜 ${year}/${pad(month)}/15`};
+}
+// 締めルールが違う部署をまとめて読むときの範囲（15日締め・月末締めの両方を含む）
+function periodSpan(year, month) {
+  const a = periodDates(year, month, {}, false), b = periodDates(year, month, {monthEnd: true}, false);
+  return {startDate: a.startDate < b.startDate ? a.startDate : b.startDate, endDate: a.endDate > b.endDate ? a.endDate : b.endDate};
+}
+function setOtRule(v) { try { localStorage.setItem(OT_RULE_KEY, v === 'mid' ? 'mid' : 'month'); } catch(e) {} _clCache.clear(); syncOtRuleSeg(); render(); if (STATE.detail) openDetail(STATE.detail, true); }
+function syncOtRuleSeg() {
+  const el = document.getElementById('ot-rule-seg'); if (!el) return;
+  const t = SOURCES.find(x => x.otToggle);
+  el.style.display = t ? '' : 'none';
+  if (!t) return;
+  const me = monthEndFor(t, true);
+  el.querySelectorAll('button').forEach(b => b.classList.toggle('on', (b.dataset.v === 'month') === me));
 }
 function addPeriod(p, n) { let y = p.year, m = p.month + n; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return {year: y, month: m}; }
 const fiscalYearOf = p => p.month >= 10 ? p.year : p.year - 1;
@@ -496,8 +530,8 @@ async function reload(force) {
   STATE.loadedOnce = true;
   const p = STATE.period, fy = fiscalYearOf(p), fps = fiscalPeriods(fy);
   const prev = addPeriod(p, -1);
-  const start = [periodDates(prev.year, prev.month).startDate, periodDates(fps[0].year, fps[0].month).startDate].sort()[0];
-  const end = periodDates(fps[11].year, fps[11].month).endDate;
+  const start = [periodSpan(prev.year, prev.month).startDate, periodSpan(fps[0].year, fps[0].month).startDate].sort()[0];
+  const end = periodSpan(fps[11].year, fps[11].month).endDate;
   setLoading(true, '全部署のデータを読み込み中...');
   if (force) _fetchCache.clear();
   STATE.errors = {};
@@ -526,7 +560,7 @@ async function reload(force) {
 const isWorkday = (d, today) => { const w = new Date(d + 'T00:00:00').getDay(); if (w === 0 || w === 6) return false; return d >= today || STATE.data.anyLeave.has(d); };
 
 function metricsFor(o, p) {
-  const today = todayStr(), {startDate: s, endDate: e} = periodDates(p.year, p.month);
+  const today = todayStr(), {startDate: s, endDate: e} = periodDates(p.year, p.month, o.src, true);   // 残業・入力の指標は残業の締め
   let n = 0, ot = 0, days = 0, miss = 0, leaveSum = 0, leaveN = 0;
   const first = Object.keys(o.days).filter(d => o.days[d].leave).sort()[0] || null;
   eachDate(s, e).forEach(d => {
@@ -550,8 +584,8 @@ function compFor(o, s, e) {
   });
   return {cats: Object.values(cats).sort((a, b) => b.h - a.h), subs: Object.values(subs).sort((a, b) => b.h - a.h), tot};
 }
-function periodProgress(p) {
-  const today = todayStr(), {startDate: s, endDate: e} = periodDates(p.year, p.month);
+function periodProgress(p, src, ot) {
+  const today = todayStr(), {startDate: s, endDate: e} = periodDates(p.year, p.month, src, ot);
   if (today < s || today > e) return null;
   const wds = eachDate(s, e).filter(d => isWorkday(d, today));
   const elapsed = wds.filter(d => d < today).length, total = wds.length;   // 今日は入力途中のため経過に含めない
@@ -560,8 +594,9 @@ function periodProgress(p) {
 
 function rowsForView() {
   const D = STATE.data, p = STATE.period, fpsIdx = D.fps.findIndex(x => x.year === p.year && x.month === p.month);
-  const prev = addPeriod(p, -1), prog = periodProgress(p), {startDate: s, endDate: e} = periodDates(p.year, p.month);
+  const prev = addPeriod(p, -1);
   return D.people.map(o => {
+    const prog = periodProgress(p, o.src, true), {startDate: s, endDate: e} = periodDates(p.year, p.month, o.src, false);   // 見込は残業の締め・業務構成は部署の締め
     const cur = metricsFor(o, p), pv = metricsFor(o, prev);
     const fyM = D.fps.slice(0, fpsIdx + 1).map(fp => metricsFor(o, fp));
     const fyOT = fyM.reduce((t, m) => t + m.ot, 0), over = fyM.filter(m => m.ot > R.otMonthLimit).length;
@@ -582,24 +617,27 @@ function syncPeriodSelectors() {
 }
 function onSelPeriod() { STATE.period = {year: Number(document.getElementById('sel-year').value), month: Number(document.getElementById('sel-month').value)}; afterPeriodChange(); }
 function shiftPeriod(n) { STATE.period = addPeriod(STATE.period, n); afterPeriodChange(); }
-function goCurrent() { STATE.period = periodOfDate(todayStr()); afterPeriodChange(); }
+function goCurrent() { STATE.period = periodOfDate(todayStr(), SOURCES[0]); afterPeriodChange(); }
 function afterPeriodChange() {
   syncPeriodSelectors();
   const D = STATE.data;
   // 年度または前月期が読み込み範囲外なら読み直す
   if (!D) return reload();
   const prev = addPeriod(STATE.period, -1);
-  if (fiscalYearOf(STATE.period) !== D.fy || periodDates(prev.year, prev.month).startDate < D.start) reload();
+  if (fiscalYearOf(STATE.period) !== D.fy || periodSpan(prev.year, prev.month).startDate < D.start) reload();
   else { render(); if (STATE.detail) openDetail(STATE.detail, true); }
 }
 function setDept(d) { STATE.dept = d; render(); }
 function setSort(s) { STATE.sort = s; render(); }
 
 function render() {
+  syncOtRuleSeg();
   const D = STATE.data; if (!D) return;
-  const p = STATE.period, pd = periodDates(p.year, p.month), fy = D.fy;
+  const p = STATE.period, pd = periodDates(p.year, p.month, SOURCES[0], false), fy = D.fy;
   document.getElementById('ttl').textContent = `${pd.label} チームの状況`;
-  document.getElementById('range').textContent = `${pd.range}（${fy + 1}年度・${fiscalKi(fy)}期）`;
+  const rngs = {}; SOURCES.forEach(src => { const r = periodDates(p.year, p.month, src, false).range; (rngs[r] = rngs[r] || []).push(src.short); });
+  const otSrc = SOURCES.find(x => x.otToggle), otR = otSrc && monthEndFor(otSrc, true) !== monthEndFor(otSrc, false) ? `・${otSrc.short}の残業 ${periodDates(p.year, p.month, otSrc, true).range}` : '';
+  document.getElementById('range').textContent = (Object.keys(rngs).length > 1 ? Object.entries(rngs).map(([r, n]) => `${n.join('・')} ${r}`).join('／') : pd.range) + otR + `（${fy + 1}年度・${fiscalKi(fy)}期）`;
   const errs = Object.entries(STATE.errors);
   document.getElementById('banners').innerHTML = errs.map(([id, e]) => {
     const s = SOURCES.find(x => x.id === id);
@@ -633,9 +671,10 @@ function renderAlerts(rows) {
 }
 
 // 時間の使い方の対象期間（この月期／年度累計＝期初〜選択中の月期）
-function allocRange() {
-  const D = STATE.data, pd = periodDates(STATE.period.year, STATE.period.month);
-  if (STATE.allocScope === 'fy') { const f = periodDates(D.fps[0].year, D.fps[0].month); return {s: f.startDate, e: pd.endDate, label: `年度累計（${f.range.split(' 〜 ')[0]} 〜 ${pd.range.split(' 〜 ')[1]}）`}; }
+function allocRange(src) {
+  src = src || SOURCES.find(x => x.id === STATE.allocDept) || SOURCES[0];
+  const D = STATE.data, pd = periodDates(STATE.period.year, STATE.period.month, src, false);
+  if (STATE.allocScope === 'fy') { const f = periodDates(D.fps[0].year, D.fps[0].month, src, false); return {s: f.startDate, e: pd.endDate, label: `年度累計（${f.range.split(' 〜 ')[0]} 〜 ${pd.range.split(' 〜 ')[1]}）`}; }
   return {s: pd.startDate, e: pd.endDate, label: `${pd.label}（${pd.range}）`};
 }
 // 部署全体の大分類・中分類の合計
@@ -658,8 +697,9 @@ function deptCats(src, used) {
 
 // ── 部署カード ──
 function renderDeptCards(rows) {
-  const {s, e} = allocRange(), today = todayStr(), p = STATE.period, pd = periodDates(p.year, p.month);
+  const today = todayStr(), p = STATE.period;
   const html = SOURCES.map(src => {
+    const {s, e} = allocRange(src), pd = periodDates(p.year, p.month, src, false);
     const list = rows.filter(r => r.o.src.id === src.id);
     if (!list.length) return `<div class="dcard" style="--dc:${src.color};opacity:.6"><div class="dh"><b>${esc(src.name)}</b><span>データなし</span></div></div>`;
     const act = list.filter(r => r.cur.days), ot = act.reduce((t, r) => t + r.cur.ot, 0);
@@ -692,7 +732,7 @@ function renderAlloc(rows) {
   const avail = SOURCES.filter(src => rows.some(r => r.o.src.id === src.id));
   if (!avail.length) { document.getElementById('alloc-bars').innerHTML = '<div class="empty">データがありません</div>'; ['alloc-matrix', 'alloc-drill', 'alloc-change'].forEach(id => document.getElementById(id).innerHTML = ''); return; }
   if (!STATE.allocDept || !avail.some(x => x.id === STATE.allocDept)) STATE.allocDept = avail[0].id;
-  const src = SOURCES.find(x => x.id === STATE.allocDept), {s, e, label} = allocRange(), pct = STATE.allocMode === 'pct';
+  const src = SOURCES.find(x => x.id === STATE.allocDept), {s, e, label} = allocRange(src), pct = STATE.allocMode === 'pct';
   document.getElementById('alloc-dept').innerHTML = avail.map(x => `<button class="${x.id === src.id ? 'on' : ''}" onclick="setAllocDept('${x.id}')"><span class="dot" style="background:${x.color}"></span>${esc(x.short)}</button>`).join('');
   document.getElementById('alloc-scope').innerHTML = `<button class="${STATE.allocScope === 'period' ? 'on' : ''}" onclick="setAllocScope('period')">この月期</button><button class="${STATE.allocScope === 'fy' ? 'on' : ''}" onclick="setAllocScope('fy')">年度累計</button>`;
   document.getElementById('alloc-mode').innerHTML = `<button class="${!pct ? 'on' : ''}" onclick="setAllocMode('h')">時間</button><button class="${pct ? 'on' : ''}" onclick="setAllocMode('pct')">割合</button>`;
@@ -742,13 +782,13 @@ function renderAlloc(rows) {
   // 前期からの変化（この月期のときだけ）
   const chg = document.getElementById('alloc-change');
   if (STATE.allocScope !== 'period') { chg.innerHTML = ''; return; }
-  const prev = addPeriod(STATE.period, -1), ppd = periodDates(prev.year, prev.month);
+  const prev = addPeriod(STATE.period, -1), ppd = periodDates(prev.year, prev.month, src, false);
   if (ppd.startDate < STATE.data.start) { chg.innerHTML = ''; return; }
   const list = rows.filter(r => r.o.src.id === src.id);
   const pc = deptComp(list, ppd.startDate, ppd.endDate);
   if (!pc.tot) { chg.innerHTML = ''; return; }
   // 月期の途中でも比べられるよう、時間ではなく「部署全体に占める割合」で比べる
-  const rs = allocRange(), k = dc.tot / pc.tot;
+  const rs = allocRange(src), k = dc.tot / pc.tot;
   const deltas = cats.concat(pc.cats.filter(x => !cats.some(c => c.cd === x.cd))).map(c => {
     const now = (dc.cats.find(x => x.cd === c.cd) || {h: 0}).h, before = (pc.cats.find(x => x.cd === c.cd) || {h: 0}).h;
     // 変化を一番動かした人（前の月期の時間を今期の総量に合わせて比べる）
@@ -770,7 +810,7 @@ function renderOtMap(rows) {
   const list = rows.map(r => ({r, ms: D.fps.map(fp => metricsFor(r.o, fp))})).sort((a, b) => b.r.fyOT - a.r.fyOT);
   const head = `<tr><th style="text-align:left">担当</th>${D.fps.map((fp, i) => `<th>${fp.month}月期${i === idx ? '<br><span class="t-ok">選択中</span>' : ''}</th>`).join('')}<th>年度累計<br>/ ${R.otYearLimit}h</th><th>${R.otMonthLimit}h超<br>/ ${R.otOverMonthsMax}回</th></tr>`;
   const body = list.map(({r, ms}) => `<tr><td class="nm" onclick="openDetail('${esc(r.o.src.id + '|' + r.o.author)}')"><span class="dot" style="background:${r.o.src.color}"></span> ${esc(r.o.author)}</td>${ms.map((m, i) => {
-      const fut = periodDates(D.fps[i].year, D.fps[i].month).startDate > today;
+      const fut = periodDates(D.fps[i].year, D.fps[i].month, r.o.src, true).startDate > today;
       if (fut || i > idx) return `<td class="fut"></td>`;
       if (!m.days) return `<td class="v-0${i === idx ? ' cur' : ''}">—</td>`;
       const lv = lvOf(m.ot), pj = i === idx && r.pj != null && r.pj > m.ot ? r.pj : null;
@@ -791,7 +831,7 @@ function renderOtTable(rows) {
   const basis = r => r.pj != null ? r.pj : r.cur.ot;
   if (STATE.sort === 'ot') list.sort((a, b) => basis(b) - basis(a) || b.cur.n - a.cur.n);
   else list.sort((a, b) => SOURCES.indexOf(a.o.src) - SOURCES.indexOf(b.o.src) || basis(b) - basis(a));
-  const prog = periodProgress(p);
+  const prog = rows.some(r => r.prog);   // 月期の途中の部署があれば「月末見込」の列を出す
   const scaleMax = Math.max(R.otMonthLimit * 1.15, ...list.map(r => Math.max(r.cur.ot, r.pj || 0))) * 1.02;
   const pc = v => Math.min(100, v / scaleMax * 100).toFixed(1);
   const meter = (cur, pj) => { const ext = pj != null && pj > cur ? pj : null;
@@ -813,11 +853,15 @@ function renderOtTable(rows) {
 
 // ── 日報 入力状況（人 × 日）──
 function renderEntryCal(rows) {
-  const p = STATE.period, pd = periodDates(p.year, p.month), today = todayStr(), dates = eachDate(pd.startDate, pd.endDate);
+  const p = STATE.period, pd = periodDates(p.year, p.month, SOURCES[0], false), today = todayStr();
+  const used = SOURCES.filter(src => rows.some(r => r.o.src.id === src.id));
+  const rs = (used.length ? used : SOURCES).map(src => periodDates(p.year, p.month, src, false));
+  const dates = eachDate(rs.map(r => r.startDate).sort()[0], rs.map(r => r.endDate).sort().slice(-1)[0]);
   const list = rows.slice().sort((a, b) => SOURCES.indexOf(a.o.src) - SOURCES.indexOf(b.o.src) || b.cur.miss - a.cur.miss);
   const head = `<tr><th></th>${dates.map(d => { const w = new Date(d + 'T00:00:00').getDay(); return `<th class="${w === 0 ? 'sun' : w === 6 ? 'sat' : ''}">${Number(d.slice(8))}<br>${WD[w]}</th>`; }).join('')}<th>未入力</th></tr>`;
-  const body = list.map(r => { const o = r.o, first = Object.keys(o.days).filter(d => o.days[d].leave).sort()[0];
+  const body = list.map(r => { const o = r.o, first = Object.keys(o.days).filter(d => o.days[d].leave).sort()[0], op = periodDates(p.year, p.month, o.src, false);
     return `<tr><td class="nm"><span class="dot" style="background:${o.src.color}"></span> ${esc(o.author)}</td>${dates.map(d => {
+      if (d < op.startDate || d > op.endDate) return '<td></td>';   // この人の部署の月期の外
       const v = o.days[d], c = v && v.leave ? calcFromLeave(v.leave, d, o.src) : null, w = new Date(d + 'T00:00:00').getDay();
       if (c) return `<td class="${c.ot > 0 ? 'ot' : 'ok'}" title="${d} 退勤 ${esc(v.leave)}（通常 ${h2(c.normal)}h・残業 ${h2(c.ot)}h）">${h1(c.normal + c.ot)}</td>`;
       if (d >= today) return '<td></td>';
@@ -826,7 +870,7 @@ function renderEntryCal(rows) {
       return `<td class="miss" title="${d} 未入力">未</td>`;
     }).join('')}<td class="cnt ${r.cur.miss ? 't-crit' : 't-muted'}">${r.cur.miss ? r.cur.miss + '日' : '—'}</td></tr>`; }).join('');
   document.getElementById('entry-cal').innerHTML = list.length ? `<table class="cal"><thead>${head}</thead><tbody>${body}</tbody></table>` : '<div class="empty">データがありません</div>';
-  document.getElementById('cal-sub').textContent = `${pd.label}（${pd.range}）・退勤時刻から計算した勤務時間。黄＝残業あり・赤＝未入力（平日の過去日）・斜線＝土日・休日`;
+  document.getElementById('cal-sub').textContent = `${pd.label}（${[...new Set(rs.map(r => r.range))].join('／')}）・退勤時刻から計算した勤務時間。黄＝残業あり・赤＝未入力（平日の過去日）・斜線＝土日・休日`;
 }
 
 // ═══════════════════════════════════════════
@@ -840,12 +884,12 @@ function openDetail(key, keepScroll) {
   const o = D.people.find(x => x.src.id + '|' + x.author === key);
   if (!o) { closeDrawer(); return; }
   STATE.detail = key;
-  const p = STATE.period, pd = periodDates(p.year, p.month), today = todayStr();
+  const p = STATE.period, pd = periodDates(p.year, p.month, o.src, false), today = todayStr();
   const idx = D.fps.findIndex(x => x.year === p.year && x.month === p.month);
   const ms = D.fps.map(fp => ({fp, m: metricsFor(o, fp)}));
-  const cur = ms[idx].m, prog = periodProgress(p), pj = prog ? cur.ot * prog.ratio : null;
+  const cur = ms[idx].m, prog = periodProgress(p, o.src, true), pj = prog ? cur.ot * prog.ratio : null;
   const fyOT = ms.slice(0, idx + 1).reduce((t, x) => t + x.m.ot, 0), over = ms.slice(0, idx + 1).filter(x => x.m.ot > R.otMonthLimit).length;
-  const fyS = periodDates(D.fps[0].year, D.fps[0].month).startDate, fyE = periodDates(D.fps[11].year, D.fps[11].month).endDate;
+  const fyS = periodDates(D.fps[0].year, D.fps[0].month, o.src, false).startDate, fyE = periodDates(D.fps[11].year, D.fps[11].month, o.src, false).endDate;
   const comp = STATE.detailScope === 'fy' ? compFor(o, fyS, fyE) : compFor(o, pd.startDate, pd.endDate);
   const hm = m => m == null ? '—' : `${Math.floor(m / 60)}:${pad(Math.round(m % 60))}`;
   const tile = (l, v, s, cls) => `<div class="tile ${cls || ''}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s || ''}</div></div>`;
@@ -858,7 +902,7 @@ function openDetail(key, keepScroll) {
   // 月期別推移
   const mx = Math.max(R.otMonthLimit * 1.1, ...ms.map(x => x.m.ot));
   const trend = `<table class="mt trend"><thead><tr><th>月期</th><th class="num">通常</th><th class="num">残業</th><th></th><th class="num">入力日数</th><th class="num">平均退勤</th></tr></thead><tbody>${ms.map((x, i) => {
-    const fut = periodDates(x.fp.year, x.fp.month).startDate > today;
+    const fut = periodDates(x.fp.year, x.fp.month, o.src, true).startDate > today;
     return `<tr class="${i === idx ? 'cur' : ''}${fut ? ' fut' : ''}" onclick="event.stopPropagation()" style="cursor:default"><td><b>${x.fp.month}月期</b></td>
       <td class="num">${x.m.days ? h1(x.m.n) + 'h' : ''}</td><td class="num">${x.m.days ? `<span class="${lvOf(x.m.ot) === 'ok' ? '' : 't-' + lvOf(x.m.ot)}">${h1(x.m.ot)}h</span>` : ''}</td>
       <td><div class="mini">${x.m.days ? `<span class="lv-${lvOf(x.m.ot)}" style="width:${(x.m.ot / mx * 100).toFixed(1)}%"></span>` : ''}<i style="left:${(R.otMonthLimit / mx * 100).toFixed(1)}%"></i></div></td>
@@ -876,8 +920,8 @@ function openDetail(key, keepScroll) {
       <span class="vl">${Math.round(me * 100)}%<small>部署 ${Math.round(team * 100)}%</small> <b class="${me - team > 0.1 ? 't-warn' : me - team < -0.1 ? 't-muted' : ''}">${me - team >= 0 ? '+' : ''}${Math.round((me - team) * 100)}</b></span></div>`; }).join('') : '';
   // 業務構成の推移（月期ごとの大分類）
   const allCats = deptCats(o.src, compFor(o, fyS, fyE).cats);
-  const mmax = Math.max(1, ...D.fps.map(fp => { const q = periodDates(fp.year, fp.month); return compFor(o, q.startDate, q.endDate).tot; }));
-  const mixTrend = D.fps.map((fp, i) => { const q = periodDates(fp.year, fp.month); if (q.startDate > today) return ''; const c = compFor(o, q.startDate, q.endDate);
+  const mmax = Math.max(1, ...D.fps.map(fp => { const q = periodDates(fp.year, fp.month, o.src, false); return compFor(o, q.startDate, q.endDate).tot; }));
+  const mixTrend = D.fps.map((fp, i) => { const q = periodDates(fp.year, fp.month, o.src, false); if (q.startDate > today) return ''; const c = compFor(o, q.startDate, q.endDate);
     return `<div class="pbar" style="cursor:default"><span class="nm" style="font-weight:700">${fp.month}月期${i === idx ? ' ●' : ''}</span><div><div class="bars" style="width:${(c.tot / mmax * 100).toFixed(1)}%;height:16px">${allCats.map(cat => { const x = c.cats.find(y => y.cd === cat.cd); return x && x.h ? `<span style="width:${(x.h / c.tot * 100).toFixed(2)}%;background:${esc(cat.color)}" title="${esc(cat.label)} ${h1(x.h)}h"></span>` : ''; }).join('')}</div></div><span class="tot">${c.tot ? h1(c.tot) + 'h' : '—'}</span></div>`; }).join('');
   const bars = (list, tot, n) => list.slice(0, n).map(x => `<div class="hbar"><span class="lb"><span class="dot" style="background:${esc(x.color)}"></span>${esc(x.label)}</span><span class="tr"><span style="width:${(x.h / list[0].h * 100).toFixed(1)}%;background:${esc(x.color)}"></span></span><span class="vl">${h1(x.h)}h<small>${Math.round(x.h / tot * 100)}%</small></span></div>`).join('');
   // 日別明細
