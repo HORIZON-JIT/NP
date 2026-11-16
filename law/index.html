@@ -3289,13 +3289,17 @@ function cacheInvalidate(date) {
   const {startDate:ckStart, endDate:ckEnd} = getPeriodDates(periodYear, periodMonth);
   const rangeKey = `range_${ckStart}_${ckEnd}`;
 
-  // メモリキャッシュ：当該日 + 当該月期のみ削除
+  // メモリキャッシュ：当該日 + 当該月期を削除
   _cache.delete(`daily_${date}`);
   _cache.delete(rangeKey);
 
-  // localStorageキャッシュ：当該日 + 当該月期のみ削除（他月は保持）
+  // localStorageキャッシュ：当該日 + 当該月期を削除（他月は保持）
   lsCacheDelete(`daily_${date}`);
   lsCacheDelete(rangeKey);
+  // その日を含むほかの期間（KPI の暦月など、15日締め以外の区切り）も削除
+  const inRange = k => { const m = /^range_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/.exec(k); return m && m[1] <= date && date <= m[2]; };
+  [..._cache.keys()].forEach(k => { if (inRange(k)) _cache.delete(k); });
+  try { Object.keys(localStorage).forEach(k => { if (k.startsWith(CACHE_PREFIX) && inRange(k.slice(CACHE_PREFIX.length))) localStorage.removeItem(k); }); } catch(e) {}
   // 入力モードキャッシュも削除（既知のキーパターンで直接削除）
   const author = getAuthor();
   if (author) localStorage.removeItem(CACHE_PREFIX + `input_${date}_${author}`);
@@ -3914,11 +3918,23 @@ function isCurrentPeriod(year, month) {
   return cp.year === year && cp.month === month;
 }
 
+// 期間データが確定したとみなせるか（締め日から40日以上たった期間）。後からの入力・修正が入りうる期間は無期限に保存しない
+const RANGE_SETTLE_DAYS = 40;
+function _rangeSettled(startDate, endDate) {
+  const t = new Date(todayStr() + 'T00:00:00'); t.setDate(t.getDate() - RANGE_SETTLE_DAYS);
+  return endDate < ymdLocal(t);
+}
+// 'range_開始_終了' のキーで、まだ確定していない期間なのに無期限で保存されているもの（以前の不具合の名残）
+function _rangeKeyUnsettledForever(key, obj) {
+  const m = /^range_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/.exec(key);
+  return !!m && obj && obj.exp === -1 && !_rangeSettled(m[1], m[2]);
+}
 function lsCacheGet(key) {
   try {
     const raw = localStorage.getItem(CACHE_PREFIX + key);
     if (!raw) return null;
     const obj = JSON.parse(raw);
+    if (_rangeKeyUnsettledForever(key, obj)) { localStorage.removeItem(CACHE_PREFIX + key); return null; }
     // 旧形式マイグレーション: exp が1970年代相当（=TTL=0で保存された古いデータ）→ 無期限に昇格
     // 2020年1月1日(ms)より小さければ旧形式とみなす
     if (obj.exp >= 0 && obj.exp < 1577836800000) {
@@ -3939,6 +3955,7 @@ function lsCacheGetStale(key) {
     if (!raw) return null;
     const obj = JSON.parse(raw);
     if (obj.exp >= 0 && obj.exp < 1577836800000) obj.exp = -1; // 旧形式は無期限扱い
+    if (_rangeKeyUnsettledForever(key, obj)) return { data: obj.data, fresh: false };
     return { data: obj.data, fresh: obj.exp === -1 || Date.now() <= obj.exp };
   } catch(e) { return null; }
 }
@@ -4970,10 +4987,10 @@ async function _bgRefreshDaily(date, ck) {
 //   戻り値の rows に hoursNormal / hoursOT が直接入っている
 async function loadRangeData(startDate, endDate, periodYear, periodMonth) {
   const ck = `range_${startDate}_${endDate}`;
-  // 当月期は1時間、過去期は30分キャッシュ
-  const ttl = (periodYear && periodMonth && isCurrentPeriod(periodYear, periodMonth))
-    ? CACHE_TTL_RANGE_CURRENT
-    : CACHE_TTL_RANGE;
+  // 締め日から40日以上たった期間だけ無期限に保存し、それ以外は1時間で読み直す。
+  // （以前は15日締めの「今月期」かどうかで決めていたため、KPI の暦月（1日〜月末）が
+  //   途中のまま「過去」として無期限に保存され、見る人の端末ごとに数字が違っていた）
+  const ttl = _rangeSettled(startDate, endDate) ? CACHE_TTL_RANGE : CACHE_TTL_RANGE_CURRENT;
 
   // 1. メモリキャッシュ優先
   const mem = cacheGet(ck);
