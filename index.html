@@ -127,6 +127,10 @@ header{background:rgba(255,255,255,.88);color:var(--g800);padding:10px 20px;disp
 .td-ripple{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:color-mix(in srgb,var(--cat-color,#6b7280) 45%,transparent);pointer-events:none;animation:tdRipple .6s ease-out forwards;}
 @keyframes tdRipple{to{transform:scale(28);opacity:0;}}
 .hours-wrap{position:relative;}
+.ot-rule-seg{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--g500);font-weight:700;margin-left:10px;}
+.ot-rule-seg span{margin-right:4px;}
+.ot-rule-seg button{border:1px solid var(--g200);background:var(--surface);color:var(--g600);border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+.ot-rule-seg button.on{background:var(--g800,#222);color:#fff;border-color:var(--g800,#222);}
 .hours-wrap input.bump{animation:cellBump .42s cubic-bezier(.2,1.4,.4,1);}
 /* Folioから取込: 入力欄に反映するときのチャージ演出 */
 .hours-wrap .chg{position:absolute;inset:0;border-radius:8px;overflow:hidden;pointer-events:none;z-index:3;border:1.5px solid var(--cc);background:var(--panel);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--cc);font-variant-numeric:tabular-nums;box-shadow:0 0 10px color-mix(in srgb,var(--cc) 45%,transparent);animation:chgIn .18s ease-out;}
@@ -1911,6 +1915,9 @@ tr.neon-row td.td-name{animation:neonText .8s ease-out;}
     <button class="dash-stab"        id="stab-person"  onclick="showDashTab('person')">個人</button>
     <button class="dash-stab"        id="stab-kpi"     onclick="showDashTab('kpi')" style="display:none;">KPI</button>
   </div>
+  <div class="ot-rule-seg no-print" id="ot-rule-seg" style="display:none;" title="残業時間を集計する月期の区切り（この端末だけの設定）">
+    <span>残業の締め</span><button type="button" data-v="month" onclick="setOtRule('month')">月末</button><button type="button" data-v="mid" onclick="setOtRule('mid')">15日</button>
+  </div>
   </div>
 
   <!-- ─── 日別ビュー ─── -->
@@ -3250,13 +3257,62 @@ function pad(n){ return String(n).padStart(2,'0'); }
 // Date → 'YYYY-MM-DD'（端末の時刻で。toISOString は UTC になり、日本時間の0時が前日になるので使わない）
 function ymdLocal(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 
-// ─── 15日締め期間計算 ────────────────────
-// 「YYYY年M月期」= 前月16日〜当月15日
-// 日付(YYYY-MM-DD)が属する月期。16日以降は翌月期、1〜15日は当月期
+// ─── 月期の締め ────────────────────
+// 既定は15日締め:「YYYY年M月期」= 前月16日〜当月15日
+// 部署設定 periodRule.monthEnd=true なら月末締め:「YYYY年M月期」= 当月1日〜月末（過去分も含めてすべて）
+// 残業だけは periodRule.otToggle=true の部署で、画面のボタンから月末締め／15日締めを切り替えられる（端末ごと）
+function periodMonthEnd() { return !!(DEPARTMENT_CONFIG.periodRule || {}).monthEnd; }
+function _calMonthDates(year, month) {
+  const last = new Date(year, month, 0).getDate();
+  return {startDate: `${year}-${pad(month)}-01`, endDate: `${year}-${pad(month)}-${pad(last)}`, label: `${year}年${month}月期`,
+          range: `${year}/${pad(month)}/01 〜 ${year}/${pad(month)}/${pad(last)}`, calendar: true};
+}
+function _midMonthDates(year, month) {
+  const prevM = month===1?12:month-1;
+  const prevY = month===1?year-1:year;
+  return {
+    startDate: `${prevY}-${pad(prevM)}-16`,
+    endDate:   `${year}-${pad(month)}-15`,
+    label:     `${year}年${month}月期`,
+    range:     `${prevY}/${pad(prevM)}/16 〜 ${year}/${pad(month)}/15`
+  };
+}
+// 日付(YYYY-MM-DD)が属する月期（15日締め: 16日以降は翌月期／月末締め: その月）
+// ※ getPeriodDates / periodOfDate は月次AI分析の GAS（gas/ai-monthly-analyzer.gs）が名前で取り出して使うので、ほかの関数に頼らず自己完結させる
 function periodOfDate(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
+  if ((DEPARTMENT_CONFIG.periodRule || {}).monthEnd) return {year: y, month: m};
   if (d > 15) return m === 12 ? {year: y + 1, month: 1} : {year: y, month: m + 1};
   return {year: y, month: m};
+}
+function periodRuleLabel() { return periodMonthEnd() ? '月末締め' : '15日締め'; }
+// ── 残業の締め（切替ボタン）──
+const OT_RULE_KEY = LS_NS + '__otPeriodRule__';
+function otRuleToggleOn() { return !!(DEPARTMENT_CONFIG.periodRule || {}).otToggle; }
+function otMonthEnd() {
+  if (!otRuleToggleOn()) return periodMonthEnd();
+  let v = null; try { v = localStorage.getItem(LS_NS + '__otPeriodRule__'); } catch(e) {}
+  return v === 'mid' ? false : v === 'month' ? true : periodMonthEnd();
+}
+function otRuleLabel() { return otMonthEnd() ? '月末締め' : '15日締め'; }
+function otRuleDiffers() { return otMonthEnd() !== periodMonthEnd(); }   // 残業だけ別の締めで数えているか
+function otPeriodDates(year, month) { return otMonthEnd() ? _calMonthDates(year, month) : _midMonthDates(year, month); }
+function otPeriodOfDate(dateStr) { const [y, m, d] = dateStr.split('-').map(Number); if (otMonthEnd() || d <= 15) return {year: y, month: m}; return m === 12 ? {year: y + 1, month: 1} : {year: y, month: m + 1}; }
+function setOtRule(v) {
+  try { localStorage.setItem(OT_RULE_KEY, v === 'mid' ? 'mid' : 'month'); } catch(e) {}
+  syncOtRuleSeg();
+  _renderCache.monthly = _renderCache.yearly = _renderCache.daily = null;
+  if (typeof _kpiCtx !== 'undefined') _kpiCtx = null;
+  if (typeof _personCtx !== 'undefined') _personCtx = null;
+  if (_currentTab === 'dash') showDashTab(_dashTab);
+}
+function syncOtRuleSeg() {
+  const el = document.getElementById('ot-rule-seg');
+  if (!el) return;
+  el.style.display = otRuleToggleOn() && ['monthly', 'yearly', 'person', 'kpi'].includes(_dashTab) ? '' : 'none';
+  const me = otMonthEnd();
+  el.querySelectorAll('button').forEach(b => b.classList.toggle('on', (b.dataset.v === 'month') === me));
+  const st = document.getElementById('stab-monthly'); if (st) st.textContent = `月次（${periodRuleLabel()}）`;
 }
 function getCurrentPeriodMonth() { return periodOfDate(todayStr()); }
 // KPI（月次工数目標）専用: kpiPeriodRule.midMonthFrom より前の月期は暦月（1日〜月末）
@@ -3270,6 +3326,11 @@ function kpiPeriodDates(year, month) {
   return getPeriodDates(year, month);
 }
 function getPeriodDates(year, month) {
+  if ((DEPARTMENT_CONFIG.periodRule || {}).monthEnd) {   // 月末締め（_calMonthDates と同じ）
+    const last = new Date(year, month, 0).getDate();
+    return {startDate: `${year}-${pad(month)}-01`, endDate: `${year}-${pad(month)}-${pad(last)}`, label: `${year}年${month}月期`,
+            range: `${year}/${pad(month)}/01 〜 ${year}/${pad(month)}/${pad(last)}`, calendar: true};
+  }
   const prevM = month===1?12:month-1;
   const prevY = month===1?year-1:year;
   return {
@@ -7241,6 +7302,7 @@ async function showTab(name) {
   document.getElementById('tab-'+name).classList.add('active');
   if (name==='dash') {
     dxSetHead(_dashTab);
+    syncOtRuleSeg();
     if (_dashTab==='daily') await renderDash();
     else if (_dashTab==='yearly') { initYearSelector(); await renderYearlyDash(); }
     else if (_dashTab==='person') { initPersonSelectors(); await renderPersonDash(); }
@@ -7282,6 +7344,7 @@ function showDashTab(name) {
   document.getElementById('dash-kpi').style.display     =name==='kpi'    ?'':'none';
   document.querySelectorAll('.dash-stab').forEach(b=>b.classList.remove('active'));
   document.getElementById('stab-'+name).classList.add('active');
+  syncOtRuleSeg();
   if (name==='monthly') { initPeriodSelectors(); renderMonthlyDash(); }
   else if (name==='yearly') { initYearSelector(); renderYearlyDash(); }
   else if (name==='person') { initPersonSelectors(); renderPersonDash(); }
@@ -7838,12 +7901,26 @@ function renderEfficiency() {
 
 // ── チーム目標 ──
 const _goalCelebrated = new Set();
+// 期間の稼働日の進み具合（日報 入力状況と同じ考え方: 平日で全員未入力の過去日は休日）
+function _progressOf(leaveMap, startDate, endDate) {
+  const today = todayStr(), authors = Object.keys(leaveMap || {}).filter(a => a !== 'ヘルプ');
+  const anyEntry = d => authors.some(a => leaveMap[a] && leaveMap[a][d]);
+  let elapsed = 0, total = 0;
+  eachDateInRange(startDate, endDate).forEach(d => {
+    const dow = new Date(d + 'T00:00:00').getDay(); if (dow === 0 || dow === 6) return;
+    if (d > today || (d === today && !anyEntry(d))) { total++; return; }
+    if (d < today && !anyEntry(d)) return;   // 休日
+    elapsed++; total++;
+  });
+  return {inProgress: startDate <= today && today <= endDate, workElapsed: elapsed, workTotal: total};
+}
 function _goalValues() {
   const ctx = _mgrCtx, ec = _entryCtx;
   if (!ctx || !ec) return null;
   const R = DEPARTMENT_CONFIG.rules;
-  const proj = (ec.inProgress && ec.workElapsed > 0 && ec.workTotal > ec.workElapsed) ? ec.workTotal / ec.workElapsed : 1;
-  const people = Object.keys(ctx.cur || {}).filter(a => Object.keys((ec.leaveMap || {})[a] || {}).length);
+  const pg = ctx.otProg || ec;   // 残業の見込は残業の締めの月期の進み具合で
+  const proj = (pg.inProgress && pg.workElapsed > 0 && pg.workTotal > pg.workElapsed) ? pg.workTotal / pg.workElapsed : 1;
+  const people = Object.keys(ctx.cur || {}).filter(a => Object.keys((ec.leaveMap || {})[a] || {}).length || (ctx.otProg && Object.keys(((ctx.otRaw || {})._leaveMap || {})[a] || {}).length));
   const otAvg = people.length ? people.reduce((t, a) => t + ctx.cur[a].ot * proj, 0) / people.length : null;
   let filled = 0, miss = 0;
   people.forEach(a => { filled += Object.keys(ec.leaveMap[a] || {}).length; miss += (ec.missing || {})[a] || 0; });
@@ -8007,7 +8084,7 @@ async function renderKpiDash(force) {
   const fy = Number(sel && sel.value) || getCurrentFiscalYear();
   const periods = getFiscalPeriods(fy), ranges = periods.map(x => kpiPeriodDates(x.year, x.month));
   // 残業時間 KPI だけは日報全体と同じ 15日締め（前月16日〜当月15日）で集計する
-  const otRanges = periods.map(x => getPeriodDates(x.year, x.month));
+  const otRanges = periods.map(x => otPeriodDates(x.year, x.month));   // 残業時間は残業の締め（切替ボタン）
   const today = todayStr();
   const curIdx = ranges.findIndex(r => r.startDate <= today && today <= r.endDate);
   let lastIdx = -1; ranges.forEach((r, i) => { if (r.startDate <= today) lastIdx = i; });
@@ -8035,7 +8112,7 @@ async function renderKpiDash(force) {
         const og = await mapPool(periods.map((x, i) => ({x, i})).filter(o => o.i <= otLastIdx), 4, ({x, i}) =>
           withTimeout(loadRangeData(otRanges[i].startDate, otRanges[i].endDate, x.year, x.month), 15000, 'timeout').catch(() => null));
         ctx.otData = periods.map((x, i) => i <= otLastIdx ? og[i] : null);
-        const opr = getPeriodDates(pp.year, pp.month);
+        const opr = otPeriodDates(pp.year, pp.month);
         ctx.otPrev0 = otLastIdx >= 0 ? await withTimeout(loadRangeData(opr.startDate, opr.endDate, pp.year, pp.month), 15000, 'timeout').catch(() => null) : null;
       } else ctx.otData = periods.map(() => null);
     } finally { setLoading(false); }
@@ -8062,7 +8139,7 @@ async function renderKpiDash(force) {
   const otProj = owd && owd.elapsed > 0 && owd.total > owd.elapsed ? owd.total / owd.elapsed : 1;
   ctx.otProj = otProj;
   const calFirst = ranges.findIndex(r => !r.calendar), calMixed = ranges.some(r => r.calendar) && calFirst >= 0;
-  const calNote = (ranges.some(r => r.calendar) ? (calFirst >= 0 ? `工数は${periods[calFirst].month}月期から15日締め、それ以前は月末締め` : '工数は月末締め') : '工数は15日締め') + (OTK ? '・残業時間は15日締め' : '');
+  const calNote = (ranges.some(r => r.calendar) ? (calFirst >= 0 ? `工数は${periods[calFirst].month}月期から15日締め、それ以前は月末締め` : '工数は月末締め') : '工数は15日締め') + (OTK ? `・残業時間は${otRuleLabel()}` : '');
 
   // ── タイル: 今期（当年度でなければ選択中の月期）──
   const tIdx = curIdx >= 0 ? curIdx : (ctx.sel >= 0 ? ctx.sel : lastIdx);
@@ -8070,7 +8147,7 @@ async function renderKpiDash(force) {
   if (tiles) {
     const tile = (k, v, note, isOt, isCur, pjx, range) => {
       const base = 'kpi-tile' + (isOt ? ' is-ot' : '');
-      const nm = `<span class="kt-nm">${escHtml(k.name)}</span>${isOt ? '<span class="kt-rule" title="残業時間は15日締め（前月16日〜当月15日）で集計">15日締め</span>' : ''}`;
+      const nm = `<span class="kt-nm">${escHtml(k.name)}</span>${isOt ? `<span class="kt-rule" title="残業時間は${otRuleLabel()}で集計（画面上の「残業の締め」で切替）">${otRuleLabel()}</span>` : ''}`;
       if (v == null) return `<div class="${base} is-na"><div class="kt-hd">${nm}<span class="kt-dot"></span></div><div class="kt-v"><b>—</b><span class="kt-tg">/ ${k.target}h</span></div><div class="kt-m"></div><div class="kt-ft"><span class="kt-tag">${note || 'データなし'}</span></div></div>`;
       const J = _kpiJudge(v, k.target, isCur, pjx), hasPj = J.hasPj, pj = J.pj, lv = J.lv, judge = J.label, r = J.rAct;
       const scale = Math.max(k.target * 1.35, pj, v, 0.01);
@@ -8144,7 +8221,7 @@ async function renderKpiDash(force) {
       const inc = prevAll ? auth.filter(a => (all[a].ot - ((prevAll[a] || {}).ot || 0)) > 0.05) : [];
       return `<div class="kpi-bd kpi-bd-ot is-${lv}">
         <div class="kpi-bd-hd"><span class="kb-dot"></span><b>${escHtml(OTK.name)}</b><span class="kb-v"><em>${total.toFixed(2)}h</em>/ ${OTK.target}h${J.hasPj ? `<span class="kb-pj">見込 ${J.pj.toFixed(2)}h</span>` : ''}${over > 0 ? `<span class="kb-over">+${over.toFixed(2)}h</span>` : ''}</span><span class="dx-tag is-${lv}">${J.label}</span></div>
-        <div class="kb-rng">${periods[osi].month}月期 ${escHtml(otRanges[osi].range)}（15日締め）${osi === otCurIdx ? '・今期' : ''}</div>
+        <div class="kb-rng">${periods[osi].month}月期 ${escHtml(otRanges[osi].range)}（${otRuleLabel()}）${osi === otCurIdx ? '・今期' : ''}</div>
         ${auth.length ? `<div class="kpi-bd-sec">担当者（多い順）・平均 ${avg.toFixed(2)}h${prevAll ? '・前期比' : ''}</div>
         <div class="dx-hbars">${auth.map(a => { const v = all[a].ot, pv = prevAll ? ((prevAll[a] || {}).ot || 0) : null, dv = pv == null ? null : v - pv, hi = v > avg + 0.05;
           return `<div class="dx-hbar"><span class="lb"><i class="dx-sw" style="background:${authColor(a)}"></i>${escHtml(a)}${hi ? '<span class="dx-tag is-crit" title="チーム平均より多い">平均超</span>' : ''}</span><div class="tr"><i style="background:${authColor(a)}" data-w="${(v / maxA * 100).toFixed(1)}"></i></div><span class="vv">${v.toFixed(2)}h<small>${total ? Math.round(v / total * 100) : 0}%</small>${dv == null ? '' : `<small class="${dv > 0.05 ? 't-crit' : dv < -0.05 ? 't-ok' : 't-muted'}" title="前期 ${pv.toFixed(2)}h">${dv > 0 ? '+' : ''}${dv.toFixed(2)}</small>`}</span></div>`; }).join('')}</div>
@@ -8171,7 +8248,7 @@ async function renderKpiDash(force) {
     otCard.style.display = OTK ? '' : 'none';
     if (OTK) {
       const os = document.getElementById('kpi-ot-sub');
-      if (os) os.textContent = `月期（15日締め）ごとの全員の残業時間の合計（日報の残業欄・担当者ごとの積み上げ）・破線＝目標 ${OTK.target}h・斜線＝今期の見込`;
+      if (os) os.textContent = `月期（${otRuleLabel()}）ごとの全員の残業時間の合計（日報の残業欄・担当者ごとの積み上げ）・破線＝目標 ${OTK.target}h・斜線＝今期の見込`;
       requestAnimationFrame(() => renderKpiOtBar(document.getElementById('kpi-ot-canvas'), periods, otRanges, otVals, OTK.target, otCurIdx, otProj, {by: otBy, authors: otAuthors, color: authColor, sel: ctx.otSel}));
       const lg = document.getElementById('kpi-ot-legend');
       if (lg) lg.innerHTML = otAuthors.map(a => `<span><i class="dx-sw" style="background:${authColor(a)}"></i>${escHtml(a)}</span>`).join('');
@@ -8475,9 +8552,10 @@ function buildAiPayload() {
     cats, cur: persons, prev, fy
   };
   if (ec && ec.key === st.key) {
-    payload.inProgress = !!ec.inProgress;
-    payload.workElapsed = ec.workElapsed;
-    payload.workTotal = ec.workTotal;
+    const pg = ctx.otProg || ec;   // 残業の見込は残業の締めの月期の進み具合
+    payload.inProgress = !!pg.inProgress;
+    payload.workElapsed = pg.workElapsed;
+    payload.workTotal = pg.workTotal;
   }
   return payload;
 }
@@ -8841,12 +8919,12 @@ async function runAiAnalysis() {
     if (!st.ctx.prev || !Object.keys(st.ctx.prev).length) {
       const p = st.ctx.period;
       const pp = p.month === 1 ? {year: p.year - 1, month: 12} : {year: p.year, month: p.month - 1};
-      const {startDate, endDate} = getPeriodDates(pp.year, pp.month);
+      const {startDate, endDate} = otPeriodDates(pp.year, pp.month);   // 残業は残業の締めの月期
       const ck = `range_${startDate}_${endDate}`;
       try {
         _cache.delete(ck); lsCacheDelete(ck);
         const prev = await withTimeout(loadRangeData(startDate, endDate, pp.year, pp.month), 15000, 'timeout');
-        if (prev) { st.ctx.prev = _otByAuthor(prev); st.ctx.prevRaw = prev; }
+        if (prev) { st.ctx.prev = _otByAuthor(prev); if (!otRuleDiffers()) st.ctx.prevRaw = prev; }
       } catch (e) { console.warn('[AI分析] 前月期の再取得に失敗:', e.message); }
     }
     const payload = buildAiPayload();
@@ -9137,7 +9215,7 @@ function _aiKpiPayload() {
     const od = c.otData || [], oat = (i, f) => (i > c.otLastIdx || !od[i]) ? null : f(od[i]);
     od.forEach((d, i) => { if (i > c.otLastIdx || !d) return; const ob = _kpiOtByAuthor(d); Object.keys(ob).forEach(a => { byAuthor[a] = _aiR((byAuthor[a] || 0) + ob[a].ot); }); });
     kpis.push({key: OTK.key, name: OTK.name, kind: 'ot', target: OTK.target, owner: OTK.owner || '', plan: OTK.plan || '', vals: c.periods.map((_, i) => oat(i, d => _aiR(_kpiOtOf(d)))), byAuthor,
-      period: '15日締め（前月16日〜当月15日）', curIdx: c.otCurIdx, proj: _aiR(c.otProj || 1), ranges: (c.otRanges || []).map(r => r.range)});
+      period: (c.otRanges && c.otRanges[0] ? c.otRanges[0].calendar : (DEPARTMENT_CONFIG.periodRule || {}).monthEnd) ? '月末締め（当月1日〜月末）' : '15日締め（前月16日〜当月15日）', curIdx: c.otCurIdx, proj: _aiR(c.otProj || 1), ranges: (c.otRanges || []).map(r => r.range)});
   }
   HK.forEach(k => {
     const byAuthor = {}, bySub = {};
@@ -9213,15 +9291,17 @@ async function loadMgrExtras(ctx) {
   const prevP = p.month === 1 ? {year: p.year - 1, month: 12} : {year: p.year, month: p.month - 1};
   const fyPeriods = getFiscalPeriods(_fiscalYearOf(p));
   const fyIdx = fyPeriods.findIndex(x => x.year === p.year && x.month === p.month);
-  const load = ({year, month}) => {
-    const {startDate, endDate} = getPeriodDates(year, month);
+  const loadBy = f => ({year, month}) => {
+    const {startDate, endDate} = f(year, month);
     return withTimeout(loadRangeData(startDate, endDate, year, month), 15000, 'timeout').catch(() => null);
   };
+  const load = loadBy(otPeriodDates);   // 残業（管理者サマリー・年度累計）は残業の締め
   try {
     const prev = await load(prevP);
+    const prevMain = otRuleDiffers() ? await loadBy(getPeriodDates)(prevP) : prev;   // 効率化の比較は表示中の締め
     if (_mgrCtx !== ctx) return;
     ctx.prev = _otByAuthor(prev);
-    ctx.prevRaw = prev || {};
+    ctx.prevRaw = prevMain || {};
     renderMgrSummary();
     renderEfficiency();
     // 年度の期初〜当期（当期は表示中のデータを使う）
@@ -9229,7 +9309,7 @@ async function loadMgrExtras(ctx) {
     if (_mgrCtx !== ctx) return;
     ctx.fyPeriods = fyPeriods; ctx.fyIdx = fyIdx;
     ctx.fy = before.map(_otByAuthor).concat([ctx.cur]);
-    ctx.fyRaw = before.concat([ctx.curRaw]);
+    ctx.fyRaw = before.concat([ctx.otRaw || ctx.curRaw]);
     renderMgrSummary();
     if (_aiState && _aiState.ctx === ctx && !_aiState.busy) renderAiCard();
   } catch(e) { console.warn('[管理者サマリー] 追加データの読込に失敗:', e.message); }
@@ -9244,9 +9324,10 @@ function renderMgrSummary() {
   const missing = (ec && ec.missing) || {};
   const ratio = (ec && ec.folioRatio) || null;
   const showRatio = !!taskImportUrl();   // 列の出し入れで表が揺れないよう、Folio連携があれば最初から列を確保
-  const proj = (ec && ec.inProgress && ec.workElapsed > 0 && ec.workTotal > ec.workElapsed) ? ec.workTotal / ec.workElapsed : null;
+  const pg = ctx.otProg || ec;   // 残業は残業の締めの月期の進み具合で見込む
+  const proj = (pg && pg.inProgress && pg.workElapsed > 0 && pg.workTotal > pg.workElapsed) ? pg.workTotal / pg.workElapsed : null;
   // 残り稼働日（今日〜締め日）。上限に収めるための1日あたり残業可能時間の分母
-  const remainDays = (ec && ec.inProgress) ? Math.max(0, (ec.workTotal || 0) - (ec.workElapsed || 0)) : 0;
+  const remainDays = (pg && pg.inProgress) ? Math.max(0, (pg.workTotal || 0) - (pg.workElapsed || 0)) : 0;
   // 期間内に一度も日報が無い担当は一覧から外し、アラート1件にまとめる（日報を使っていない人で埋まらないように）
   const allA = _entryAuthors(ec ? ec.leaveMap : {});
   const noEntry = allA.filter(a => !ctx.cur[a] && missing[a]);
@@ -9399,8 +9480,14 @@ async function renderPersonDash(force) {
         const {startDate, endDate} = getPeriodDates(year, month);
         return withTimeout(loadRangeData(startDate, endDate, year, month), 15000, 'timeout').catch(() => null);
       });
+      // 残業だけ別の締め（切替ボタン）のときは、残業用に残業の締めの月期も読む
+      ctx.otData = otRuleDiffers() ? await mapPool(periods, 4, ({year, month}) => {
+        const {startDate, endDate} = otPeriodDates(year, month);
+        return withTimeout(loadRangeData(startDate, endDate, year, month), 15000, 'timeout').catch(() => null);
+      }) : ctx.data;
     } finally { setLoading(false); }
   }
+  if (!ctx.otData) ctx.otData = ctx.data;
   if (_personCtx !== ctx) return;
   const R = DEPARTMENT_CONFIG.rules;
   const warn = R.otMonthWarn || 36, limit = R.otMonthLimit || 45, yLimit = R.otYearLimit || 360, maxOver = R.otOverMonthsMax || 6;
@@ -9408,13 +9495,13 @@ async function renderPersonDash(force) {
 
   // 期ごとの本人・チーム集計
   const per = ctx.data.map((d, i) => {
-    const all = _otByAuthor(d);
-    const me = all[a] || {n: 0, ot: 0};
+    const all = _otByAuthor(d), allO = ctx.otData === ctx.data ? all : _otByAuthor(ctx.otData[i]);   // 残業は残業の締めの月期
+    const me = {n: (all[a] || {}).n || 0, ot: (allO[a] || {}).ot || 0};
     const lm = ((d && d._leaveMap) || {})[a] || {};
     const days = Object.keys(lm).length;
     const leaveMins = Object.values(lm).map(t => _hmToMin(t)).filter(v => v > 0);
     const others = Object.keys(all).filter(x => x !== a && Object.keys(((d && d._leaveMap) || {})[x] || {}).length);
-    const teamAvgOT = others.length ? others.reduce((t, x) => t + all[x].ot, 0) / others.length : null;
+    const teamAvgOT = others.length ? others.reduce((t, x) => t + ((allO[x] || {}).ot || 0), 0) / others.length : null;
     return {p: periods[i], me, days, leaveMins, teamAvgOT, rows: _scaledRows(d, a, me.n), lm};
   });
   const active = per.filter(x => x.days > 0);
@@ -9765,6 +9852,14 @@ async function renderMonthlyDash(silent) {
         `<p class="no-data-msg">データ読込失敗 — <a href="#" onclick="renderMonthlyDash();return false;" style="color:var(--primary);">再試行</a></p>`;
       return;
     }
+    // 残業だけ別の締め（切替ボタン）のときは、その月期のデータも読む
+    const otP = otPeriodDates(currentPeriod.year, currentPeriod.month);
+    let otRaw = byAuthor;
+    if (otRuleDiffers()) {
+      try { otRaw = await loadRangeData(otP.startDate, otP.endDate); } catch(e) { otRaw = {_leaveMap:{}}; }
+      if (_renderCache.monthly !== null && _renderCache.monthly !== renderKey) { /* 読込中に別の月期へ移った */ }
+    }
+    document.getElementById('monthly-ot-sub').textContent =`${otP.range}（残業は${otRuleLabel()}）　— 破線＝平均　緑＝平均より少ない　赤＝平均より多い（斜線＝平均を超えた分）`;
     const days      = byAuthor._days||countDays(startDate,endDate);
     const leaveMap  = byAuthor._leaveMap||{};
     const authors   = Object.keys(byAuthor).filter(k=>k!=='_days'&&k!=='_leaveMap');
@@ -9791,9 +9886,23 @@ async function renderMonthlyDash(silent) {
       otByAuthor[a]     = aOT;
       normalByAuthor[a] = aN;
     });
+    // 残業（タイル・残業時間集計）は残業の締めの月期で数える
+    const otAgg = {};   // 担当 → 残業
+    let otAuthorsM = allAuthors;
+    if (otRuleDiffers()) {
+      const lmO = otRaw._leaveMap || {};
+      otAuthorsM = new Set([...Object.keys(otRaw).filter(k=>k!=='_days'&&k!=='_leaveMap'), ...Object.keys(lmO)]);
+      totalOT = 0;
+      otAuthorsM.forEach(a=>{
+        let v = 0;
+        if (a === 'ヘルプ') (otRaw[a]||[]).forEach(r=>{ v += r.hoursOT||0; });
+        else Object.entries(lmO[a]||{}).forEach(([dt,t])=>{ const c = calcFromLeave(t, dt); if (c) v += c.ot; });
+        otAgg[a] = v; totalOT += v;
+      });
+    } else allAuthors.forEach(a=>{ otAgg[a] = otByAuthor[a]||0; });
     const personsM = allAuthors.size;
-    const personsMExHelp = [...allAuthors].filter(a=>a!=='ヘルプ').length;
-    const totalOTExHelpM = [...allAuthors].filter(a=>a!=='ヘルプ').reduce((s,a)=>s+(otByAuthor[a]||0),0);
+    const personsMExHelp = [...otAuthorsM].filter(a=>a!=='ヘルプ').length;
+    const totalOTExHelpM = [...otAuthorsM].filter(a=>a!=='ヘルプ').reduce((s,a)=>s+(otAgg[a]||0),0);
     const avgPerPerson = personsMExHelp>0 ? totalOTExHelpM/personsMExHelp : 0;
     // 全員合計の平均（日次ベース：totalOTをそのまま表示）
     const avgTotal = totalOT; // 月期1期分の全員合計
@@ -9835,15 +9944,17 @@ async function renderMonthlyDash(silent) {
     requestAnimationFrame(()=>{ renderCatBar(filtered,'monthly-cat-canvas','monthly-cat-empty'); renderSubList(filtered,'monthly-sub-list'); });
     // 残業棒グラフ（強化版）：ヘルプを除外
     const otData={};
-    allAuthors.forEach(a=>{
+    otAuthorsM.forEach(a=>{
       if(a==='ヘルプ') return;
-      otData[a]=[{cdSub:'_ot',hoursNormal:normalByAuthor[a]||0,hoursOT:otByAuthor[a]||0}];
+      otData[a]=[{cdSub:'_ot',hoursNormal:normalByAuthor[a]||0,hoursOT:otAgg[a]||0}];
     });
     requestAnimationFrame(()=>renderOTBarEnhanced(otData,'monthly-ot-canvas','monthly-ot-empty',avgPerPerson,0));
     // 日報 入力状況 ＋ Folio 予実（Folioは非同期で後から差し込む）
     _entryCtx = {key: renderKey, leaveMap, startDate, endDate, folio: null, folioErr: null};
-    _mgrCtx = {key: renderKey, startDate, endDate, period: {...currentPeriod},
-               cur: _otByAuthor(byAuthor), curRaw: byAuthor, prev: null, prevRaw: null, fy: null, fyPeriods: null, fyIdx: -1};
+    // 管理者サマリー・チーム目標（残業）・AI の残業は残業の締めの月期。curRaw/prevRaw（作業内訳・効率化）は表示中の月期
+    _mgrCtx = {key: renderKey, startDate: otP.startDate, endDate: otP.endDate, otRange: otP.range, period: {...currentPeriod},
+               cur: _otByAuthor(otRaw), curRaw: byAuthor, otRaw, prev: null, prevRaw: null, fy: null, fyPeriods: null, fyIdx: -1,
+               otProg: otRuleDiffers() ? _progressOf(otRaw._leaveMap || {}, otP.startDate, otP.endDate) : null};
     renderEfficiency();
     renderEntryMatrix();
     renderFolioCompare();
@@ -9936,8 +10047,8 @@ async function renderYearlyDash(silent) {
   try {
     // 会計年度（10月スタート）: currentFiscalYear=2025 → 10月期〜翌9月期
     const fiscalPeriods = getFiscalPeriods(currentFiscalYear);
-    const fyStart=`${currentFiscalYear}/10/16`;
-    const fyEnd  =`${currentFiscalYear+1}/9/15`;
+    const fyStart=getPeriodDates(currentFiscalYear, 10).startDate.replace(/-/g,'/');   // 年度の期初（締めルールに合わせる）
+    const fyEnd  =getPeriodDates(currentFiscalYear+1, 9).endDate.replace(/-/g,'/');
     const dispFY=currentFiscalYear+1; const kiNum=fiscalKi(currentFiscalYear);
     document.getElementById('yearly-range').textContent       = `${dispFY}年度（${kiNum}期）　${fyStart} 〜 ${fyEnd}`;
     document.getElementById('yearly-ot-sub').textContent      = `全担当合計 ｜ 棒=残業 ｜ 破線=月平均 ｜ 折線=累計平均 ｜ グレー=前年`;
@@ -9955,7 +10066,7 @@ async function renderYearlyDash(silent) {
         `range read timed out: ${startDate} - ${endDate}`
       ).catch(() => null);
     };
-    let allData, prevAllData;
+    let allData, prevAllData, otAllData, otPrevAllData;
     try {
       // 24期を一斉ではなく最大4並列で取得（Firestore SDKの同時実行過多による
       // INTERNAL ASSERTION(Unexpected state)を回避しつつ、直列より高速）。
@@ -9963,6 +10074,12 @@ async function renderYearlyDash(silent) {
       const allResults = await mapPool(allPeriods, 4, loadPeriod);
       allData     = allResults.slice(0, fiscalPeriods.length);
       prevAllData = allResults.slice(fiscalPeriods.length);
+      // 残業だけ別の締め（切替ボタン）のときは、残業用に残業の締めの月期も読む
+      if (otRuleDiffers()) {
+        const otRes = await mapPool(allPeriods, 4, ({year, month}) => { const r = otPeriodDates(year, month);
+          return withTimeout(loadRangeData(r.startDate, r.endDate, year, month), 15000, 'timeout').catch(() => null); });
+        otAllData = otRes.slice(0, fiscalPeriods.length); otPrevAllData = otRes.slice(fiscalPeriods.length);
+      } else { otAllData = allData; otPrevAllData = prevAllData; }
     } catch(e) {
       _renderCache.yearly = null;
       document.getElementById('yearly-person-grid').innerHTML=
@@ -10038,6 +10155,25 @@ async function renderYearlyDash(silent) {
       monthOT.push({year,month, totalOT:mOT, persons:allAuthors.size});
     });
 
+    // 残業だけ別の締めのときは、残業（タイル・推移・36協定）を残業の締めの月期で数え直す
+    const _periodOT = d => { const out = {}; if (!d) return out; const lm = d._leaveMap || {};
+      new Set([...Object.keys(d).filter(k=>k!=='_days'&&k!=='_leaveMap'), ...Object.keys(lm)]).forEach(a => {
+        let v = 0;
+        if (a === 'ヘルプ') (d[a]||[]).forEach(r => { v += r.hoursOT||0; });
+        else Object.entries(lm[a]||{}).forEach(([dt,t]) => { const c = calcFromLeave(t, dt); if (c) v += c.ot; });
+        out[a] = v; });
+      return out; };
+    if (otRuleDiffers()) {
+      totalOT = 0;
+      Object.keys(personMonth).forEach(a => delete personMonth[a]);
+      fiscalPeriods.forEach((_, idx) => {
+        const po = _periodOT(otAllData[idx]); let mOT = 0;
+        Object.entries(po).forEach(([a, v]) => { mOT += v; if (a !== 'ヘルプ') { if (!personMonth[a]) personMonth[a] = fiscalPeriods.map(() => 0); personMonth[a][idx] += v; } });
+        if (monthOT[idx]) monthOT[idx].totalOT = mOT;
+        totalOT += mOT;
+      });
+    }
+    { const ys = document.getElementById('yearly-ot-sub'); if (ys && otRuleToggleOn()) ys.textContent = `全担当合計 ｜ 棒=残業 ｜ 破線=月平均 ｜ 折線=累計平均 ｜ グレー=前年 ｜ 残業は${otRuleLabel()}`; }
     const persons = personSet.size;
     const avgMonthOTTotal  = activeMonths>0 ? totalOT/activeMonths : 0;   // 全員合計の月平均
     const avgMonthOTPerson = (activeMonths>0&&persons>0) ? totalOT/activeMonths/persons : 0; // 1人1ヶ月平均
@@ -10058,7 +10194,7 @@ async function renderYearlyDash(silent) {
     let prevMonthOT = null;
     try {
       prevMonthOT = prevFiscalPeriods.map(({year,month}, idx) => {
-        const d = prevAllData[idx];
+        const d = otPrevAllData[idx];   // 残業は残業の締めの月期
         if (!d) return {year, month, totalOT:0};
         const leaveMap = d._leaveMap||{};
         const allAuthors = new Set([...Object.keys(d).filter(k=>k!=='_days'&&k!=='_leaveMap'), ...Object.keys(leaveMap)]);
@@ -10105,7 +10241,7 @@ async function renderYearlyDash(silent) {
       const diffEl = document.getElementById('ys-ot-diff');
       let prevOT = 0, curOT = 0, n = 0;
       fiscalPeriods.forEach((_, i) => {
-        const c = allData[i], pv = prevAllData[i];
+        const c = otAllData[i], pv = otPrevAllData[i];   // 残業は残業の締めの月期
         if (!c || !Object.keys(c._leaveMap || {}).length) return;
         n++;
         curOT += Object.values(_otByAuthor(c)).reduce((t, x) => t + x.ot, 0);

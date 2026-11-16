@@ -15,6 +15,9 @@ window.DEPARTMENT_CONFIG_OVERRIDE = {
   taikoSoundDefault: true,
   // 全端末で1回だけ演出設定を上書き（id を変えると、もう一度だけ上書きされる）
   // Folio 取込の「中分類ごとの合計を 0.25h 単位に丸める」を全端末で1回だけ OFF にする（id を変えると、もう一度だけ上書き）
+  // 月期の締め: 月末締め（当月1日〜月末。過去分も含めてすべて）。
+  // otToggle=true でダッシュボードに「残業の締め 月末／15日」の切替ボタンを出す（残業の集計だけ・端末ごと）
+  periodRule: { monthEnd: true, otToggle: true },
   // KPI の「残業時間」の集計から外す担当者（工数の KPI には含める）
   kpiOtExcludeAuthors: ['秋永'],
   folioRoundForce: { id: '2026-11-round-off', on: false },

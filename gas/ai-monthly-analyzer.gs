@@ -154,7 +154,7 @@ function systemPrompt_(kind) {
     '課員の日報を月期ごとに集計したJSONを受け取り、課長・課員が月次の振り返りに使う分析レポートを日本語で書いてください。',
     '',
     '【データの前提】',
-    '- 月期は前月16日〜当月15日（15日締め）。inProgress=true は期の途中で、workElapsed/workTotal が経過稼働日/期全体の稼働日。',
+    '- 月期の期間は period.start〜period.end（部署の締めルールによる）。inProgress=true は期の途中で、workElapsed/workTotal が経過稼働日/期全体の稼働日。',
     '- 各担当の n（通常時間）と ot（残業時間）は退勤時刻から算出した正式な値。残業は otStart 以降。',
     '- subs は日報に入力した中分類ごとの [通常, 残業] 時間。cats で中分類コードを「大分類/中分類」名に引ける。',
     '- miss は平日の日報未入力日数。prev は前月期、fy は年度（10月期始まり）の期初から当月期までの残業累計と月45h超の回数。',
@@ -196,7 +196,7 @@ function systemPromptYearly_() {
     '課員の日報を年度（10月期〜翌9月期の12か月期）で集計したJSONを受け取り、課長・課員が年度の振り返りに使う分析レポートを日本語で書いてください。',
     '',
     '【データの前提】',
-    '- months は月期のラベル（各月期は前月16日〜当月15日）。配列の値は months と同じ順。null は未経過またはデータなし。',
+    '- months は月期のラベル（各月期の期間は部署の締めルール。15日締めなら前月16日〜当月15日、月末締めなら当月1日〜月末）。配列の値は months と同じ順。null は未経過またはデータなし。',
     '- persons[担当].ot / n は月期ごとの残業・通常時間（退勤時刻から算出した正式な値）。persons[担当].subs は年度累計の中分類別 [通常, 残業]（日報入力ベース）。',
     '- mainByMonth は大分類ごとの月期別の作業時間（通常＋残業）。cats で中分類コードを「大分類/中分類」名に引ける。',
     '- prevOt は前年度の同じ月期の全員の残業合計。prevPersonsOt は前年度の同じ経過月期までの担当別残業合計。',
@@ -306,7 +306,7 @@ function clearStoredAnalyses() {
 // ═══════════════════════════════════════════════════════════════
 //  自動分析（時間主導トリガーで毎朝実行）
 //  - 平日（土日・祝日を除く）: 月次（当月期）と KPI（当年度）
-//  - 月期の締め（15日）後の最初の平日: 締まった月期の月次と、その年度の年次も
+//  - 月期の締め後の最初の平日: 締まった月期の月次と、その年度の年次も（締めは日報アプリの periodOfDate に従う。15日締め／月末締め）
 //  日報データは Firestore（nippou-f191c）をこのスクリプトの実行ユーザーの権限で直接読む。
 //  集計は日報アプリの公開コード（index.html / config.js）から同じ関数を取り出して実行するため、
 //  画面に出る図表と同じ数値・同じハッシュになる（画面で「日報が更新されています」と誤表示されない）。
@@ -534,15 +534,13 @@ function autoDailyRun_(force, dry) {
     var core = loadAppCore_();
     var today = core.todayStr(); core.set('currentDate', today);
     if (!force && core.isHoliday(today)) { Logger.log(today + ' は土日・祝日のためスキップ'); return; }
-    var y = Number(today.slice(0, 4)), mo = Number(today.slice(5, 7)), dd = Number(today.slice(8, 10));
-    // 締め（15日）後の最初の平日か: 16日〜昨日までに平日が無い
-    var closeDay = false;
-    if (dd >= 16) {
-      closeDay = true;
-      for (var d = 16; d < dd; d++) { if (!core.isHoliday(y + '-' + core.pad(mo) + '-' + core.pad(d))) { closeDay = false; break; } }
-    }
+    // 締め後の最初の平日か: 直前の平日が別の月期（締めルールは日報アプリの periodOfDate に従う）
+    var shiftDay_ = function (ymd, n) { var t = new Date(ymd + 'T00:00:00'); t.setDate(t.getDate() + n); return t.getFullYear() + '-' + core.pad(t.getMonth() + 1) + '-' + core.pad(t.getDate()); };
+    var prevWork = shiftDay_(today, -1);
+    for (var i = 0; i < 14 && core.isHoliday(prevWork); i++) prevWork = shiftDay_(prevWork, -1);
+    var curP = core.periodOfDate(today), closedP = core.periodOfDate(prevWork);
+    var closeDay = closedP.year !== curP.year || closedP.month !== curP.month;
     applyMaster_(core, fsMaster_(core.DEPARTMENT_CONFIG.deptId));
-    var curP = core.periodOfDate(today), closedP = {year: y, month: mo};
     var fyNow = core.getCurrentFiscalYear(), fyClosed = core._fiscalYearOf(closedP);
     // 読む範囲: 前年度の期初（年次の前年比用）〜今日
     var fromFy = Math.min(fyNow, fyClosed) - (closeDay ? 1 : 0);
